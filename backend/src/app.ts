@@ -28,6 +28,16 @@ export function createApp(): Application {
     });
   }
 
+  // Root server welcome/health check
+  app.get('/', (req, res) => {
+    res.json({
+      service: 'City Pharma LIMS Backend Server',
+      status: 'online',
+      apiBase: '/api/v1',
+      frontendUrl: 'http://localhost:3000',
+    });
+  });
+
   // Mount API router under /api/v1
   app.use('/api/v1', apiRouter);
 

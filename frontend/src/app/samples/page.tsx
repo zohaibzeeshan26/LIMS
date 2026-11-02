@@ -89,6 +89,45 @@ const LAB_TABS = [
   },
 ];
 
+// Helper function: Strictly isolates samples to ensure only records belonging to the active lab are displayed
+function isSampleInLab(s: Sample, labKey: 'GENERAL' | 'PENICILLIN' | 'CEPHALOSPORIN'): boolean {
+  const labType = (s.laboratoryType || (typeof s.laboratory === 'string' ? s.laboratory : '')).toString().toUpperCase();
+  const labName = ((s.laboratory as any)?.name || (s.laboratory as any)?.code || '').toString().toUpperCase();
+  const code = (s.sampleCode || s.sampleId || s.accessionNo || '').toString().toUpperCase();
+
+  if (labKey === 'GENERAL') {
+    return (
+      labType === 'GENERAL' ||
+      labName === 'GENERAL' ||
+      labName === 'GL' ||
+      code.includes('GEN') ||
+      code.startsWith('GL/') ||
+      code.includes('/GL/')
+    );
+  }
+  if (labKey === 'PENICILLIN') {
+    return (
+      labType === 'PENICILLIN' ||
+      labName.includes('PEN') ||
+      code.includes('PEN') ||
+      code.startsWith('PEN/') ||
+      code.includes('/PEN/')
+    );
+  }
+  if (labKey === 'CEPHALOSPORIN') {
+    return (
+      labType === 'CEPHALOSPORIN' ||
+      labType === 'SAF' ||
+      labName.includes('CEPH') ||
+      labName.includes('SAF') ||
+      code.includes('CEP') ||
+      code.startsWith('CEPH/') ||
+      code.includes('/CEPH/')
+    );
+  }
+  return false;
+}
+
 function SamplesPageInner() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -132,13 +171,22 @@ function SamplesPageInner() {
     }
   }, [isRestrictedToLab, authorizedLabId, searchParams, router]);
 
-  // Active laboratory subsection: 'semi-base' | 'formulation' (defaults to 'semi-base')
+  // Active laboratory subsection: 'all' | 'semi-base' | 'formulation' (defaults to 'all' to show all samples for selected lab)
   const sectionParam = searchParams.get('section')?.toLowerCase();
-  const activeSection: LabSection = sectionParam === 'formulation' ? 'formulation' : 'semi-base';
+  const activeSection: 'all' | 'semi-base' | 'formulation' =
+    sectionParam === 'semi-base'
+      ? 'semi-base'
+      : sectionParam === 'formulation'
+      ? 'formulation'
+      : 'all';
 
-  const selectSection = (section: LabSection) => {
+  const selectSection = (section: 'all' | 'semi-base' | 'formulation') => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('section', section);
+    if (section === 'all') {
+      params.delete('section');
+    } else {
+      params.set('section', section);
+    }
     setPage(1);
     router.push(`/samples?${params.toString()}`);
   };
@@ -219,9 +267,7 @@ function SamplesPageInner() {
   const selectLaboratory = (labId: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('lab', labId);
-    if (!params.has('section')) {
-      params.set('section', 'semi-base');
-    }
+    params.delete('section'); // Show all samples of selected lab
     setPage(1); // Reset to page 1 on lab switch
     router.push(`/samples?${params.toString()}`);
   };
@@ -254,7 +300,16 @@ function SamplesPageInner() {
     queryFn: () => samplingService.getMetrics(),
   });
 
-  // Dynamic counts for Semi Basics and Formulation for the active laboratory
+  // Dynamic counts for All, Semi Basics and Formulation for the active laboratory
+  const { data: allLabCountData } = useQuery({
+    queryKey: ['samples-count-all', isAllLabs ? 'all' : activeLab.key],
+    queryFn: () =>
+      samplingService.getAll({
+        laboratory: isAllLabs ? undefined : activeLab.key,
+        limit: 1,
+      }),
+  });
+
   const { data: semiBaseCountData } = useQuery({
     queryKey: ['samples-count-sb', isAllLabs ? 'all' : activeLab.key],
     queryFn: () =>
@@ -277,12 +332,13 @@ function SamplesPageInner() {
 
   const semiBaseCount = semiBaseCountData?.meta?.total ?? 0;
   const formulationCount = formulationCountData?.meta?.total ?? 0;
+  const allLabCount = allLabCountData?.meta?.total ?? (semiBaseCount + formulationCount);
 
   // Query laboratory records with server-side filtering, sorting, and pagination
   const queryFilters: SamplingFilters = useMemo(
     () => ({
       laboratory: isAllLabs ? undefined : activeLab.key,
-      section: isAllLabs ? undefined : activeSection,
+      section: isAllLabs || activeSection === 'all' ? undefined : (activeSection as any),
       sampleId: debouncedSampleId || undefined,
       nomenclature: debouncedNomenclature || undefined,
       batchNumber: debouncedBatch || undefined,
@@ -341,9 +397,10 @@ function SamplesPageInner() {
         (s.priority === 'STAT' || s.priority === 'URGENT') &&
         s.status !== 'APPROVED' &&
         s.status !== 'REJECTED' &&
-        s.status !== 'ARCHIVED'
+        s.status !== 'ARCHIVED' &&
+        isSampleInLab(s, activeLab.key)
     );
-  }, [urgentAlertsResponse]);
+  }, [urgentAlertsResponse, activeLab.key]);
 
   // Section-specific urgent sample distribution
   const semiBaseUrgentSamples: Sample[] = useMemo(() => {
@@ -354,20 +411,32 @@ function SamplesPageInner() {
     return allUrgentSamples.filter((s) => getSampleSection(s) === 'formulation');
   }, [allUrgentSamples]);
 
-  // Active section urgent samples (matches whether Semi Basics or Formulation is selected)
+  // Active section urgent samples (matches whether All, Semi Basics or Formulation is selected)
   const urgentSamples: Sample[] = useMemo(() => {
-    return activeSection === 'semi-base' ? semiBaseUrgentSamples : formulationUrgentSamples;
-  }, [activeSection, semiBaseUrgentSamples, formulationUrgentSamples]);
+    if (activeSection === 'semi-base') return semiBaseUrgentSamples;
+    if (activeSection === 'formulation') return formulationUrgentSamples;
+    return allUrgentSamples;
+  }, [activeSection, semiBaseUrgentSamples, formulationUrgentSamples, allUrgentSamples]);
 
-  // Extract samples array and strictly filter by active section (guarantees zero leakage)
+  // Extract samples array and strictly filter by active laboratory and section (guarantees zero cross-lab leakage)
   const samplesList: Sample[] = useMemo(() => {
     let raw: Sample[] = [];
     if (responseData) {
       if (Array.isArray(responseData)) raw = responseData;
       else if (Array.isArray((responseData as any).data)) raw = (responseData as any).data;
     }
-    return raw.filter((s) => getSampleSection(s) === activeSection);
-  }, [responseData, activeSection]);
+    return raw.filter((s: Sample) => {
+      // 1. Strict Laboratory Isolation: only show samples of the active laboratory
+      if (!isSampleInLab(s, activeLab.key)) {
+        return false;
+      }
+      // 2. Section filter: if 'semi-base' or 'formulation', filter accordingly; if 'all', show all samples of this lab
+      if (activeSection === 'semi-base' || activeSection === 'formulation') {
+        return getSampleSection(s) === activeSection;
+      }
+      return true;
+    });
+  }, [responseData, activeLab.key, activeSection]);
 
   const meta = useMemo(() => {
     if (responseData && 'meta' in (responseData as any)) {
@@ -458,152 +527,181 @@ function SamplesPageInner() {
 
   return (
     <div className="space-y-6 font-sans">
-      {/* 3 Laboratory Selector Tabs (General Lab, Penicillin Lab, Cephalosporin Lab) */}
-      {!isRestrictedToLab ? (
-        <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Select Analytical Laboratory
-            </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              Active: {activeLab.name}
-            </span>
+      {/* Active Laboratory Banner (Strict Laboratory Isolation — Only active lab is shown) */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+            <FlaskConical className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {LAB_TABS.map((tab) => {
-              const isSelected = activeLab.id === tab.id;
-              const TabIcon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => selectLaboratory(tab.id)}
-                  className={cn(
-                    'flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer',
-                    isSelected
-                      ? 'bg-[#0066FF] text-white shadow-md shadow-blue-500/20'
-                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/80'
-                  )}
-                >
-                  <TabIcon className={cn('h-4 w-4', isSelected ? 'text-white' : 'text-slate-500')} />
-                  <span>{tab.name}</span>
-                </button>
-              );
-            })}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Analytical Laboratory
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                Active Facility
+              </span>
+            </div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
+              {activeLab.name}
+            </h2>
           </div>
         </div>
-      ) : (
-        <div className="bg-blue-50 border border-blue-200 px-4 py-3 rounded-2xl flex items-center justify-between text-xs text-blue-900 font-semibold shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <FlaskConical className="h-4 w-4 text-blue-600" />
-            <span>Assigned Laboratory: <strong className="font-bold">{activeLab.name}</strong></span>
-          </div>
-          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-600 text-white uppercase tracking-wider">
-            Assigned Personnel
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200/80 shadow-2xs">
+            {allLabCount} Samples
           </span>
         </div>
-      )}
+      </div>
 
-      {/* 2 Sub-Section Options under Laboratory: Semi Base and Formulation */}
+      {/* Sub-Section Options under Laboratory: All Samples, Semi Basics, and Formulation */}
       <div className="bg-slate-50/90 p-3 rounded-2xl border border-slate-200/90">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Option 1: Semi Basics */}
-            <button
-              type="button"
-              onClick={() => selectSection('semi-base')}
-              className={cn(
-                'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
-                activeSection === 'semi-base'
-                  ? 'bg-white border-slate-300 shadow-sm'
-                  : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
-                    activeSection === 'semi-base'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600'
-                  )}
-                >
-                  <Layers className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="text-sm font-bold tracking-tight text-slate-900">
-                      1. Semi Basics
-                    </h4>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      {semiBaseCount} Samples
-                    </span>
-                    {semiBaseUrgentSamples.length > 0 && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
-                        <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                        <span>{semiBaseUrgentSamples.length} Urgent</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="shrink-0">
-                {activeSection === 'semi-base' ? (
-                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                ) : (
-                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Option 1: All Laboratory Samples */}
+          <button
+            type="button"
+            onClick={() => selectSection('all')}
+            className={cn(
+              'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+              activeSection === 'all'
+                ? 'bg-white border-blue-400 shadow-sm ring-1 ring-blue-400/20'
+                : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={cn(
+                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                  activeSection === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600'
                 )}
+              >
+                <FlaskConical className="h-5 w-5" />
               </div>
-            </button>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                    All {activeLab.name}
+                  </h4>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    {allLabCount} Samples
+                  </span>
+                  {allUrgentSamples.length > 0 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                      <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                      <span>{allUrgentSamples.length} Urgent</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0">
+              {activeSection === 'all' ? (
+                <CheckCircle2 className="h-5 w-5 text-blue-600" />
+              ) : (
+                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
+              )}
+            </div>
+          </button>
 
-            {/* Option 2: Formulation */}
-            <button
-              type="button"
-              onClick={() => selectSection('formulation')}
-              className={cn(
-                'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
-                activeSection === 'formulation'
-                  ? 'bg-white border-slate-300 shadow-sm'
-                  : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
-                    activeSection === 'formulation'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600'
-                  )}
-                >
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="text-sm font-bold tracking-tight text-slate-900">
-                      2. Formulation
-                    </h4>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {formulationCount} Samples
-                    </span>
-                    {formulationUrgentSamples.length > 0 && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
-                        <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                        <span>{formulationUrgentSamples.length} Urgent</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="shrink-0">
-                {activeSection === 'formulation' ? (
-                  <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                ) : (
-                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
+          {/* Option 2: Semi Basics */}
+          <button
+            type="button"
+            onClick={() => selectSection('semi-base')}
+            className={cn(
+              'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+              activeSection === 'semi-base'
+                ? 'bg-white border-blue-400 shadow-sm ring-1 ring-blue-400/20'
+                : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={cn(
+                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                  activeSection === 'semi-base'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600'
                 )}
+              >
+                <Layers className="h-5 w-5" />
               </div>
-            </button>
-          </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                    Semi Basics
+                  </h4>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    {semiBaseCount} Samples
+                  </span>
+                  {semiBaseUrgentSamples.length > 0 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                      <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                      <span>{semiBaseUrgentSamples.length} Urgent</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0">
+              {activeSection === 'semi-base' ? (
+                <CheckCircle2 className="h-5 w-5 text-blue-600" />
+              ) : (
+                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
+              )}
+            </div>
+          </button>
+
+          {/* Option 3: Formulation */}
+          <button
+            type="button"
+            onClick={() => selectSection('formulation')}
+            className={cn(
+              'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+              activeSection === 'formulation'
+                ? 'bg-white border-blue-400 shadow-sm ring-1 ring-blue-400/20'
+                : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className={cn(
+                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                  activeSection === 'formulation'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-blue-50 group-hover:text-blue-600'
+                )}
+              >
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                    Formulation
+                  </h4>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {formulationCount} Samples
+                  </span>
+                  {formulationUrgentSamples.length > 0 && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                      <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                      <span>{formulationUrgentSamples.length} Urgent</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0">
+              {activeSection === 'formulation' ? (
+                <CheckCircle2 className="h-5 w-5 text-blue-600" />
+              ) : (
+                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-blue-600 transition-colors" />
+              )}
+            </div>
+          </button>
         </div>
+      </div>
 
       {/* 2. Page Title Header: Selected Laboratory in Heading & Actions */}
       <div className="bg-white rounded-2xl border border-slate-200/90 px-6 py-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -614,7 +712,11 @@ function SamplesPageInner() {
             </span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}
+            {activeSection === 'all'
+              ? `${activeLab.name} — All Samples`
+              : activeSection === 'semi-base'
+              ? `${activeLab.name} — Semi Basics`
+              : `${activeLab.name} — Formulation`}
           </h1>
         </div>
 
@@ -626,7 +728,15 @@ function SamplesPageInner() {
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
           >
             <PlusCircle className="h-4 w-4 text-white" />
-            <span>Add New Sample ({activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'})</span>
+            <span>
+              Add New Sample (
+              {activeSection === 'semi-base'
+                ? 'Semi Basics'
+                : activeSection === 'formulation'
+                ? 'Formulation'
+                : activeLab.name}
+              )
+            </span>
           </Button>
         </div>
       </div>
@@ -782,7 +892,11 @@ function SamplesPageInner() {
           {/* Filter by Stage / Type */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              {activeSection === 'semi-base' ? 'Semi Basics Category' : 'Formulation Category'}
+              {activeSection === 'semi-base'
+                ? 'Semi Basics Category'
+                : activeSection === 'formulation'
+                ? 'Formulation Category'
+                : 'Stage / Category'}
             </label>
             <select
               value={stageFilter}
@@ -793,9 +907,20 @@ function SamplesPageInner() {
               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-medium"
             >
               <option value="">
-                All Categories ({activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'})
+                All Categories (
+                {activeSection === 'semi-base'
+                  ? 'Semi Basics'
+                  : activeSection === 'formulation'
+                  ? 'Formulation'
+                  : 'All Lab Categories'}
+                )
               </option>
-              {(activeSection === 'semi-base' ? SEMI_BASE_STAGES : FORMULATION_STAGES).map((stg) => (
+              {(activeSection === 'semi-base'
+                ? SEMI_BASE_STAGES
+                : activeSection === 'formulation'
+                ? FORMULATION_STAGES
+                : Array.from(new Set([...SEMI_BASE_STAGES, ...FORMULATION_STAGES]))
+              ).map((stg) => (
                 <option key={stg} value={stg}>
                   {stg}
                 </option>
@@ -836,8 +961,8 @@ function SamplesPageInner() {
           <div className="flex items-center gap-2">
             <span className="font-bold text-xs text-navy-950 uppercase tracking-wider">
               {isAllLabs
-                ? `All Sampling Records — ${activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}`
-                : `${activeLab.name} — ${activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'} Records`}
+                ? `All Sampling Records — ${activeSection === 'all' ? 'All' : activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}`
+                : `${activeLab.name} — ${activeSection === 'all' ? 'All Samples' : activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'} Records`}
             </span>
             <span className="text-xs text-slate-400 font-medium">
               ({meta.total} {meta.total === 1 ? 'record' : 'records'} total)
@@ -987,11 +1112,6 @@ function SamplesPageInner() {
                 <th className="py-3 px-3.5 min-w-[140px]">
                   <span>Received By</span>
                 </th>
-
-                {/* 12. Actions */}
-                <th className="py-3 px-3.5 min-w-[145px] text-right">
-                  <span>Actions</span>
-                </th>
               </tr>
             </thead>
 
@@ -1011,13 +1131,12 @@ function SamplesPageInner() {
                     <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-16" /></td>
                     <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-24" /></td>
                     <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-20" /></td>
-                    <td className="py-3.5 px-3.5 text-right"><div className="h-6 bg-slate-200 rounded w-20 ml-auto" /></td>
                   </tr>
                 ))
               ) : isError ? (
                 /* State B: Error State */
                 <tr>
-                  <td colSpan={12} className="py-12 px-4 text-center">
+                  <td colSpan={11} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2">
                       <div className="flex items-center justify-center gap-2 font-bold text-sm">
                         <AlertTriangle className="h-5 w-5 text-rose-600" />
@@ -1041,7 +1160,7 @@ function SamplesPageInner() {
               ) : samplesList.length === 0 ? (
                 /* State C: Empty State */
                 <tr>
-                  <td colSpan={12} className="py-14 px-4 text-center">
+                  <td colSpan={11} className="py-14 px-4 text-center">
                     <div className="max-w-sm mx-auto space-y-3">
                       <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto shadow-2xs">
                         <FlaskConical className="h-6 w-6 text-slate-400" />
@@ -1194,83 +1313,6 @@ function SamplesPageInner() {
                       {/* 11. Received By */}
                       <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[150px] truncate" title={receivedText}>
                         {receivedText}
-                      </td>
-
-                      {/* 12. Actions */}
-                      <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                        <div
-                          className="flex items-center justify-end gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-
-                          {/* View Record Details */}
-                          <button
-                            type="button"
-                            title="View Record Dossier"
-                            onClick={() => setSelectedSampleId(sample.id)}
-                            className="p-1.5 rounded-lg text-slate-600 hover:text-navy-950 hover:bg-slate-100 transition-colors cursor-pointer"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Submit / Route Workflow Action */}
-                          <button
-                            type="button"
-                            title="Submit Sample to Testing Workflow (Microbiology, Chemical, Physical)"
-                            onClick={() => setSubmittingSample(sample)}
-                            className="p-1.5 rounded-lg text-teal-700 hover:text-teal-950 hover:bg-teal-50 transition-colors cursor-pointer"
-                          >
-                            <Send className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Edit Record (Permissions checked: Administrator Only) */}
-                          <button
-                            type="button"
-                            title={
-                              canEdit
-                                ? 'Edit Sample Record (Administrator)'
-                                : 'Modification Restricted: Only Administrator can edit existing records'
-                            }
-                            disabled={!canEdit}
-                            onClick={() => {
-                              if (canEdit) {
-                                setEditingSample(sample);
-                              }
-                            }}
-                            className={cn(
-                              'p-1.5 rounded-lg transition-colors',
-                              canEdit
-                                ? 'text-teal-700 hover:text-teal-900 hover:bg-teal-50 cursor-pointer'
-                                : 'text-slate-300 opacity-60 cursor-not-allowed'
-                            )}
-                          >
-                            {canEdit ? (
-                              <Edit3 className="h-3.5 w-3.5" />
-                            ) : (
-                              <Lock className="h-3.5 w-3.5 text-slate-400" />
-                            )}
-                          </button>
-
-                          {/* Print Container Slip / QR Label */}
-                          <button
-                            type="button"
-                            title="Print Physical Container Routing Slip / Label"
-                            onClick={() => setChitSample(sample)}
-                            className="p-1.5 rounded-lg text-blue-700 hover:text-blue-900 hover:bg-blue-50 transition-colors cursor-pointer"
-                          >
-                            <QrCode className="h-3.5 w-3.5" />
-                          </button>
-
-                          {/* Print Record */}
-                          <button
-                            type="button"
-                            title="Print Official Record Dossier"
-                            onClick={() => setPrintingSample(sample)}
-                            className="p-1.5 rounded-lg text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50 transition-colors cursor-pointer"
-                          >
-                            <Printer className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   );
@@ -1604,11 +1646,12 @@ function SamplesPageInner() {
         isOpen={isAccessionModalOpen}
         onClose={() => setIsAccessionModalOpen(false)}
         defaultLaboratory={isAllLabs ? 'GENERAL' : activeLab.key}
-        defaultSection={activeSection}
+        defaultSection={activeSection === 'all' ? 'semi-base' : activeSection}
         onSampleCreated={(newSample) => {
           handleResetFilters();
           setSelectedSampleId(newSample.id);
           queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
+          queryClient.invalidateQueries({ queryKey: ['samples-count-all'] });
           queryClient.invalidateQueries({ queryKey: ['samples-count-sb'] });
           queryClient.invalidateQueries({ queryKey: ['samples-count-fm'] });
           queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });

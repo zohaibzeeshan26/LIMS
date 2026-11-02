@@ -467,3 +467,81 @@ model SampleSubmission {
   @@index([status])
   @@map("sample_submissions")
 }
+
+enum AskprolStage {
+  FINAL_BULK
+  FINISHED_GOOD
+}
+
+enum ComplianceStatus {
+  COMPLIES
+  DOES_NOT_COMPLY
+}
+
+enum QcVerdict {
+  APPROVED
+  REJECTED
+}
+
+model AskprolQcReport {
+  id                    String            @id @default(uuid())
+  reportNumber          String            @unique
+  coaNumber             String            @unique
+  batchNumber           String
+  analyticalReportNo    String            // A.No. e.g. A-2026-9041
+  stage                 AskprolStage      @default(FINISHED_GOOD)
+  testingDate           DateTime          @default(now())
+  manufacturingDate     DateTime
+  expiryDate            DateTime
+  methodReference       String            @default("QC/CLG/ATM-003")
+  genericName           String            @default("Acetaminophen (Paracetamol) 120mg/5ml")
+  brandName             String            @default("Askprol Suspension 120mg/5ml")
+  registrationNo        String            @default("030725")
+  mfgLicenseNo          String            @default("000512")
+  gtin                  String            @default("8964002697014")
+  shelfLife             String            @default("02 Years (24 Months)")
+  packSize              String?           @default("60 mL Amber Bottle")
+  packagingType         String?
+  contentDescription    String            @default("A reddish color suspension with solid particles uniformly dispersed in it.")
+  packagingDescription  String?
+
+  // Qualitative checks
+  identificationHplc    ComplianceStatus  @default(COMPLIES)
+  identificationFtir    ComplianceStatus  @default(COMPLIES)
+  suspendedMatters      ComplianceStatus? @default(COMPLIES)
+
+  // Quantitative & System Suitability Data (JSON structures)
+  densityData           Json
+  phData                Json
+  deliverableVolumeData Json?
+  uniformityDosageData  Json?
+  hplcAssayData         Json
+  impurityData          Json
+  safetyMicrobialData   Json
+
+  // Calculated summary metrics
+  calculatedDensity     Float
+  calculatedPh          Float
+  calculatedAssay       Float
+  calculatedImpurity    Float
+  deliverableVolAvg     Float?
+  avValue               Float?
+
+  // Verdict & Signatures
+  overallVerdict        QcVerdict         @default(APPROVED)
+  analystName           String            @default("Muhammad Zubair")
+  reviewerName          String            @default("Syed Kamran Ali (AMQC)")
+  approverName          String            @default("Dr. Tariq Mahmood (Head of QC)")
+  releaseDate           DateTime          @default(now())
+  remarks               String?
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([batchNumber])
+  @@index([analyticalReportNo])
+  @@index([stage])
+  @@index([overallVerdict])
+  @@map("askprol_qc_reports")
+}
+

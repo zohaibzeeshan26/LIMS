@@ -618,7 +618,16 @@ export class SamplesService {
           laboratory: true,
           submittedByUser: { select: { id: true, fullName: true, employeeId: true } },
           receivedByUser: { select: { id: true, fullName: true, employeeId: true } },
+          assignedTo: { select: { id: true, fullName: true, employeeId: true, username: true } },
           batch: { select: { id: true, batchNumber: true, drugProduct: true, status: true } },
+          tests: {
+            include: {
+              testSpecification: true,
+              instrument: true,
+              analyst: { select: { id: true, fullName: true, employeeId: true, username: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
           _count: { select: { tests: true, submissions: true, oosIncidents: true } },
         },
       }),

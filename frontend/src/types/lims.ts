@@ -272,12 +272,24 @@ export type BatchStatus = 'QUARANTINE' | 'RELEASED' | 'REJECTED' | 'CONDITIONAL'
 export interface User {
   id: string;
   email: string;
-  username?: string;
+  username?: string | null;
   fullName: string;
   employeeId: string;
   department: string;
   role: Role;
   isActive?: boolean;
+  mustChangePassword?: boolean;
+  assignedLab?: string | null;
+  lastLogin?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: {
+    accessionedSamples?: number;
+    performedTests?: number;
+    calibrations?: number;
+    submittedSamples?: number;
+    assignedSamples?: number;
+  };
 }
 
 export interface Sample {

@@ -12,4 +12,14 @@ export const auditService = {
 
   getByEntity: (entityName: string, entityId: string) =>
     api.get<AuditTrail[]>(`/audit/${entityName}/${entityId}`),
+
+  logActivity: (data: {
+    action: string;
+    entityName?: string;
+    entityId?: string;
+    reasonForChange: string;
+    diffPayload?: any;
+    performedByName?: string;
+    role?: string;
+  }) => api.post<any>('/audit', data).catch((err) => console.warn('[LIMS Audit] logActivity failed:', err)),
 };

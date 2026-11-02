@@ -20,6 +20,7 @@ import { QrScannerModal, ScannedSampleData } from '@/components/samples/QrScanne
 import { SampleQrLabelModal } from '@/components/samples/SampleQrLabelModal';
 import { SampleRoutingChitModal, SampleRoutingChitData } from '@/components/samples/SampleRoutingChitModal';
 import {
+  ArrowLeft,
   FlaskConical,
   Microscope,
   ShieldAlert,
@@ -468,11 +469,89 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
     onSuccess: (newSample: any) => {
       queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['samples-for-task-assignment'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-audit-logs'] });
       queryClient.invalidateQueries({ queryKey: ['navbar-audit-alerts'] });
       setIsConfirmModalOpen(false);
       setPendingConfirmationData(null);
+
+      // Automatically sync newly registered sample into Task Assignment Registry for that lab
+      try {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('city_pharma_lims_tasks');
+          const currentTasks = stored ? JSON.parse(stored) : [];
+
+          const labRaw = (
+            newSample.laboratory ||
+            newSample.laboratoryType ||
+            selectedLab ||
+            'GENERAL'
+          )
+            .toString()
+            .toUpperCase();
+          const labKey = labRaw.includes('PEN')
+            ? 'PENICILLIN'
+            : labRaw.includes('CEPH') || labRaw.includes('SAF')
+            ? 'CEPHALOSPORIN'
+            : 'GENERAL';
+
+          const sampleCode = newSample.sampleCode || newSample.accessionNo || `SMP-${Date.now()}`;
+          const sampleName =
+            newSample.nomenclature ||
+            newSample.materialName ||
+            pendingConfirmationData?.nomenclature ||
+            'Analytical Registered Sample';
+
+          const sec = selectedSection === 'formulation' ? 'formulation' : 'semi-base';
+
+          const defaultAnalyst =
+            labKey === 'CEPHALOSPORIN'
+              ? { name: 'Cephalosporin Lab Analyst', id: 'EMP-004' }
+              : labKey === 'PENICILLIN'
+              ? { name: 'Penicillin Lab Analyst', id: 'EMP-005' }
+              : { name: 'Zubair Raza', id: 'EMP-003' };
+
+          const defaultProtocol =
+            sec === 'semi-base'
+              ? 'HPLC Potency Assay & Chromatographic Purity'
+              : 'Uniformity of Dosage Units & Hardness Test';
+
+          const cleanCode = sampleCode.replace(/[^a-zA-Z0-9-]/g, '');
+          const taskCode = `TSK-${cleanCode}`;
+
+          const alreadyExists = currentTasks.some(
+            (t: any) =>
+              (t.sampleId && t.sampleId.toUpperCase() === sampleCode.toUpperCase()) ||
+              (t.taskCode && t.taskCode.toUpperCase() === taskCode.toUpperCase())
+          );
+
+          if (!alreadyExists) {
+            const autoTask = {
+              id: `tsk-smp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              taskCode: taskCode,
+              sampleId: sampleCode,
+              sampleName: sampleName,
+              laboratory: labKey,
+              section: sec,
+              assignedAnalystName: defaultAnalyst.name,
+              assignedAnalystId: defaultAnalyst.id,
+              testProtocol: defaultProtocol,
+              priority: newSample.priority || pendingConfirmationData?.priority || 'URGENT',
+              shift: 'Morning Shift (08:00 - 16:00)',
+              dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              assignedDate: new Date().toISOString().split('T')[0],
+              status: 'ASSIGNED',
+              instructions: `Auto-allocated task generated upon sample registration (${newSample.lotNumber || newSample.batchId || 'Lot verified'}).`,
+            };
+            const updated = [autoTask, ...currentTasks];
+            localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
+            window.dispatchEvent(new Event('lims-tasks-updated'));
+          }
+        }
+      } catch (err) {
+        console.error('Error auto-syncing sample to tasks:', err);
+      }
 
       setSuccessInfo({
         sampleCode: newSample.sampleCode,
@@ -595,6 +674,19 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
   };
 
 
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
   return (
     <>
       {/* Global Incomplete Form Toast Alert */}
@@ -612,18 +704,62 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
         </div>
       )}
 
-      <Modal
-        isOpen={isOpen}
-        onClose={handleRequestClose}
-        title="Create Sampling Record"
-        maxWidth="3xl"
-      >
-        <form
-          id="new-sample-form-modal"
-          onSubmit={handleSubmit(handleFormValid, handleFormInvalid)}
-          noValidate
-          className="space-y-4 text-xs font-sans"
-        >
+      {/* Full-Screen Add Sample View: Eliminates sidebar completely, shows Citi Pharma + LIMS and working Back button */}
+      <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col overflow-y-auto font-sans animate-in fade-in duration-200">
+        {/* Top Header Bar per user mandate: Back button + Citi Pharma logo & LIMS branding */}
+        <header className="sticky top-0 z-30 bg-white border-b border-slate-200/90 shadow-2xs px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0">
+          {/* Left: Working Back Button */}
+          <button
+            type="button"
+            onClick={handleRequestClose}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold shadow-2xs transition-all cursor-pointer"
+            title="Back to Samples"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-4 w-4 text-slate-600" />
+            <span>Back</span>
+          </button>
+
+          {/* Center: Citi Pharma Logo + LIMS Branding */}
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-[#0B1A30] p-1 flex items-center justify-center border border-slate-200 shadow-xs">
+              <img
+                src="/city-pharma-logo.png"
+                alt="Citi Pharma Logo"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-black text-slate-900 tracking-tight text-lg leading-none">Citi Pharma</span>
+              <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#0066FF] text-white shadow-2xs">
+                LIMS
+              </span>
+            </div>
+          </div>
+
+          {/* Right Spacer for balance */}
+          <div className="w-20 hidden sm:block" />
+        </header>
+
+        {/* Centered Form Body Container */}
+        <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-8">
+            <div className="pb-4 mb-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Create Sampling Record</h2>
+                <p className="text-xs text-slate-500 mt-1">21 CFR Part 11 compliant pharmaceutical sample intake and registration form.</p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                {selectedLab === 'PENICILLIN' ? 'Penicillin Lab' : selectedLab === 'CEPHALOSPORIN' ? 'Cephalosporin Lab' : 'General Lab'}
+              </span>
+            </div>
+
+            <form
+              id="new-sample-form-modal"
+              onSubmit={handleSubmit(handleFormValid, handleFormInvalid)}
+              noValidate
+              className="space-y-4 text-xs font-sans"
+            >
           {/* Explicit hidden input ensuring laboratory is registered in form */}
           <input type="hidden" {...register('laboratory')} value={selectedLab} />
           {/* Success Banner */}
@@ -1309,7 +1445,9 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
             </div>
           </div>
         </form>
-      </Modal>
+          </div>
+        </main>
+      </div>
 
       {/* Protected Confirmation Modal: Opens ONLY when all client-side validations pass with 100% valid state */}
       {isConfirmModalOpen && pendingConfirmationData && (

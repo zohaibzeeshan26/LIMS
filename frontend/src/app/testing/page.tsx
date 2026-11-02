@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -8,6 +9,8 @@ import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { formatDateTime } from '@/lib/date';
+import { STATIC_ANALYSTS, isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
+import { auditService } from '@/services/audit.service';
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -19,15 +22,48 @@ import {
   PlusCircle,
   ShieldCheck,
   Beaker,
+  Play,
+  ArrowLeft,
+  BookOpen,
 } from 'lucide-react';
+import { OfficialAtm003Document } from '@/components/askprol/OfficialAtm003Document';
 
 export default function TestingPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { analysts: allAnalystsList } = useAllAnalysts();
+
+  const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN';
+  const isManager = isSuperAdmin || user?.role === 'MANAGER' || user?.role === 'DEPUTY_MANAGER' || user?.role === 'SHIFT_INCHARGE';
+  const isAnalyst = !isManager;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [selectedAnalystFilter, setSelectedAnalystFilter] = useState<string>('ALL');
+  const [testingTab, setTestingTab] = useState<'QUEUE' | 'OFFICIAL_SOP'>('QUEUE');
+
+  // Stored tasks synchronization from localStorage (assigned from /tasks)
+  const [storedTasks, setStoredTasks] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const syncTasks = () => {
+      try {
+        const raw = localStorage.getItem('city_pharma_lims_tasks');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setStoredTasks(parsed);
+        }
+      } catch (e) {}
+    };
+    syncTasks();
+    window.addEventListener('storage', syncTasks);
+    window.addEventListener('lims-tasks-updated', syncTasks);
+    return () => {
+      window.removeEventListener('storage', syncTasks);
+      window.removeEventListener('lims-tasks-updated', syncTasks);
+    };
+  }, []);
 
   // Selected test for recording results
   const [activeTest, setActiveTest] = useState<any | null>(null);
@@ -64,22 +100,113 @@ export default function TestingPage() {
     return [];
   }, [instrumentsResponse]);
 
-  // Flatten sample tests for analytical worksheet table
+  // Flatten sample tests and merge stored tasks for analytical worksheet table
   const allTests = React.useMemo(() => {
-    return samplesList.flatMap((s) =>
-      (s.tests || []).map((t: any) => ({
+    // 1. Database tests from sample records
+    const dbTests = samplesList.flatMap((s) => {
+      const sCode = (s.sampleCode || s.sampleId || s.accessionNo || s.id || '').toUpperCase();
+      const matchingTask = storedTasks.find((t) => {
+        const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
+        return tCode === sCode;
+      });
+
+      return (s.tests || []).map((t: any) => ({
         ...t,
         sampleCode: s.sampleCode || s.sampleId,
         materialName: s.materialName || s.nomenclature,
         samplePriority: s.priority,
         batchNumber: s.batch?.batchNumber || s.lotNumber || s.batchLotNumber,
-      }))
-    );
-  }, [samplesList]);
+        assignedToId: s.assignedToId || t.analystId || matchingTask?.assignedAnalystId,
+        assignedTo: s.assignedTo,
+        assignedAnalystId: matchingTask?.assignedAnalystId || t.analyst?.employeeId || t.analyst?.id || s.assignedTo?.employeeId || s.assignedToId,
+        assignedAnalystName: matchingTask?.assignedAnalystName || t.analyst?.fullName || s.assignedTo?.fullName,
+        assignedAnalystUsername: matchingTask?.assignedAnalystUsername || t.analyst?.username || s.assignedTo?.username,
+      }));
+    });
 
-  // Filtered tests
+    // 2. Worksheets created from assigned tasks
+    const taskWorksheets = storedTasks.map((t: any) => {
+      const foundAnalyst = allAnalystsList.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName) || STATIC_ANALYSTS.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName);
+
+      return {
+        id: t.id,
+        isTaskItem: true,
+        taskCode: t.taskCode,
+        sampleCode: t.sampleId,
+        materialName: t.sampleName,
+        samplePriority: t.priority || 'ROUTINE',
+        batchNumber: t.lotNumber || '—',
+        laboratory: t.laboratory,
+        status: t.status === 'COMPLETED' ? 'COMPLETED' : t.status === 'IN_PROGRESS' ? 'IN_ANALYSIS' : 'PENDING',
+        resultStatus: t.resultStatus || (t.status === 'COMPLETED' ? 'PASSED' : 'PENDING'),
+        numericResult: t.numericResult !== undefined ? t.numericResult : null,
+        textResult: t.textResult || null,
+        unit: '%',
+        minLimit: 95.0,
+        maxLimit: 105.0,
+        targetValue: 100.0,
+        instrumentId: t.instrumentId,
+        instrument: t.instrument || { equipmentCode: 'HPLC-01', name: 'Agilent 1260 Infinity II HPLC' },
+        rawDataReference: t.rawDataReference,
+        comments: t.instructions,
+        testSpecification: {
+          name: t.testProtocol || 'Compendial Potency Assay',
+          testCode: t.taskCode,
+          pharmacopeiaMethod: 'BP 2024 / USP 44',
+          category: (t.testProtocol || '').toLowerCase().includes('dissolution')
+            ? 'PHYSICAL'
+            : (t.testProtocol || '').toLowerCase().includes('micro')
+            ? 'MICROBIOLOGICAL'
+            : 'CHROMATOGRAPHY',
+        },
+        assignedAnalystId: t.assignedAnalystId,
+        assignedAnalystName: t.assignedAnalystName,
+        assignedAnalystUsername: t.assignedAnalystUsername || foundAnalyst?.username,
+      };
+    });
+
+    const existingSampleTestKeys = new Set(dbTests.map((x) => `${x.sampleCode}-${x.testSpecification?.name}`.toUpperCase()));
+    const uniqueTaskWorksheets = taskWorksheets.filter((tw: any) => !existingSampleTestKeys.has(`${tw.sampleCode}-${tw.testSpecification?.name}`.toUpperCase()));
+
+    return [...dbTests, ...uniqueTaskWorksheets];
+  }, [samplesList, storedTasks]);
+
+  // Filtered tests with strict role isolation for Analysts
   const filteredTests = React.useMemo(() => {
     return allTests.filter((t) => {
+      // 1. Role-Based Workload Isolation:
+      // If logged in as Analyst: Show ONLY tests assigned to this specific analyst (while keeping Askprol protocol tests accessible)
+      if (isAnalyst && user) {
+        const userEmpId = (user.employeeId || '').toUpperCase();
+        const userUsername = (user.username || '').toLowerCase();
+        const userFullName = (user.fullName || '').toLowerCase();
+
+        const isAskprolItem =
+          (t.sampleCode || '').toUpperCase().includes('ASK') ||
+          (t.materialName || '').toLowerCase().includes('askprol') ||
+          (t.testSpecification?.testCode || '').toUpperCase().includes('SPEC-ASK');
+
+        const matchesAnalyst =
+          isAskprolItem ||
+          isAssignedToUser(t, user) ||
+          (t.assignedAnalystId && userEmpId && t.assignedAnalystId.toUpperCase() === userEmpId) ||
+          (t.assignedAnalystUsername && userUsername && t.assignedAnalystUsername.toLowerCase() === userUsername) ||
+          (t.assignedAnalystName && userFullName && (t.assignedAnalystName.toLowerCase().includes(userFullName) || userFullName.includes(t.assignedAnalystName.toLowerCase())));
+
+        if (!matchesAnalyst) return false;
+      } else if (selectedAnalystFilter !== 'ALL') {
+        const isAskprolItem =
+          (t.sampleCode || '').toUpperCase().includes('ASK') ||
+          (t.materialName || '').toLowerCase().includes('askprol') ||
+          (t.testSpecification?.testCode || '').toUpperCase().includes('SPEC-ASK');
+
+        const found = allAnalystsList.find((a) => a.id === selectedAnalystFilter) || STATIC_ANALYSTS.find((a) => a.id === selectedAnalystFilter);
+        const matchId = t.assignedAnalystId === selectedAnalystFilter;
+        const matchUsername = found && t.assignedAnalystUsername?.toLowerCase() === found.username.toLowerCase();
+        const matchName = found && t.assignedAnalystName?.toLowerCase().includes(found.name.toLowerCase());
+        if (!isAskprolItem && !matchId && !matchUsername && !matchName) return false;
+      }
+
       if (statusFilter && t.status !== statusFilter) return false;
       if (categoryFilter && t.testSpecification?.category !== categoryFilter) return false;
       if (searchTerm) {
@@ -87,11 +214,12 @@ export default function TestingPage() {
         const matchCode = t.sampleCode?.toLowerCase().includes(term);
         const matchName = t.materialName?.toLowerCase().includes(term);
         const matchTest = t.testSpecification?.name?.toLowerCase().includes(term);
-        if (!matchCode && !matchName && !matchTest) return false;
+        const matchAnalyst = t.assignedAnalystName?.toLowerCase().includes(term);
+        if (!matchCode && !matchName && !matchTest && !matchAnalyst) return false;
       }
       return true;
     });
-  }, [allTests, statusFilter, categoryFilter, searchTerm]);
+  }, [allTests, isAnalyst, user, selectedAnalystFilter, statusFilter, categoryFilter, searchTerm]);
 
   // Mutation to record result
   const recordResultMutation = useMutation({
@@ -133,17 +261,121 @@ export default function TestingPage() {
     const num = parseFloat(numericResult);
     if (isNaN(num)) return null;
 
-    const min = activeTest.minLimit ?? activeTest.testSpecification.defaultMinLimit;
-    const max = activeTest.maxLimit ?? activeTest.testSpecification.defaultMaxLimit;
+    const min = activeTest.minLimit ?? activeTest.testSpecification?.defaultMinLimit ?? 95.0;
+    const max = activeTest.maxLimit ?? activeTest.testSpecification?.defaultMaxLimit ?? 105.0;
 
     if (min !== null && min !== undefined && num < min) return 'OUT_OF_SPEC';
     if (max !== null && max !== undefined && num > max) return 'OUT_OF_SPEC';
     return 'WITHIN_SPEC';
   }, [activeTest, numericResult]);
 
+  // Start analysis transition for an assigned test
+  const handleStartAnalysis = (test: any) => {
+    if (test.isTaskItem) {
+      const updated = storedTasks.map((t) => {
+        if (t.id === test.id || t.taskCode === test.taskCode) {
+          return { ...t, status: 'IN_PROGRESS' };
+        }
+        return t;
+      });
+      setStoredTasks(updated);
+      localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
+      window.dispatchEvent(new Event('lims-tasks-updated'));
+
+      // 21 CFR Part 11 Audit Trail for Analysis Initiation
+      auditService.logActivity({
+        action: 'TASK_STATUS_UPDATED',
+        entityName: 'TestWorksheet',
+        entityId: test.id || test.taskCode || test.sampleCode,
+        performedByName: user?.fullName || 'Analyst',
+        role: user?.role || 'QC_ANALYST',
+        reasonForChange: `Analyst initiated analytical testing on sample ${test.sampleCode} (${test.materialName || 'QC Material'})`,
+        diffPayload: {
+          details: `${user?.fullName || 'Analyst'} initiated testing for sample ${test.sampleCode} — Protocol: ${test.testSpecification?.name || test.taskCode}`,
+          sampleCode: test.sampleCode,
+          taskCode: test.taskCode,
+          status: 'IN_PROGRESS',
+        },
+      });
+    } else {
+      openRecordModal(test);
+    }
+  };
+
   const handleSubmitResult = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTest) return;
+
+    const num = numericResult !== '' ? parseFloat(numericResult) : null;
+    const isPass = evaluatedStatus === 'WITHIN_SPEC';
+    const statusOutcome = isPass ? 'PASSED' : evaluatedStatus === 'OUT_OF_SPEC' ? 'OUT_OF_SPEC' : 'RECORDED';
+
+    if (activeTest.isTaskItem) {
+      const status = 'COMPLETED';
+      const resultStatus = isPass ? 'PASSED' : 'FAILED';
+
+      const updated = storedTasks.map((t) => {
+        if (t.id === activeTest.id || t.taskCode === activeTest.taskCode) {
+          return {
+            ...t,
+            status,
+            resultStatus,
+            numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
+            textResult: textResult || undefined,
+            instrumentId: selectedInstrumentId || undefined,
+            rawDataReference,
+            instructions: comments || t.instructions,
+          };
+        }
+        return t;
+      });
+      setStoredTasks(updated);
+      localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
+      window.dispatchEvent(new Event('lims-tasks-updated'));
+
+      // 21 CFR Part 11 Audit Trail for Test Result Recording
+      auditService.logActivity({
+        action: 'TEST_RESULT_RECORDED',
+        entityName: 'TestWorksheet',
+        entityId: activeTest.id || activeTest.taskCode || activeTest.sampleCode,
+        performedByName: user?.fullName || 'Analyst',
+        role: user?.role || 'QC_ANALYST',
+        reasonForChange: `Recorded analytical result for ${activeTest.sampleCode} (${activeTest.testSpecification?.name || 'Assay'}): ${numericResult || textResult} (${statusOutcome})`,
+        diffPayload: {
+          details: `${user?.fullName || 'Analyst'} logged analytical result for ${activeTest.sampleCode}: ${numericResult !== '' ? numericResult + ' %' : textResult} [${statusOutcome}]`,
+          sampleCode: activeTest.sampleCode,
+          testName: activeTest.testSpecification?.name,
+          result: numericResult || textResult,
+          status: statusOutcome,
+          rawDataReference,
+        },
+      });
+
+      setActiveTest(null);
+      setNumericResult('');
+      setTextResult('');
+      setRawDataReference('');
+      setComments('');
+      return;
+    }
+
+    // 21 CFR Part 11 Audit Trail for Database Test
+    auditService.logActivity({
+      action: 'TEST_RESULT_RECORDED',
+      entityName: 'TestWorksheet',
+      entityId: activeTest.id || activeTest.sampleCode,
+      performedByName: user?.fullName || 'Analyst',
+      role: user?.role || 'QC_ANALYST',
+      reasonForChange: `Recorded analytical test results for sample ${activeTest.sampleCode} (${activeTest.testSpecification?.name || 'Assay'}): ${numericResult || textResult}`,
+      diffPayload: {
+        details: `${user?.fullName || 'Analyst'} logged analytical result for ${activeTest.sampleCode}: ${numericResult !== '' ? numericResult + ' %' : textResult} [${statusOutcome}]`,
+        sampleCode: activeTest.sampleCode,
+        testName: activeTest.testSpecification?.name,
+        result: numericResult || textResult,
+        status: statusOutcome,
+        rawDataReference,
+      },
+    });
 
     recordResultMutation.mutate({
       numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
@@ -156,12 +388,23 @@ export default function TestingPage() {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
+      {/* Title & Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+              <span>Back to Dashboard</span>
+            </Link>
+            <span className="text-xs font-semibold text-slate-400">/</span>
+            <span className="text-xs font-bold text-slate-700">Analytical Workstation</span>
+          </div>
           <h1 className="text-xl sm:text-2xl font-bold text-navy-950 tracking-tight flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-teal-700" />
-            <span>Analytical Testing & Worksheets</span>
+            <span>Analytical Testing &amp; Worksheets</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Compendial worksheet calculations, chromatogram raw data references, and automated limit evaluations
@@ -169,32 +412,133 @@ export default function TestingPage() {
         </div>
       </div>
 
-      {/* Phase 2 Roadmap Notice Banner */}
-      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 flex items-start gap-3">
-        <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-teal-800 shadow-xs shrink-0 mt-0.5">
-          <ShieldCheck className="h-4 w-4 text-teal-700" />
-        </div>
-        <div className="text-xs text-slate-600 leading-relaxed">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="font-bold text-navy-950">Future Module: Analytical QC Engine (Phase 2 Roadmap)</span>
-            <span className="text-[10px] font-bold text-navy-700 bg-white px-2 py-0.5 rounded border border-slate-200/80 uppercase">
-              Phase 2 Scope
-            </span>
+      {/* Role-Specific Workstation Notice Banner */}
+      {isAnalyst ? (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-md border border-blue-700/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-300 shadow-xs shrink-0 mt-0.5">
+              <Beaker className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="font-bold text-white text-sm">
+                  Analyst Testing Workstation &bull; {user?.fullName || 'Quality Analyst'}
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-white/10 text-blue-200 px-2 py-0.5 rounded border border-white/20">
+                  @{user?.username || 'analyst'}
+                </span>
+                <span className="text-[10px] font-bold bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-400/30">
+                  Workload Isolated ({filteredTests.length} Tests)
+                </span>
+              </div>
+              <p className="text-xs text-blue-200/90 leading-relaxed max-w-3xl">
+                Showing strictly tests and analytical worksheets assigned to your bench. Select an instrument, enter observed assay results, and attach raw data sequence references to update status.
+              </p>
+            </div>
           </div>
-          The Sampling module is currently the fully active certified module for City Pharma LIMS v1.0. This view demonstrates the planned USP/BP compendial calculation engine. Live results can be inspected below.
         </div>
+      ) : (
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 flex items-start gap-3">
+          <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-teal-800 shadow-xs shrink-0 mt-0.5">
+            <ShieldCheck className="h-4 w-4 text-teal-700" />
+          </div>
+          <div className="text-xs text-slate-600 leading-relaxed">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="font-bold text-navy-950">Super Admin Analytical Inspection Portal</span>
+              <span className="text-[10px] font-bold text-navy-700 bg-white px-2 py-0.5 rounded border border-slate-200/80 uppercase">
+                Full Oversight
+              </span>
+            </div>
+            Master governance across General, Cephalosporin and Penicillin analytical benches. Inspect results, review OOS flags, and verify compendial worksheets across all 10 analyst accounts.
+          </div>
+        </div>
+      )}
+
+      {/* Askprol Suspension QC/CLG/ATM-003 Testing Launcher Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-white border border-purple-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-xs shrink-0 mt-0.5">
+            <FileSpreadsheet className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="font-bold text-slate-900 text-sm">
+                Askprol Suspension 120mg/5ml Analytical Protocol (QC/CLG/ATM-003)
+              </span>
+              <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200">
+                Bulk &amp; Finished Pack
+              </span>
+              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                Workbook Synced
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
+              Official analytical testing protocol matching QC/CLG/ATM-003 Version 06. Enter observed lab weights, HPLC peak areas, deliverable volumes, and AV values with automated release CoA generation.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/askprol"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[#0B1A30] text-white hover:bg-slate-800 transition-all shadow-xs shrink-0"
+        >
+          <Beaker className="w-4 h-4 text-purple-300" />
+          <span>Launch Askprol Testing Worksheet &rarr;</span>
+        </Link>
       </div>
+
+      {/* Workstation Top Navigation Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setTestingTab('QUEUE')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              testingTab === 'QUEUE'
+                ? 'bg-[#0B1A30] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-teal-400" />
+            <span>Analytical Testing Queue ({filteredTests.length} Tests)</span>
+          </button>
+
+          <button
+            onClick={() => setTestingTab('OFFICIAL_SOP')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              testingTab === 'OFFICIAL_SOP'
+                ? 'bg-[#0B1A30] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-purple-500" />
+            <span>Official SOP Monograph (QC/CLG/ATM-003 Ver: 06 - 10 Pages)</span>
+          </button>
+        </div>
+
+        <Link
+          href="/askprol"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 transition-colors shadow-2xs"
+        >
+          <Beaker className="w-4 h-4 text-purple-600" />
+          <span>Launch Askprol QC &amp; CoA Engine &rarr;</span>
+        </Link>
+      </div>
+
+      {testingTab === 'OFFICIAL_SOP' ? (
+        <OfficialAtm003Document />
+      ) : (
+        <>
 
       {/* Filter Toolbar */}
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search test name, sample code, material..."
+              placeholder="Search test, sample, analyst..."
               className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
             />
           </div>
@@ -207,9 +551,9 @@ export default function TestingPage() {
             >
               <option value="">All Test Statuses</option>
               <option value="PENDING">Pending Analysis</option>
-              <option value="IN_ANALYSIS">In Analysis</option>
+              <option value="IN_ANALYSIS">In Analysis / Testing</option>
               <option value="COMPLETED">Completed (Awaiting QA)</option>
-              <option value="VERIFIED">Verified & Signed Off</option>
+              <option value="VERIFIED">Verified &amp; Signed Off</option>
             </select>
           </div>
 
@@ -223,10 +567,32 @@ export default function TestingPage() {
               <option value="CHROMATOGRAPHY">Chromatography (HPLC / GC)</option>
               <option value="PHYSICAL">Physical (Dissolution / LOD)</option>
               <option value="CHEMICAL">Chemical (pH / Titration)</option>
-              <option value="MICROBIOLOGICAL">Microbiological & Endotoxin</option>
+              <option value="MICROBIOLOGICAL">Microbiological &amp; Endotoxin</option>
               <option value="STABILITY">Stability Protocol</option>
             </select>
           </div>
+
+          {/* Analyst Filter Dropdown for Super Admin / Managers */}
+          {!isAnalyst ? (
+            <div>
+              <select
+                value={selectedAnalystFilter}
+                onChange={(e) => setSelectedAnalystFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white font-medium text-slate-700"
+              >
+                <option value="ALL">All Analysts (All Worksheets)</option>
+                {allAnalystsList.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.username ? `@${a.username}` : a.id}) — {a.department}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold">
+              <span className="truncate">Analyst Bench: @{user?.username}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -236,11 +602,12 @@ export default function TestingPage() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-4">Test Monograph & Category</th>
-                <th className="py-3.5 px-4">Sample & Lot Link</th>
+                <th className="py-3.5 px-4">Test Monograph &amp; Category</th>
+                <th className="py-3.5 px-4">Sample &amp; Lot Link</th>
                 <th className="py-3.5 px-4">Compendial Limits</th>
+                <th className="py-3.5 px-4">Assigned Analyst</th>
                 <th className="py-3.5 px-4">Observed Result</th>
-                <th className="py-3.5 px-4">Status & Result</th>
+                <th className="py-3.5 px-4">Status &amp; Result</th>
                 <th className="py-3.5 px-4">Instrument</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
@@ -248,14 +615,26 @@ export default function TestingPage() {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     Loading worksheets...
                   </td>
                 </tr>
               ) : filteredTests.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    No tests matching current criteria.
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center">
+                      <Beaker className="h-8 w-8 text-slate-300 mb-2 stroke-[1.5]" />
+                      <p className="font-semibold text-slate-700 text-sm">
+                        {isAnalyst
+                          ? 'No Tests Currently Assigned To Your Bench'
+                          : 'No Tests Matching Current Filters'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                        {isAnalyst
+                          ? `You are logged in as @${user?.username}. Tests assigned to you by your Manager will appear here.`
+                          : 'Try clearing the search or analyst filter to inspect other analytical worksheets.'}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -263,13 +642,14 @@ export default function TestingPage() {
                   const spec = test.testSpecification;
                   const isVerified = test.status === 'VERIFIED';
                   const isCompleted = test.status === 'COMPLETED';
+                  const isPending = test.status === 'PENDING';
 
                   return (
                     <tr key={test.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900">{spec.name}</div>
+                        <div className="font-semibold text-slate-900">{spec?.name || 'Analytical Monograph'}</div>
                         <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          {spec.testCode} • {spec.pharmacopeiaMethod} • {spec.category}
+                          {spec?.testCode} &bull; {spec?.pharmacopeiaMethod} &bull; {spec?.category}
                         </div>
                       </td>
 
@@ -295,6 +675,24 @@ export default function TestingPage() {
                         )}
                         {test.targetValue !== null && (
                           <div className="text-[10px] text-slate-400">Target: {test.targetValue} {test.unit}</div>
+                        )}
+                      </td>
+
+                      {/* Assigned Analyst Column */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {test.assignedAnalystName ? (
+                          <div>
+                            <span className="font-semibold text-slate-800 text-xs block">
+                              {test.assignedAnalystName}
+                            </span>
+                            {test.assignedAnalystUsername && (
+                              <span className="text-[10px] text-blue-600 font-mono">
+                                @{test.assignedAnalystUsername}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Unassigned</span>
                         )}
                       </td>
 
@@ -331,7 +729,32 @@ export default function TestingPage() {
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {isPending && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartAnalysis(test)}
+                              className="h-7 text-xs text-blue-700 hover:bg-blue-50 border-blue-200"
+                              title="Start analysis on this sample"
+                            >
+                              <Play className="h-3 w-3" />
+                              <span>Start</span>
+                            </Button>
+                          )}
+
+                          {/* Direct ATM-003 Sheet link for Askprol tests */}
+                          {(test.sampleCode?.includes('ASK') || test.materialName?.includes('Askprol') || test.testSpecification?.testCode?.includes('SPEC-ASK')) && (
+                            <Link
+                              href="/askprol"
+                              className="h-7 px-2 rounded-lg text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 inline-flex items-center gap-1 transition-colors"
+                              title="Open dedicated ATM-003 3-module calculation worksheet"
+                            >
+                              <FileSpreadsheet className="h-3 w-3 text-purple-600" />
+                              <span>ATM-003 Sheet</span>
+                            </Link>
+                          )}
+
                           <Button
                             size="sm"
                             variant="primary"
@@ -364,6 +787,8 @@ export default function TestingPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* Record Test Result Modal with Live Auto-Evaluation */}
       {activeTest && (
@@ -405,21 +830,55 @@ export default function TestingPage() {
               </div>
             </div>
 
-            {/* Numeric Result Input */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Quantitative Numeric Result ({activeTest.unit || 'units'}) *
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={numericResult}
-                onChange={(e) => setNumericResult(e.target.value)}
-                placeholder="Enter observed numerical assay value..."
-                className="w-full text-sm font-mono px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
-                required
-              />
-            </div>
+            {/* If Askprol ATM-003 test, show SOP reference banner */}
+            {(activeTest.sampleCode?.includes('ASK') || activeTest.materialName?.includes('Askprol') || activeTest.testSpecification?.testCode?.includes('SPEC-ASK')) && (
+              <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="text-xs">
+                  <span className="font-bold text-purple-900 block">Citi Pharma Ltd &bull; QC/CLG/ATM-003 (Version: 06)</span>
+                  <span className="text-[11px] text-purple-700">Analytical Protocol: {activeTest.testSpecification.name} &bull; Method: {activeTest.testSpecification.pharmacopeiaMethod}</span>
+                </div>
+                <Link
+                  href="/askprol"
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0B1A30] hover:bg-slate-800 text-white shadow-2xs shrink-0"
+                >
+                  <Beaker className="w-3.5 h-3.5 text-purple-300" />
+                  <span>Open Full Calculation Worksheet &rarr;</span>
+                </Link>
+              </div>
+            )}
+
+            {/* Qualitative vs Quantitative Input */}
+            {(activeTest.unit === 'Qualitative' || activeTest.unit === 'Text' || (activeTest.minLimit === null && activeTest.maxLimit === null)) ? (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Qualitative Observed Result / Physical Appearance *
+                </label>
+                <input
+                  type="text"
+                  value={textResult}
+                  onChange={(e) => setTextResult(e.target.value)}
+                  placeholder="e.g. Complies / A reddish color suspension with solid particles uniformly dispersed"
+                  className="w-full text-sm px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                  required
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Quantitative Numeric Result ({activeTest.unit || 'units'}) *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={numericResult}
+                  onChange={(e) => setNumericResult(e.target.value)}
+                  placeholder="Enter observed numerical assay value..."
+                  className="w-full text-sm font-mono px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                  required
+                />
+              </div>
+            )}
 
             {/* LIVE DYNAMIC EVALUATION BANNER */}
             {evaluatedStatus === 'WITHIN_SPEC' && (

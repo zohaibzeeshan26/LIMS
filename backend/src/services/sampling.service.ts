@@ -459,12 +459,12 @@ export class SamplingService {
           accessionedBy: { select: { id: true, fullName: true, employeeId: true, department: true } },
           assignedTo: { select: { id: true, fullName: true, employeeId: true, department: true } },
           tests: {
-            select: {
-              id: true,
-              status: true,
-              resultStatus: true,
-              testSpecification: { select: { name: true, testCode: true } },
+            include: {
+              testSpecification: true,
+              instrument: true,
+              analyst: { select: { id: true, fullName: true, employeeId: true, username: true } },
             },
+            orderBy: { createdAt: 'asc' },
           },
           submissions: {
             select: {

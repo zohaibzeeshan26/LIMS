@@ -225,6 +225,14 @@ class ApiClient {
     });
   }
 
+  put<T>(endpoint: string, body?: any, options?: RequestInit) {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+      ...options,
+    });
+  }
+
   patch<T>(endpoint: string, body?: any, options?: RequestInit) {
     return this.request<T>(endpoint, {
       method: 'PATCH',

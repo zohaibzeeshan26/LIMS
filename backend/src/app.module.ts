@@ -16,6 +16,7 @@ import { BatchesModule } from './batches/batches.module';
 import { OosModule } from './oos/oos.module';
 import { AuditModule } from './audit/audit.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AskprolModule } from './askprol/askprol.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     OosModule,
     AuditModule,
     AnalyticsModule,
+    AskprolModule,
   ],
 })
 export class AppModule {}

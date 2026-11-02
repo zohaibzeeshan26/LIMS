@@ -43,4 +43,41 @@ export class AuditService {
       },
     });
   }
+
+  async create(data: {
+    entityName: string;
+    entityId: string;
+    action: string;
+    performedById?: string;
+    performedByName: string;
+    role: string;
+    ipAddress?: string;
+    reasonForChange?: string;
+    diffPayload?: string;
+  }) {
+    return this.prisma.auditTrail.create({
+      data: {
+        entityName: data.entityName,
+        entityId: data.entityId,
+        action: data.action,
+        performedById: data.performedById,
+        performedByName: data.performedByName,
+        role: data.role,
+        ipAddress: data.ipAddress || '127.0.0.1',
+        reasonForChange: data.reasonForChange,
+        diffPayload: data.diffPayload,
+      },
+      include: {
+        performedBy: {
+          select: {
+            id: true,
+            fullName: true,
+            employeeId: true,
+            department: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
 }

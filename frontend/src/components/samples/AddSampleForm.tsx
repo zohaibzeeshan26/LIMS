@@ -278,11 +278,90 @@ export function AddSampleForm({
     onSuccess: (newSample: any) => {
       queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['samples-for-task-assignment'] });
       queryClient.invalidateQueries({ queryKey: ['active-expedited-urgent-samples'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-recent-samples'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-audit-logs'] });
       setIsConfirmModalOpen(false);
       setPendingConfirmationData(null);
+
+      // Automatically sync newly registered sample into Task Assignment Registry
+      try {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('city_pharma_lims_tasks');
+          const currentTasks = stored ? JSON.parse(stored) : [];
+
+          const labRaw = (
+            newSample.laboratory ||
+            newSample.laboratoryType ||
+            defaultLaboratory ||
+            'GENERAL'
+          )
+            .toString()
+            .toUpperCase();
+          const labKey = labRaw.includes('PEN')
+            ? 'PENICILLIN'
+            : labRaw.includes('CEPH') || labRaw.includes('SAF')
+            ? 'CEPHALOSPORIN'
+            : 'GENERAL';
+
+          const sampleCode = newSample.sampleCode || newSample.accessionNo || `SMP-${Date.now()}`;
+          const sampleName =
+            newSample.nomenclature ||
+            newSample.materialName ||
+            pendingConfirmationData?.nomenclature ||
+            'Analytical Registered Sample';
+
+          const sec = selectedSection === 'formulation' ? 'formulation' : 'semi-base';
+
+          const defaultAnalyst =
+            labKey === 'CEPHALOSPORIN'
+              ? { name: 'Cephalosporin Lab Analyst', id: 'EMP-004' }
+              : labKey === 'PENICILLIN'
+              ? { name: 'Penicillin Lab Analyst', id: 'EMP-005' }
+              : { name: 'Zubair Raza', id: 'EMP-003' };
+
+          const defaultProtocol =
+            sec === 'semi-base'
+              ? 'HPLC Potency Assay & Chromatographic Purity'
+              : 'Uniformity of Dosage Units & Hardness Test';
+
+          const cleanCode = sampleCode.replace(/[^a-zA-Z0-9-]/g, '');
+          const taskCode = `TSK-${cleanCode}`;
+
+          const alreadyExists = currentTasks.some(
+            (t: any) =>
+              (t.sampleId && t.sampleId.toUpperCase() === sampleCode.toUpperCase()) ||
+              (t.taskCode && t.taskCode.toUpperCase() === taskCode.toUpperCase())
+          );
+
+          if (!alreadyExists) {
+            const autoTask = {
+              id: `tsk-smp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              taskCode: taskCode,
+              sampleId: sampleCode,
+              sampleName: sampleName,
+              laboratory: labKey,
+              section: sec,
+              assignedAnalystName: defaultAnalyst.name,
+              assignedAnalystId: defaultAnalyst.id,
+              testProtocol: defaultProtocol,
+              priority: newSample.priority || pendingConfirmationData?.priority || 'URGENT',
+              shift: 'Morning Shift (08:00 - 16:00)',
+              dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              assignedDate: new Date().toISOString().split('T')[0],
+              status: 'ASSIGNED',
+              instructions: `Auto-allocated task generated upon sample registration (${newSample.lotNumber || newSample.batchId || 'Lot verified'}).`,
+            };
+            const updated = [autoTask, ...currentTasks];
+            localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
+            window.dispatchEvent(new Event('lims-tasks-updated'));
+          }
+        }
+      } catch (err) {
+        console.error('Error auto-syncing sample to tasks in form:', err);
+      }
+
       if (onSuccess) onSuccess(newSample);
     },
     onError: (err: any) => {

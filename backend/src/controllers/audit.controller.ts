@@ -25,6 +25,30 @@ export class AuditController {
       next(err);
     }
   }
+
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = (req as any).user;
+      const ipAddress = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+      const body = req.body || {};
+
+      const result = await auditService.create({
+        entityName: body.entityName || 'System',
+        entityId: body.entityId || user?.id || 'GLOBAL',
+        action: body.action || 'OPERATIONAL_ACTION',
+        performedById: user?.id,
+        performedByName: body.performedByName || user?.fullName || user?.username || 'Staff User',
+        role: body.role || user?.role || 'QC_ANALYST',
+        ipAddress,
+        reasonForChange: body.reasonForChange || 'Laboratory operational activity recorded',
+        diffPayload: typeof body.diffPayload === 'object' ? JSON.stringify(body.diffPayload) : body.diffPayload,
+      });
+
+      res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const auditController = new AuditController();

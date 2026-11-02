@@ -10,14 +10,19 @@ import { samplingService } from '@/services/sampling.service';
 import { cn } from '@/lib/utils';
 import {
   Home,
+  LayoutDashboard,
   FlaskConical,
   FileText,
+  Package,
   X,
   ShieldAlert,
   Microscope,
   Users,
+  UserCheck,
   AlertCircle,
   ArrowRight,
+  LogOut,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -58,21 +63,32 @@ export const LABORATORIES = [
 function SidebarInner({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN' || user?.role === 'MANAGER';
   const role = user?.role || 'QC_ANALYST';
 
   const isOnSamples = pathname.startsWith('/samples');
 
   const userAccess = getUserLabAccess(user);
-  const visibleLaboratories = React.useMemo(() => {
-    if (userAccess === 'ALL') return LABORATORIES;
-    return LABORATORIES.filter((l) => l.code === userAccess);
-  }, [userAccess]);
-
   const activeLabParam =
     searchParams.get('lab')?.toLowerCase() ||
     (userAccess === 'ALL' ? 'general' : userAccess.toLowerCase());
+
+  const visibleLaboratories = React.useMemo(() => {
+    // When inside a specific laboratory view on /samples, isolate sidebar to show only that active laboratory
+    if (isOnSamples && activeLabParam) {
+      const currentLab = LABORATORIES.find(
+        (l) =>
+          l.id === activeLabParam ||
+          (l.id === 'general' && (activeLabParam === 'gen' || activeLabParam === 'gl')) ||
+          (l.id === 'penicillin' && (activeLabParam === 'pen' || activeLabParam === 'pl')) ||
+          (l.id === 'cephalosporin' && (activeLabParam === 'ceph' || activeLabParam === 'cp' || activeLabParam === 'saf'))
+      );
+      if (currentLab) return [currentLab];
+    }
+    if (userAccess === 'ALL') return LABORATORIES;
+    return LABORATORIES.filter((l) => l.code === userAccess);
+  }, [userAccess, isOnSamples, activeLabParam]);
 
   const labBadgeLabel =
     userAccess === 'ALL'
@@ -165,10 +181,14 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
     isPriority?: boolean;
   }> = [
       {
-        name: 'Dashboard',
+        name: 'Portal',
         href: '/',
         icon: Home,
-        adminOnly: true,
+      },
+      {
+        name: 'QC Dashboard',
+        href: '/dashboard',
+        icon: LayoutDashboard,
       },
       {
         name: 'Priority Notice',
@@ -184,9 +204,33 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         badge: labBadgeLabel,
       },
       {
+        name: 'Task Assignment',
+        href: '/tasks',
+        icon: UserCheck,
+        badge: 'Tasks',
+      },
+      {
         name: 'Analytical Tests',
         href: '/testing',
         icon: Microscope,
+      },
+      {
+        name: 'Products',
+        href: '/products',
+        icon: Package,
+        badge: 'Products',
+      },
+      {
+        name: 'User Management',
+        href: '/users',
+        icon: Users,
+        adminOnly: true,
+        badge: 'Admin',
+      },
+      {
+        name: 'Batches & Inventory',
+        href: '/batches',
+        icon: Package,
       },
     ];
 
@@ -315,9 +359,9 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
           {/* Dedicated Analytical Laboratories Section (Always Visible) */}
           <div className="pt-4 pb-1.5 px-3">
             <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Analytical Laboratories</span>
+              <span>{isOnSamples ? 'Active Laboratory' : 'Analytical Laboratories'}</span>
               <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold">
-                {visibleLaboratories.length} Units
+                {visibleLaboratories.length} {visibleLaboratories.length === 1 ? 'Unit' : 'Units'}
               </span>
             </div>
           </div>
@@ -364,6 +408,33 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
                 </Link>
               );
             })}
+          </div>
+        </div>
+
+        {/* User Account & Sign Out footer */}
+        <div className="p-3 border-t border-white/10 bg-[#091527] shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {user?.fullName?.charAt(0) || 'U'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-white truncate leading-tight">
+                  {user?.fullName || 'Lab Staff'}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate leading-tight">
+                  {isAdmin ? 'Super Admin' : user?.role === 'ANALYST' || user?.role === 'QC_ANALYST' || user?.role === 'TESTING_ANALYST' ? `Analyst (@${user?.username || 'user'})` : labBadgeLabel}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              title="Sign Out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+              aria-label="Sign Out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
 

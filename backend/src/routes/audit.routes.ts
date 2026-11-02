@@ -8,5 +8,6 @@ router.use(authenticateToken);
 
 router.get('/', (req, res, next) => auditController.findAll(req, res, next));
 router.get('/:entityName/:entityId', (req, res, next) => auditController.getByEntity(req, res, next));
+router.post('/', (req, res, next) => auditController.create(req, res, next));
 
 export default router;

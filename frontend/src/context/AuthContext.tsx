@@ -22,6 +22,7 @@ export interface User {
   employeeId: string;
   department: string;
   role: Role;
+  designation?: string;
 }
 
 interface AuthResponse {
@@ -49,25 +50,181 @@ export const DEMO_USERS = [
     role: 'ADMIN' as const,
     username: 'admin',
     email: 'admin@citypharma.com',
-    password: 'Password@123',
+    password: 'lims123',
     employeeId: 'EMP-001',
     name: 'Dr. Tariq Mahmood',
-    title: 'QC Director / Administrator',
-    desc: 'Master administrative access across the facility',
-    labBadge: 'Master Administrator',
+    title: 'Super Admin / QC Director',
+    desc: 'Full administrative access across all modules, samples, and users',
+    labBadge: 'Super Admin',
     labId: 'all',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst1',
+    email: 'analyst1@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-01',
+    name: 'Muhammad Zubair',
+    title: 'General QC Testing Analyst',
+    desc: 'Chemical assay, sample testing, worksheet calculations',
+    labBadge: 'QC Analyst 1',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst2',
+    email: 'analyst2@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-02',
+    name: 'Bilal Raza',
+    title: 'Physical QC Testing Analyst',
+    desc: 'Physical tests, LOD, water content by Karl Fischer',
+    labBadge: 'QC Analyst 2',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst3',
+    email: 'analyst3@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-03',
+    name: 'Usman Tariq',
+    title: 'Finished Formulation Specialist',
+    desc: 'Dissolution testing, dosage uniformity, friability',
+    labBadge: 'QC Analyst 3',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst4',
+    email: 'analyst4@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-04',
+    name: 'Hamza Farooq',
+    title: 'Raw Material Acceptance Analyst',
+    desc: 'Active raw materials identification & USP acceptance',
+    labBadge: 'QC Analyst 4',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst5',
+    email: 'analyst5@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-05',
+    name: 'Ayesha Khan',
+    title: 'Penicillin QC Testing Analyst',
+    desc: 'Penicillin suite potency assay & containment monitoring',
+    labBadge: 'QC Analyst 5',
+    labId: 'penicillin',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst6',
+    email: 'analyst6@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-06',
+    name: 'Fatima Noor',
+    title: 'Cephalosporin Sterile Analyst',
+    desc: 'Sterility testing, particulate matter, aseptic suite',
+    labBadge: 'QC Analyst 6',
+    labId: 'cephalosporin',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst7',
+    email: 'analyst7@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-07',
+    name: 'Salman Ahmed',
+    title: 'HPLC / Chromatography Specialist',
+    desc: 'Reversed-phase HPLC, purity, and related substances',
+    labBadge: 'QC Analyst 7',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst8',
+    email: 'analyst8@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-08',
+    name: 'Zeeshan Ali',
+    title: 'Dissolution & Physical Testing',
+    desc: '6-vessel dissolution baths, disintegration time',
+    labBadge: 'QC Analyst 8',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst9',
+    email: 'analyst9@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-09',
+    name: 'Zainab Bibi',
+    title: 'Microbiological Testing Specialist',
+    desc: 'Bioburden, BET endotoxin, environmental swabbing',
+    labBadge: 'QC Analyst 9',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'analyst10',
+    email: 'analyst10@citypharma.com',
+    password: 'lab123',
+    employeeId: 'EMP-ANL-10',
+    name: 'Omer Farooq',
+    title: 'Stability & Release Inspection Analyst',
+    desc: 'Accelerated stability chambers & batch release check',
+    labBadge: 'QC Analyst 10',
+    labId: 'general',
   },
   {
     role: 'ANALYST' as const,
     username: 'analyst',
     email: 'analyst@citypharma.com',
     password: 'Password@123',
-    employeeId: 'EMP-ANL-01',
+    employeeId: 'EMP-ANL-00',
     name: 'Muhammad Ali',
     title: 'Quality Control Analyst',
     desc: 'Sample registration, accessioning, and testing',
     labBadge: 'QC Analyst',
     labId: 'all',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'general',
+    email: 'general@citypharma.com',
+    password: 'gen123',
+    employeeId: 'EMP-LAB-GL',
+    name: 'General Lab Personnel',
+    title: 'General QC Laboratory Staff',
+    desc: 'Raw materials & finished oral formulations analysis',
+    labBadge: 'General Lab',
+    labId: 'general',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'penicillin',
+    email: 'penicillin@citypharma.com',
+    password: 'pen123',
+    employeeId: 'EMP-LAB-PEN',
+    name: 'Penicillin Lab Specialist',
+    title: 'Penicillin Suite QC Staff',
+    desc: 'Penicillin containment suite analytical testing',
+    labBadge: 'Penicillin Lab',
+    labId: 'penicillin',
+  },
+  {
+    role: 'ANALYST' as const,
+    username: 'cephalosporin',
+    email: 'cephalosporin@citypharma.com',
+    password: 'ceph123',
+    employeeId: 'EMP-LAB-CEPH',
+    name: 'Cephalosporin Lab Specialist',
+    title: 'Sterile Area Cephalosporin QC Staff',
+    desc: 'Cephalosporin sterile facility analytical testing',
+    labBadge: 'Cephalosporin Lab',
+    labId: 'cephalosporin',
   },
 ];
 
@@ -98,7 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    async function restoreSession() {
+    function restoreSession() {
       if (typeof window !== 'undefined') {
         const savedRemembered = localStorage.getItem(REMEMBER_KEY);
         if (savedRemembered) {
@@ -113,21 +270,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(synced);
           setToken(storedToken);
 
-          // Background verification of token validity
-          try {
-            const freshProfile = await api.get<User>('/auth/me');
-            if (isMounted) {
-              const freshSynced = syncUserWithDemo(freshProfile);
-              setUser(freshSynced);
-              if (freshSynced) {
+          // Asynchronous background profile refresh (does not block local session)
+          api.get<User>('/auth/me')
+            .then((freshProfile) => {
+              if (isMounted && freshProfile) {
+                const freshSynced = syncUserWithDemo(freshProfile);
+                setUser(freshSynced);
                 try {
                   localStorage.setItem(USER_KEY, JSON.stringify(freshSynced));
                 } catch {}
               }
-            }
-          } catch (e) {
-            // If verification fails, api.request handles refresh automatically.
-          }
+            })
+            .catch((err: any) => {
+              // Only clear session if explicitly rejected with 401 Unauthorized
+              if (err?.message?.includes('401') || err?.message?.includes('Unauthorized')) {
+                clearStoredSession();
+                if (isMounted) {
+                  setUser(null);
+                  setToken(null);
+                }
+              } else {
+                console.warn('[AUTH] Background profile check warning:', err?.message || err);
+              }
+            });
         }
       }
 
@@ -151,11 +316,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!user && !isLoginPage) {
       router.replace('/login');
-      return;
+      // Hard fallback if client-side router transition is blocked
+      const fallbackTimer = setTimeout(() => {
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.replace('/login');
+        }
+      }, 400);
+      return () => clearTimeout(fallbackTimer);
     }
 
     if (user && isLoginPage) {
-      router.replace(user.role === 'ADMIN' ? '/' : '/samples');
+      if (typeof window !== 'undefined') {
+        window.location.replace('/');
+      } else {
+        router.replace('/');
+      }
       return;
     }
   }, [user, isLoading, pathname, router]);
@@ -165,7 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await api.post<AuthResponse>('/auth/login', {
         email: identifier.trim(),
-        password: pass,
+        password: pass.trim(),
       });
 
       const syncedUser = syncUserWithDemo(res.user) || res.user;
@@ -178,7 +353,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRememberedIdentifier(identifier.trim());
       }
 
-      router.replace(res.user?.role === 'ADMIN' ? '/' : '/samples');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      } else {
+        router.replace('/');
+      }
     } finally {
       setIsLoading(false);
     }
