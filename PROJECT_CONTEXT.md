@@ -1,162 +1,139 @@
 # City Pharma LIMS — Project Context & Architecture Guide
 
-> **Document Version:** 1.0.0  
-> **Repository:** [https://github.com/Zohaibzeeshan0/LIMS](https://github.com/Zohaibzeeshan0/LIMS)  
-> **Last Verified:** October 2026  
-> **Purpose:** Authoritative codebase reference to eliminate repeated exploration, accelerate feature delivery, and ensure 100% correctness across frontend and backend.
+> **Document Version:** 2.0.0  
+> **Repository:** [https://github.com/zohaibzeeshan26/LIMS](https://github.com/zohaibzeeshan26/LIMS)  
+> **Last Verified:** November 2026  
+> **Purpose:** Authoritative single source of truth for the codebase to eliminate repeated exploration, accelerate future feature development, and ensure 100% correctness across frontend and backend.
 
 ---
 
-## 1. System Overview & Domain
+## 1. System Overview & Pharmaceutical Domain
 
-City Pharma **LIMS** (Laboratory Information Management System) is an enterprise pharmaceutical grade system designed for cGMP (current Good Manufacturing Practice) and FDA 21 CFR Part 11 compliance. It governs:
-1. **Sample Accession & Intake:** Logging samples from production lines and sampling booths into four distinct QC laboratories:
-   - **SAF** (Sterile Area Facility / Cephalosporins)
-   - **SEF** (Semi-Synthetic Penicillins & Extended Formulations)
-   - **PENICILLIN** (Dedicated Penicillin Block)
-   - **GENERAL** (Oral Solids, Liquids, Non-sterile production)
-2. **Analytical Testing & Electronic Worksheets:** Assigning compendial tests (USP/BP/Ph.Eur/In-House), recording raw and calculated assay results, measuring conformance against min/max limits.
-3. **Out-of-Specification (OOS) Investigations:** Phase I laboratory investigations, re-testing protocols, and QA dispositioning.
-4. **Batch Release & Certificates of Analysis (CoA):** Quarantine-to-release workflow with digital verification.
-5. **ALCOA+ Audit Trail:** Immutable historical audit logs tracking every change, user, timestamp, previous value, new value, and rationale.
+City Pharma **LIMS** (Laboratory Information Management System) is an enterprise pharmaceutical cGMP system designed for Citi Pharma (Pakistan) adhering to FDA 21 CFR Part 11 and ALCOA+ data integrity standards.
 
----
-
-## 2. Technology Stack
-
-### Backend (`/backend`)
-| Component | Technology | Version / Details |
-|---|---|---|
-| **Framework** | NestJS | 10.3.8 (TypeScript 5.4) |
-| **Runtime** | Node.js | v20+ / Windows PowerShell |
-| **ORM & Database** | Prisma ORM & PostgreSQL | Prisma 5.13.0, schema in `prisma/schema.prisma` |
-| **Authentication** | Passport.js + JWT | Access tokens (15m) + Refresh tokens (7d), bcrypt password hashing |
-| **Validation** | Class-Validator & Class-Transformer | Strict DTO validation with implicit conversions |
-| **API Documentation** | Swagger / OpenAPI | Configured at `/api/v1` via `@nestjs/swagger` |
-| **Date / Time** | `date-fns` & `date-fns-tz` | `Asia/Karachi` timezone adherence |
-
-### Frontend (`/frontend`)
-| Component | Technology | Version / Details |
-|---|---|---|
-| **Framework** | Next.js (App Router) | 14.2.3 |
-| **UI Library** | React | 18.3.1 |
-| **State & Fetching** | TanStack React Query | v5.32.0 (cache invalidation on mutations) |
-| **Forms & Validation** | React Hook Form + Zod | `zodResolver` schema enforcement |
-| **Styling** | Vanilla CSS + Tailwind CSS | Tailwind 3.4.3 (`globals.css`, customized navy/slate/rose tokens) |
-| **Icons** | Lucide React | 0.372.0 |
-| **HTTP Client** | Custom Fetch Client (`api.ts`) | Automatic JWT rotation, 401 interception, session storage sync |
+### Key Capabilities:
+1. **Multi-Laboratory Sample Accession & Intake:**
+   - **General Lab (`GENERAL`):** Oral Solids, Liquids, Non-sterile production (Sample Prefix: `GL/SB-`, `GL/F-`)
+   - **Cephalosporin Lab (`CEPHALOSPORIN`):** Sterile Cephalosporins (Sample Prefix: `CEPH/SB-`, `CEPH/F-`)
+   - **Penicillin Lab (`PENICILLIN`):** Dedicated Penicillin Block (Sample Prefix: `PEN/SB-`, `PEN/F-`)
+2. **Lab Sub-Sections:**
+   - **Semi Basics (`semi-base`):** Raw materials, quarantine samples, in-process testing.
+   - **Formulation (`formulation`):** Finished products, coated tablets, injections.
+3. **Analytical Testing Worksheets:** Execution of compendial tests (USP/BP/Ph.Eur/In-House), recording raw and calculated assay results, limits validation.
+4. **Out-of-Specification (OOS):** Phase I laboratory investigations, root cause analysis, QA disposition.
+5. **Batch Release & CoA:** Quarantine-to-release workflow with digital verification and Certificate of Analysis generation.
+6. **ALCOA+ Audit Trail:** Immutable audit logs (`audit_logs` & `audit_trails`) tracking user, timestamp, prior value, and new value.
 
 ---
 
-## 3. Directory Structure
+## 2. Technology Stack Mandate
+
+* **Frontend:** Next.js 14.2 (App Router) + React 18 + Tailwind CSS 3.4 + TanStack React Query v5
+* **Backend:** Node.js 20 LTS + Express / NestJS Architecture + TypeScript 5.4
+* **Database:** PostgreSQL 18 (Prisma ORM 5.13+)
+* **Authentication:** JWT (Access: 15min, Refresh: 7d) with role-based & laboratory isolation
+
+### Running Ports & Services:
+| Service | URL / Port | Protocol / Path | Start Command |
+|---|---|---|---|
+| **Frontend** | `http://localhost:3000` | HTTP | `npm run dev` (in `frontend/`) |
+| **Backend API** | `http://localhost:5000` | HTTP (`/api/v1`) | `node dist/src/server.js` or `npm run dev` (in `backend/`) |
+| **PostgreSQL** | `localhost:5432` | TCP (DB: `city_pharma_lims`) | Windows Service (`postgresql-x64-18`) |
+
+---
+
+## 3. Key Directory Structure & File Map
 
 ```
-LIMS/
-├── backend/                             # NestJS API Server (Port: 3001, Prefix: /api/v1)
+Star LIMS/
+├── PROJECT_CONTEXT.md                   # THIS FILE - Read before every task
+├── TASK_PLAN.md                         # Active implementation tracker & history
+├── AGENTS.md                            # Stack rules & git push constraints
+├── README.md                            # Operational guide & credentials
+├── city_pharma_lims_complete.sql        # Database schema + initial data dump
+│
+├── backend/                             # API Server (Port 5000, Base: /api/v1)
+│   ├── .env                             # PORT=5000, DATABASE_URL, JWT secrets
 │   ├── prisma/
 │   │   ├── schema.prisma                # Database schema (PostgreSQL)
-│   │   ├── seed.ts                      # Initial roles, users, test specs, and batches
+│   │   ├── seed.ts                      # Database seed logic
 │   ├── src/
-│   │   ├── analytics/                   # Lab throughput & turnaround time metrics
-│   │   ├── audit-logs/                  # 21 CFR Part 11 audit trail service & controller
-│   │   ├── auth/                        # Login, JWT strategy, refresh token logic, guards
-│   │   ├── batches/                     # Drug product batch management & release states
-│   │   ├── categories/                  # Material & sample categories
-│   │   ├── common/                      # Exception filters, decorators, logging
-│   │   ├── instruments/                 # Analytical equipment calibration & status
-│   │   ├── laboratories/                # Lab modules (SAF, SEF, PENICILLIN, GENERAL)
-│   │   ├── oos/                         # Out of specification investigation workflows
-│   │   ├── samples/                     # Sample lifecycle, approvals, and reviews
-│   │   ├── sampling/                    # Accession intake, barcode/sample IDs, priority SLA
-│   │   │   ├── dto/                     # create-sample.dto.ts, update-sample.dto.ts
-│   │   │   ├── sampling.controller.ts   # Sampling REST endpoints
-│   │   │   ├── sampling.service.ts      # Core accession business logic & PostgreSQL mutations
-│   │   ├── submissions/                 # Certificate of analysis & final batch submissions
-│   │   ├── tests/                       # Test specifications, test execution, analytical entry
-│   │   ├── users/                       # User management, roles (ADMIN, QA, QC, AUDITOR)
-│   │   ├── app.module.ts                # Main backend module wiring
-│   │   └── main.ts                      # Bootstrap, CORS config, ValidationPipe, Swagger
-│   ├── .env                             # Local environment variables
+│   │   ├── server.ts                    # Server entrypoint & DB connection test
+│   │   ├── app.ts                       # Express app bootstrap, CORS, route mounting
+│   │   ├── config/
+│   │   │   ├── env.ts                   # Environment variables loader
+│   │   │   └── prisma.ts                # PrismaClient singleton instance
+│   │   ├── auth/ & services/auth.service.ts # Authentication, passwords, JWT tokens
+│   │   ├── sampling/ & services/sampling.service.ts # Core sample accession & lab routing
+│   │   ├── samples/                     # Sample lifecycle & approvals
+│   │   ├── batches/                     # Batch records & release management
+│   │   ├── oos/                         # Out-of-Specification workflows
+│   │   ├── audit-logs/ & audit/         # 21 CFR Part 11 audit trails
+│   │   └── laboratories/                # Lab modules & instrument calibrations
+│   ├── dist/                            # Compiled JS output for high-performance execution
 │   └── package.json
 │
-├── frontend/                            # Next.js App Router Client (Port: 3000)
-│   ├── src/
-│   │   ├── app/                         # App Router Pages
-│   │   │   ├── layout.tsx               # Root layout & providers
-│   │   │   ├── page.tsx                 # Executive Dashboard (KPIs, pending samples, audit logs)
-│   │   │   ├── login/page.tsx           # High-aesthetic pharma login portal
-│   │   │   ├── samples/page.tsx         # Samples registry, filtering, dossiers, status actions
-│   │   │   ├── testing/page.tsx         # Analytical testing worksheets & data entry
-│   │   │   ├── oos/page.tsx             # OOS investigations & management
-│   │   │   ├── batches/page.tsx         # Batch records & release tracking
-│   │   │   ├── instruments/page.tsx     # Equipment calibration & usage logs
-│   │   │   ├── audit/page.tsx           # Full audit trail log explorer
-│   │   │   └── reports/page.tsx         # Regulatory reports & CSV/PDF exports
-│   │   ├── components/
-│   │   │   ├── layout/                  # Navbar.tsx, Sidebar.tsx, AppShell.tsx
-│   │   │   ├── samples/                 # NewSampleModal.tsx, EditSampleModal.tsx, PrintSampleModal.tsx, SubmitSampleModal.tsx
-│   │   │   └── ui/                      # Modal.tsx, Button.tsx, Badge.tsx, StatCard.tsx, CityPharmaLogo.tsx
-│   │   ├── context/
-│   │   │   └── AuthContext.tsx          # User session, role verification, login/logout
-│   │   ├── lib/
-│   │   │   ├── api.ts                   # Fetch-based API client with auto-refresh queue
-│   │   │   └── utils.ts                 # Class merger (cn) and formatting helpers
-│   │   ├── services/                    # Typed API services (sampling, audit, categories, etc.)
-│   │   └── types/
-│   │       └── lims.ts                  # Shared TypeScript interfaces (Sample, Batch, Test, User)
-│   ├── .env.local                       # Local frontend environment variables
-│   └── package.json
-│
-├── PROJECT_CONTEXT.md                   # This authoritative context document
-├── TASK_PLAN.md                         # Active task tracking & implementation history
-└── README.md
+└── frontend/                            # Next.js App Router Client (Port 3000)
+    ├── .env                             # NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+    ├── src/
+    │   ├── app/
+    │   │   ├── layout.tsx               # Root layout & React Query provider
+    │   │   ├── page.tsx                 # Portal Launchpad / Executive Dashboard
+    │   │   ├── login/page.tsx           # Login portal with quick role personas
+    │   │   ├── samples/page.tsx         # Samples registry (3 labs × 2 sections)
+    │   │   ├── testing/page.tsx         # Electronic analytical testing worksheets
+    │   │   ├── batches/page.tsx         # Batch records & CoA tracking
+    │   │   ├── oos/page.tsx             # OOS investigations
+    │   │   ├── audit/page.tsx           # Audit trail explorer
+    │   │   └── users/page.tsx           # User management directory (Admin only)
+    │   ├── components/
+    │   │   ├── layout/                  # Navbar.tsx, Sidebar.tsx, AppShell.tsx
+    │   │   ├── samples/                 # NewSampleModal, EditSampleModal, PrintSampleModal
+    │   │   └── ui/                      # Modal.tsx, Button.tsx, Badge.tsx, StatCard.tsx
+    │   ├── context/
+    │   │   └── AuthContext.tsx          # Session state, JWT storage, role verification
+    │   ├── lib/
+    │   │   ├── api.ts                   # HTTP client with auto-refresh token handling
+    │   │   └── date.ts                  # Timezone-aware date helpers
+    │   ├── services/                    # Typed API service wrappers
+    │   └── types/
+    │       └── lims.ts                  # TypeScript interfaces & getUserLabAccess helper
+    └── package.json
 ```
 
 ---
 
-## 4. Key Business Logic & Conventions
+## 4. Authentication & Credentials
 
-### Priority SLA Targets & Notifications
-- **ROUTINE:** `5 Days` turnaround target. Standard lab priority.
-- **URGENT:** `2 Days` turnaround target. Displays amber warning badge and triggers executive admin notification in Navbar & Dashboard alert banner.
-- **STAT / IMMEDIATE:** `24 Hours` turnaround target. Displays pulsing rose critical badge and triggers immediate high-priority admin notification in Navbar & Dashboard banner.
-
-### Sample Accession Intake
-- Located in [`NewSampleModal.tsx`](frontend/src/components/samples/NewSampleModal.tsx).
-- Storage Condition has been removed from manual input (defaults safely to `'Controlled Room Temp 20-25°C'`).
-- Compendial Test selection has been removed from the initial accession intake form (defaults safely to empty array `[]`).
-- Priority selection dynamically updates SLA target banner directly above the submit button.
-
-### ALCOA+ Audit Trail
-- Any change made by non-admin staff triggers:
-  1. An immutable audit record in PostgreSQL (`audit_logs` table).
-  2. Live notification on the Admin dashboard.
-  3. Navbar alert badge count increment.
-
-### Security & Authentication
-- Header: `Authorization: Bearer <accessToken>`.
-- Token keys: `cp_lims_token`, `cp_lims_refresh_token`, `cp_lims_user`.
-- Multi-storage support (SessionStorage for shared terminals vs LocalStorage for Remember Me).
+* **Super Admin (Full System Access):**
+  * Username / Email: `admin` / `admin@citypharma.com`
+  * Password: `admin` or `lims123` or `Admin@1234`
+  * Role: `ADMIN`
+* **QC Analysts & Lab Personas:**
+  * General Lab: `analyst` or `general` (Password: `lab123` or `gen123`)
+  * Penicillin Lab: `penicillin` (Password: `pen123`)
+  * Cephalosporin Lab: `cephalosporin` (Password: `ceph123`)
+  * Nasir (0012): `0012` (Password: `123456`)
 
 ---
 
-## 5. Development Commands
+## 5. Standard Development & Verification Commands
 
-| Task | Location | Command |
+| Action | Working Directory | Command |
 |---|---|---|
-| **Start Backend Dev Server** | `backend/` | `npm run start:dev` (runs on `http://localhost:3001/api/v1`) |
-| **Start Frontend Dev Server** | `frontend/` | `npm run dev` (runs on `http://localhost:3000`) |
-| **Prisma Generate** | `backend/` | `npm run prisma:generate` |
-| **Prisma DB Push / Migrate** | `backend/` | `npm run prisma:push` or `npm run prisma:migrate` |
-| **Prisma Studio UI** | `backend/` | `npm run prisma:studio` |
-| **Database Seed** | `backend/` | `npm run prisma:seed` |
-| **Frontend Type Check** | `frontend/` | `npx tsc --noEmit` |
-| **Git Push** | Workspace Root | `git push origin main` |
+| **Build Backend** | `backend/` | `npx tsc` |
+| **Start Backend** | `backend/` | `node dist/src/server.js` |
+| **Start Frontend** | `frontend/` | `npm run dev` |
+| **Type Check Frontend** | `frontend/` | `npx tsc --noEmit` |
+| **Prisma Generate** | `backend/` | `npx prisma generate` |
+| **Git Push** *(User instructed only)* | Workspace Root | `git push origin main` |
 
 ---
 
-## 6. Guidelines for Fast & Correct Agentic Changes
-1. **Always read `PROJECT_CONTEXT.md` and `TASK_PLAN.md` first** before beginning work.
-2. **For small changes:** Locate target file directly, edit using `replace_file_content` or `multi_replace_file_content`, run `npx tsc --noEmit`, and push to git.
-3. **For complex/multi-file changes:** Write step-by-step plan in `TASK_PLAN.md` first, implement methodically, verify, and update `TASK_PLAN.md`.
-4. **Never stop dev servers:** Dev servers (`npm run start:dev` and `npm run dev`) run continuously in background processes. Do not restart them unless environment variables or schema change.
+## 6. Rules for Fast & Correct Future Tasks
+
+1. **Read First:** Check `PROJECT_CONTEXT.md` and `TASK_PLAN.md` before touching code.
+2. **Small Changes:** Skip broad codebase scans. Identify target file from Section 3, edit directly, verify, and finish.
+3. **Complex Tasks:** Outline the plan in `TASK_PLAN.md`, implement incrementally, and update status.
+4. **Preserve Services:** Do not kill running background dev servers unless modifying `.env` or Prisma schema.
+5. **Respect `AGENTS.md`:** Only perform `git push` when the user explicitly requests it.

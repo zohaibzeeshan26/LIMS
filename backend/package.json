@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "start": "node init && node dist/server.js",
+    "start": "node init && node dist/src/server.js",
     "dev": "node init && ts-node -r tsconfig-paths/register src/server.ts",
     "start:dev": "node init && ts-node -r tsconfig-paths/register src/server.ts",
     "start.dev": "ts-node -r tsconfig-paths/register src/server.ts",
