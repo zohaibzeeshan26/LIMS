@@ -1,5 +1,6 @@
 import express, { Application } from 'express';
 import cors from 'cors';
+
 import { ENV } from './config/env';
 import apiRouter from './routes';
 import { errorHandler } from './middlewares/error.middleware';
@@ -23,6 +24,7 @@ export function createApp(): Application {
   // Request logger in development
   if (ENV.NODE_ENV === 'development') {
     app.use((req, res, next) => {
+
       console.log(`[HTTP] ${req.method} ${req.url}`);
       next();
     });
