@@ -16,7 +16,6 @@ import {
   FileText,
   Package,
   BarChart3,
-  Settings,
   ArrowRight,
   FlaskConical,
   ShieldAlert,
@@ -28,6 +27,8 @@ import {
   Lock,
   UserCheck,
   FileSpreadsheet,
+  Users,
+  FileCheck2,
 } from 'lucide-react';
 
 export default function WelcomePortalPage() {
@@ -87,30 +88,6 @@ export default function WelcomePortalPage() {
 
   const portalCards = [
     {
-      id: 'samples',
-      title: 'Sample Lab',
-      description: 'Manage samples, scan barcodes and track sample status across laboratories.',
-      href: '/samples',
-      icon: TestTube2,
-      badgeText: metrics?.totalSamples ? `${metrics.totalSamples} Active` : 'All Labs',
-      // Pastel purple theme matching mockup Card 1
-      cardBg: 'bg-[#f8f7ff] border-[#e7e3fc] hover:border-[#c5bcf8] hover:shadow-md',
-      iconBg: 'bg-[#ede9fe] text-[#7c3aed]',
-      arrowColor: 'text-slate-400 group-hover:text-[#7c3aed]',
-    },
-    {
-      id: 'tasks',
-      title: 'Assigning Task',
-      description: 'Allocate samples, test protocols and analytical worksheets to designated laboratory analysts.',
-      href: '/tasks',
-      icon: UserCheck,
-      badgeText: 'Duty Allocation',
-      // Pastel indigo theme
-      cardBg: 'bg-[#f5f3ff] border-[#e0e7ff] hover:border-[#a5b4fc] hover:shadow-md',
-      iconBg: 'bg-[#ede9fe] text-[#4f46e5]',
-      arrowColor: 'text-slate-400 group-hover:text-[#4f46e5]',
-    },
-    {
       id: 'dashboard',
       title: 'QC Dashboard',
       description: 'Real-time metrics, emergency sample notices, test approvals, and audit activity.',
@@ -123,9 +100,55 @@ export default function WelcomePortalPage() {
       arrowColor: 'text-slate-400 group-hover:text-[#16a34a]',
     },
     {
+      id: 'users',
+      title: 'User Management',
+      description: 'Role-based access control (RBAC), user authentication, laboratory permissions, and credential security.',
+      href: '/users',
+      icon: Users,
+      badgeText: 'RBAC & Auth',
+      cardBg: 'bg-[#faf5ff] border-[#f3e8ff] hover:border-[#d8b4fe] hover:shadow-md',
+      iconBg: 'bg-[#f3e8ff] text-[#9333ea]',
+      arrowColor: 'text-slate-400 group-hover:text-[#9333ea]',
+    },
+    {
+      id: 'samples',
+      title: 'Sample Registration',
+      description: 'Manage samples, scan barcodes and track sample status across laboratories.',
+      href: '/samples',
+      icon: TestTube2,
+      badgeText: metrics?.totalSamples ? `${metrics.totalSamples} Active` : 'All Labs',
+      // Pastel purple theme matching mockup Card 1
+      cardBg: 'bg-[#f8f7ff] border-[#e7e3fc] hover:border-[#c5bcf8] hover:shadow-md',
+      iconBg: 'bg-[#ede9fe] text-[#7c3aed]',
+      arrowColor: 'text-slate-400 group-hover:text-[#7c3aed]',
+    },
+    {
+      id: 'tasks',
+      title: 'Sample Assignment',
+      description: 'Allocate samples, test protocols and analytical worksheets to designated laboratory analysts.',
+      href: '/tasks',
+      icon: UserCheck,
+      badgeText: 'Duty Allocation',
+      // Pastel indigo theme
+      cardBg: 'bg-[#f5f3ff] border-[#e0e7ff] hover:border-[#a5b4fc] hover:shadow-md',
+      iconBg: 'bg-[#ede9fe] text-[#4f46e5]',
+      arrowColor: 'text-slate-400 group-hover:text-[#4f46e5]',
+    },
+    {
+      id: 'documentation-manager',
+      title: 'Documentation',
+      description: 'Upload & maintain approved commercial product description PDF documents (.pdf) and version history.',
+      href: '/documentation-manager',
+      icon: FileText,
+      badgeText: 'PDF Docs',
+      cardBg: 'bg-[#f0fdfa] border-[#ccfbf1] hover:border-[#99f6e4] hover:shadow-md',
+      iconBg: 'bg-[#ccfbf1] text-[#0d9488]',
+      arrowColor: 'text-slate-400 group-hover:text-[#0d9488]',
+    },
+    {
       id: 'testing',
-      title: 'Test Reports',
-      description: 'View, print and manage lab test reports, COAs and analytical testing.',
+      title: 'Analyst Execution',
+      description: 'Execute analytical tests, enter compendial worksheet results, and review pharmacopeial limits.',
       href: '/testing',
       icon: FileText,
       badgeText: metrics?.inTesting ? `${metrics.inTesting} In Analysis` : 'QC Protocols',
@@ -133,6 +156,17 @@ export default function WelcomePortalPage() {
       cardBg: 'bg-[#f0f7ff] border-[#d5e7fd] hover:border-[#acd2fc] hover:shadow-md',
       iconBg: 'bg-[#dbeafe] text-[#2563eb]',
       arrowColor: 'text-slate-400 group-hover:text-[#2563eb]',
+    },
+    {
+      id: 'quality-review',
+      title: 'Quality Review & Certificate (CoA)',
+      description: 'Review analytical worksheets, verify pharmacopeial limits, authorize batch disposition, and issue release CoAs.',
+      href: '/quality-review',
+      icon: FileCheck2,
+      badgeText: 'Release & CoA',
+      cardBg: 'bg-[#f0fdf4] border-[#dcfce7] hover:border-[#86efac] hover:shadow-md',
+      iconBg: 'bg-[#dcfce7] text-[#16a34a]',
+      arrowColor: 'text-slate-400 group-hover:text-[#16a34a]',
     },
     {
       id: 'products',
@@ -168,18 +202,6 @@ export default function WelcomePortalPage() {
       cardBg: 'bg-[#fff1f2] border-[#fecdcb] hover:border-[#fda5b1] hover:shadow-md',
       iconBg: 'bg-[#ffe4e6] text-[#e11d48]',
       arrowColor: 'text-slate-400 group-hover:text-[#e11d48]',
-    },
-    {
-      id: 'settings',
-      title: 'Settings & Instruments',
-      description: 'Configure lab, instruments, user roles and system preferences.',
-      href: '/instruments',
-      icon: Settings,
-      badgeText: 'Equipment',
-      // Pastel cyan/teal theme matching mockup Card 6
-      cardBg: 'bg-[#f0f9fa] border-[#d1eff2] hover:border-[#a3dfe5] hover:shadow-md',
-      iconBg: 'bg-[#cffafe] text-[#0891b2]',
-      arrowColor: 'text-slate-400 group-hover:text-[#0891b2]',
     },
   ];
 

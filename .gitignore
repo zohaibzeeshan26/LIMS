@@ -45,4 +45,8 @@ desktop.ini
 *.sw?
 config.bat
 
+# Uploads
+uploads/
+*/uploads/
+
 frontend/portalbe/

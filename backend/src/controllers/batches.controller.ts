@@ -29,6 +29,15 @@ export class BatchesController {
     }
   }
 
+  async getAllCoas(req: Request, res: Response, next: NextFunction) {
+    try {
+      const coas = await batchesService.getAllCoas();
+      res.json(coas);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async releaseBatch(req: Request, res: Response, next: NextFunction) {
     try {
       const { decision, notes } = req.body;

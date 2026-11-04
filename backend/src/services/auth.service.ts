@@ -46,6 +46,8 @@ export class AuthService {
         user = await prisma.user.findFirst({ where: { username: 'penicillin' } });
       } else if (lower.includes('ceph') || lower.includes('cephalosporin')) {
         user = await prisma.user.findFirst({ where: { username: 'cephalosporin' } });
+      } else if (lower.includes('doc') || lower.includes('sana')) {
+        user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
       }
     }
 

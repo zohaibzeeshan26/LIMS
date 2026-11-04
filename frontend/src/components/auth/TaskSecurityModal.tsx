@@ -99,7 +99,7 @@ export function TaskSecurityModal({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-800 tracking-tight">
-                Assigning Task Gateway
+                Sample Assignment Gateway
               </span>
               <span className="text-[10px] font-mono font-extrabold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
                 DUTY ALLOCATION

@@ -23,6 +23,7 @@ import {
   ArrowRight,
   LogOut,
   FileSpreadsheet,
+  FileCheck2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -198,34 +199,47 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         isPriority: true,
       },
       {
-        name: 'All Samples Registry',
+        name: 'User Management',
+        href: '/users',
+        icon: Users,
+        adminOnly: true,
+        badge: 'Admin',
+      },
+      {
+        name: 'Sample Registration',
         href: '/samples',
         icon: FileText,
         badge: labBadgeLabel,
       },
       {
-        name: 'Task Assignment',
+        name: 'Sample Assignment',
         href: '/tasks',
         icon: UserCheck,
         badge: 'Tasks',
       },
       {
-        name: 'Analytical Tests',
+        name: 'Documentation',
+        href: '/documentation-manager',
+        icon: FileText,
+        roles: ['DOCUMENTATION_MANAGER', 'ADMIN', 'QA_MANAGER', 'MANAGER'],
+        badge: 'PDF Docs',
+      },
+      {
+        name: 'Analyst Execution',
         href: '/testing',
         icon: Microscope,
+      },
+      {
+        name: 'Quality Review & Certificate (CoA)',
+        href: '/quality-review',
+        icon: FileCheck2,
+        badge: 'CoA',
       },
       {
         name: 'Products',
         href: '/products',
         icon: Package,
         badge: 'Products',
-      },
-      {
-        name: 'User Management',
-        href: '/users',
-        icon: Users,
-        adminOnly: true,
-        badge: 'Admin',
       },
       {
         name: 'Batches & Inventory',

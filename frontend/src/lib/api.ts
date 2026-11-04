@@ -244,6 +244,38 @@ class ApiClient {
   delete<T>(endpoint: string, options?: RequestInit) {
     return this.request<T>(endpoint, { method: 'DELETE', ...options });
   }
+
+  async upload<T>(endpoint: string, formData: FormData): Promise<T> {
+    const url = endpoint.startsWith('http')
+      ? endpoint
+      : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    const token = getStoredToken();
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = Array.isArray(errorData.message)
+          ? errorData.message.join(', ')
+          : errorData.message || errorMessage;
+      } catch (e) {}
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

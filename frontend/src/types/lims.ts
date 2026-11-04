@@ -8,7 +8,8 @@ export type Role =
   | 'DEPUTY_MANAGER'
   | 'SHIFT_INCHARGE'
   | 'TESTING_ANALYST'
-  | 'ANALYST';
+  | 'ANALYST'
+  | 'DOCUMENTATION_MANAGER';
 
 export type SampleStatus =
   | 'RECEIVED'
@@ -45,7 +46,8 @@ export function getUserLabAccess(
     role === 'AUDITOR' ||
     role === 'MANAGER' ||
     role === 'DEPUTY_MANAGER' ||
-    role === 'SHIFT_INCHARGE'
+    role === 'SHIFT_INCHARGE' ||
+    role === 'DOCUMENTATION_MANAGER'
   ) {
     return 'ALL';
   }
@@ -517,4 +519,45 @@ export interface AuditTrail {
   reasonForChange?: string | null;
   diffPayload?: string | null;
   performedBy?: User | null;
+}
+
+export interface ProductDocument {
+  id: string;
+  productId: string;
+  productName: string;
+  productCode: string;
+  category: string;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  filePath?: string;
+  version: number;
+  versionNotes?: string | null;
+  uploadedById?: string | null;
+  uploadedByName: string;
+  isCurrent: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Product {
+  id: string;
+  brandName: string;
+  genericName: string;
+  dosageForm: string;
+  strength: string;
+  packSize: string;
+  laboratory: LaboratoryType | string;
+  labName: string;
+  atmCode: string;
+  version: string;
+  status: string;
+  specs: string;
+  description: string;
+  parameters: string[];
+  documents?: ProductDocument[];
+  currentDocument?: ProductDocument | null;
+  createdAt?: string;
+  updatedAt?: string;
 }

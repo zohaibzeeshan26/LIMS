@@ -226,6 +226,18 @@ export const DEMO_USERS = [
     labBadge: 'Cephalosporin Lab',
     labId: 'cephalosporin',
   },
+  {
+    role: 'DOCUMENTATION_MANAGER' as const,
+    username: 'doc.manager',
+    email: 'doc.manager@citypharma.com',
+    password: 'doc123',
+    employeeId: 'EMP-DOC-MGR',
+    name: 'Sana Tariq',
+    title: 'Documentation Manager',
+    desc: 'Manage approved product descriptions, Word documentation (.doc/.docx) & revisions',
+    labBadge: 'Doc Manager',
+    labId: 'all',
+  },
 ];
 
 function syncUserWithDemo(u: User | null): User | null {

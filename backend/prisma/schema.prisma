@@ -18,6 +18,7 @@ enum Role {
   QC_ANALYST
   LAB_TECHNICIAN
   AUDITOR
+  DOCUMENTATION_MANAGER
 }
 
 enum BatchStatus {
@@ -138,6 +139,7 @@ model User {
   auditTrails        AuditTrail[]
   auditLogs          AuditLog[]              @relation("UserAuditLogs")
   sampleSubmissions  SampleSubmission[]      @relation("WorkflowSubmittedBy")
+  uploadedProductDocuments ProductDocument[] @relation("UploadedBy")
 
   @@map("users")
 }
@@ -543,5 +545,55 @@ model AskprolQcReport {
   @@index([stage])
   @@index([overallVerdict])
   @@map("askprol_qc_reports")
+}
+
+model Product {
+  id          String   @id
+  brandName   String
+  genericName String
+  dosageForm  String
+  strength    String
+  packSize    String
+  laboratory  String
+  labName     String
+  atmCode     String
+  version     String
+  status      String
+  specs       String
+  description String
+  parameters  String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents ProductDocument[]
+
+  @@map("products")
+}
+
+model ProductDocument {
+  id             String   @id @default(uuid())
+  productId      String
+  productName    String
+  productCode    String
+  category       String
+  title          String
+  fileName       String
+  fileSize       Int
+  mimeType       String
+  filePath       String
+  version        Int      @default(1)
+  versionNotes   String?
+  uploadedById   String?
+  uploadedByName String
+  isCurrent      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  uploadedBy User?   @relation("UploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([isCurrent])
+  @@map("product_documents")
 }
 

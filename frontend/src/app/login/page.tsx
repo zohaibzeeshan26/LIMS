@@ -379,8 +379,8 @@ export default function LoginPage() {
                 <span className="text-[10px] text-slate-400">Click to fill</span>
               </div>
 
-              {/* Super Admin, Nasir & QC Analyst Quick Chips */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+              {/* Super Admin, Doc Manager, Nasir & QC Analyst Quick Chips */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
                 {/* Super Admin */}
                 <button
                   type="button"
@@ -402,6 +402,31 @@ export default function LoginPage() {
                     </div>
                   </div>
                   <span className="text-[11px] font-bold text-blue-600 group-hover:underline">
+                    &rarr;
+                  </span>
+                </button>
+
+                {/* Documentation Manager */}
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleDirectLogin('doc.manager', 'doc123')}
+                  className="p-2.5 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/70 text-left transition-all flex items-center justify-between group cursor-pointer disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-lg bg-teal-600 text-white flex items-center justify-center text-xs font-black shrink-0">
+                      DM
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 group-hover:text-teal-700">
+                        Doc Manager
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        doc.manager / doc123
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-teal-600 group-hover:underline">
                     &rarr;
                   </span>
                 </button>

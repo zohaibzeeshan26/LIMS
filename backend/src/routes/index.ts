@@ -13,6 +13,8 @@ import usersRoutes from './users.routes';
 import submissionsRoutes from './submissions.routes';
 import analyticsRoutes from './analytics.routes';
 import askprolRoutes from './askprol.routes';
+import productsRoutes from './products.routes';
+import productDocumentsRoutes from './product-documents.routes';
 
 const apiRouter = Router();
 
@@ -31,6 +33,8 @@ apiRouter.use('/users', usersRoutes);
 apiRouter.use('/submissions', submissionsRoutes);
 apiRouter.use('/analytics', analyticsRoutes);
 apiRouter.use('/askprol', askprolRoutes);
+apiRouter.use('/products', productsRoutes);
+apiRouter.use('/product-documents', productDocumentsRoutes);
 
 // Root API endpoint
 apiRouter.get('/', (req, res) => {
@@ -55,6 +59,8 @@ apiRouter.get('/', (req, res) => {
       '/api/v1/submissions',
       '/api/v1/analytics',
       '/api/v1/askprol',
+      '/api/v1/products',
+      '/api/v1/product-documents',
     ],
   });
 });

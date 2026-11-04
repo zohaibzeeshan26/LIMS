@@ -900,7 +900,7 @@ function TaskAssignmentPageInner() {
             Portal
           </Link>
           <span>/</span>
-          <span className="font-bold text-slate-800">{activeLabName} — Assigning Task</span>
+          <span className="font-bold text-slate-800">{activeLabName} — Sample Assignment</span>
           {activeSection !== 'all' && (
             <>
               <span>/</span>

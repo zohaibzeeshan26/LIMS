@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { formatDateTime } from '@/lib/date';
 import { STATIC_ANALYSTS, isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
 import { auditService } from '@/services/audit.service';
+import { productService } from '@/services/product.service';
 import {
   FileSpreadsheet,
   CheckCircle2,
@@ -25,6 +26,9 @@ import {
   Play,
   ArrowLeft,
   BookOpen,
+  FileText,
+  Download,
+  Eye,
 } from 'lucide-react';
 import { OfficialAtm003Document } from '@/components/askprol/OfficialAtm003Document';
 
@@ -99,6 +103,40 @@ export default function TestingPage() {
     if (Array.isArray((instrumentsResponse as any).data)) return (instrumentsResponse as any).data;
     return [];
   }, [instrumentsResponse]);
+
+  // Load commercial products to link official description PDF documents
+  const { data: productsList = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: productService.getAll,
+  });
+
+  const getProductDocForTest = React.useCallback(
+    (test: any) => {
+      if (!productsList || productsList.length === 0) return null;
+      const mat = (test?.materialName || test?.nomenclature || '').toLowerCase();
+      const sample = (test?.sampleCode || test?.sampleId || '').toLowerCase();
+      const specName = (test?.testSpecification?.name || test?.testSpecification?.testCode || '').toLowerCase();
+      const pId = (test?.productId || '').toLowerCase();
+
+      const matchedProduct = productsList.find((p) => {
+        const id = p.id.toLowerCase();
+        const brand = p.brandName.toLowerCase();
+        const generic = p.genericName.toLowerCase();
+        const atm = p.atmCode.toLowerCase();
+        const brandTokens = brand.split(/[\s-]+/).filter((t: string) => t.length > 2);
+        const genericTokens = generic.split(/[\s-]+/).filter((t: string) => t.length > 2);
+
+        if (pId && (id === pId || atm === pId)) return true;
+        if (mat && (mat.includes(brand) || mat.includes(generic) || mat.includes(atm))) return true;
+        if (brandTokens.some((tok: string) => mat.includes(tok) || specName.includes(tok) || sample.includes(tok))) return true;
+        if (genericTokens.some((tok: string) => mat.includes(tok) || specName.includes(tok))) return true;
+        return false;
+      });
+
+      return matchedProduct?.currentDocument || null;
+    },
+    [productsList]
+  );
 
   // Flatten sample tests and merge stored tasks for analytical worksheet table
   const allTests = React.useMemo(() => {
@@ -743,6 +781,24 @@ export default function TestingPage() {
                             </Button>
                           )}
 
+                          {/* Official PDF Document Description Link */}
+                          {(() => {
+                            const productDoc = getProductDocForTest(test);
+                            if (!productDoc) return null;
+                            return (
+                              <a
+                                href={productService.getDocumentViewUrl(productDoc.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="h-7 px-2.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+                                title={`Open & View Official Product Description PDF: ${productDoc.fileName} (v${productDoc.version}.0)`}
+                              >
+                                <FileText className="h-3.5 w-3.5 text-rose-600" />
+                                <span>PDF Spec (v{productDoc.version}.0)</span>
+                              </a>
+                            );
+                          })()}
+
                           {/* Direct ATM-003 Sheet link for Askprol tests */}
                           {(test.sampleCode?.includes('ASK') || test.materialName?.includes('Askprol') || test.testSpecification?.testCode?.includes('SPEC-ASK')) && (
                             <Link
@@ -829,6 +885,66 @@ export default function TestingPage() {
                 </div>
               </div>
             </div>
+
+            {/* Official Product Description PDF Document (.pdf) */}
+            {(() => {
+              const activeDoc = getProductDocForTest(activeTest);
+              if (!activeDoc) return null;
+              return (
+                <div className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className="p-2 rounded-lg bg-rose-100 text-rose-800 shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-rose-950 text-xs truncate max-w-[240px]" title={activeDoc.fileName}>
+                          {activeDoc.fileName}
+                        </span>
+                        <span className="font-mono text-[10px] font-bold bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded shrink-0">
+                          v{activeDoc.version}.0 (PDF)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-rose-700 mt-0.5">
+                        Official product description PDF document uploaded by {activeDoc.uploadedByName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={`/products/${activeDoc.productId}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
+                      title="View complete product details and description"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Details</span>
+                    </Link>
+
+                    <a
+                      href={productService.getDocumentViewUrl(activeDoc.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white shadow-2xs shrink-0"
+                      title="Open and read PDF document directly in browser"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>View PDF</span>
+                    </a>
+
+                    <a
+                      href={productService.getDocumentDownloadUrl(activeDoc.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-rose-300 bg-white hover:bg-rose-100 text-rose-800 text-xs font-semibold shadow-2xs shrink-0"
+                      title="Download PDF file"
+                    >
+                      <Download className="w-3.5 h-3.5 text-rose-700" />
+                    </a>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* If Askprol ATM-003 test, show SOP reference banner */}
             {(activeTest.sampleCode?.includes('ASK') || activeTest.materialName?.includes('Askprol') || activeTest.testSpecification?.testCode?.includes('SPEC-ASK')) && (

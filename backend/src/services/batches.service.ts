@@ -88,6 +88,34 @@ export class BatchesService {
     return batch;
   }
 
+  async getAllCoas() {
+    return prisma.certificateOfAnalysis.findMany({
+      orderBy: { issuedDate: 'desc' },
+      include: {
+        authorizedBy: {
+          select: {
+            id: true,
+            fullName: true,
+            employeeId: true,
+            role: true,
+            department: true,
+          },
+        },
+        batch: {
+          include: {
+            samples: {
+              include: {
+                tests: {
+                  include: { testSpecification: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async releaseBatch(id: string, decision: 'RELEASED' | 'REJECTED', notes: string, user: any) {
     const batch = await prisma.batch.findUnique({
       where: { id },

@@ -109,6 +109,10 @@ Star LIMS/
   * Username / Email: `admin` / `admin@citypharma.com`
   * Password: `admin` or `lims123` or `Admin@1234`
   * Role: `ADMIN`
+* **Documentation Manager (Product Descriptions & Word Documents):**
+  * Username / Email: `doc.manager` / `doc.manager@citypharma.com`
+  * Password: `doc123`
+  * Role: `DOCUMENTATION_MANAGER`
 * **QC Analysts & Lab Personas:**
   * General Lab: `analyst` or `general` (Password: `lab123` or `gen123`)
   * Penicillin Lab: `penicillin` (Password: `pen123`)

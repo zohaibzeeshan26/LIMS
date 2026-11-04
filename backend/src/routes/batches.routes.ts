@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/', (req, res, next) => batchesController.findAll(req, res, next));
+router.get('/coas', (req, res, next) => batchesController.getAllCoas(req, res, next));
 router.get('/:id', (req, res, next) => batchesController.findOne(req, res, next));
 router.post('/', requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST), (req, res, next) =>
   batchesController.create(req, res, next)

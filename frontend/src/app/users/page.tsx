@@ -63,6 +63,7 @@ export default function UserManagementPage() {
   const { user: currentUser } = useAuth();
 
   // Search & filter state
+  const [activeTab, setActiveTab] = useState<'USERS' | 'RBAC_MATRIX' | 'AUTH_POLICIES'>('USERS');
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [labFilter, setLabFilter] = useState<string>('ALL');
@@ -337,22 +338,22 @@ export default function UserManagementPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Link
-              href="/dashboard"
+              href="/"
               className="text-xs font-semibold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to QC Dashboard</span>
+              <span>Back to Portal Launchpad</span>
             </Link>
             <span className="text-slate-300">/</span>
-            <span className="text-xs font-bold text-slate-700">User Management</span>
+            <span className="text-xs font-bold text-slate-700">RBAC &amp; User Security</span>
           </div>
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+            <div className="h-9 w-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
               <Users className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Laboratory Personnel & User Management
+                User Management &amp; Authentication Module (RBAC)
               </h1>
               <p className="text-xs text-slate-500">
                 Manage Citi Pharma cGMP analyst credentials, access levels, laboratory assignments, and 21 CFR Part 11 roles.
@@ -383,6 +384,48 @@ export default function UserManagementPage() {
         </div>
       </div>
 
+      {/* Navigation Tabs Bar */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => setActiveTab('USERS')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
+            activeTab === 'USERS'
+              ? 'bg-[#0B1A30] text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          )}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>User Directory ({users.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('RBAC_MATRIX')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
+            activeTab === 'RBAC_MATRIX'
+              ? 'bg-[#0B1A30] text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          )}
+        >
+          <Shield className="w-3.5 h-3.5" />
+          <span>RBAC Permissions Matrix (11 Roles)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('AUTH_POLICIES')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer',
+            activeTab === 'AUTH_POLICIES'
+              ? 'bg-[#0B1A30] text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          )}
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span>Authentication &amp; Security Policies</span>
+        </button>
+      </div>
+
       {/* Action Notification Alert */}
       {actionNotice && (
         <div
@@ -410,8 +453,11 @@ export default function UserManagementPage() {
         </div>
       )}
 
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* TAB 1: USERS DIRECTORY */}
+      {activeTab === 'USERS' && (
+        <>
+          {/* KPI Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="enterprise-card rounded-xl p-3.5 flex items-center justify-between">
           <div>
             <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Personnel</p>
@@ -786,6 +832,376 @@ export default function UserManagementPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: RBAC PERMISSIONS MATRIX (11 ROLES)                                 */}
+      {/* ========================================================================= */}
+      {activeTab === 'RBAC_MATRIX' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 shadow-sm border border-slate-800">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400 bg-teal-950/70 px-2 py-0.5 rounded border border-teal-500/30">
+                  FDA 21 CFR Part 11 Compliance
+                </span>
+                <h3 className="text-lg font-bold text-white mt-1">
+                  Role-Based Access Control (RBAC) Permissions Matrix
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Formal matrix mapping each of the 11 cGMP laboratory roles to permitted operational scopes across Citi Pharma LIMS.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-semibold">
+                  <Check className="w-3.5 h-3.5" /> Full Access
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/30 font-semibold">
+                  <Check className="w-3.5 h-3.5" /> Bench Scoped
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="enterprise-card rounded-2xl overflow-hidden border border-slate-200 shadow-2xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="py-3 px-3.5 sticky left-0 bg-slate-50 z-10 min-w-[180px]">Role / Job Title</th>
+                    <th className="py-3 px-3 text-center">Sample Registration</th>
+                    <th className="py-3 px-3 text-center">Sample Assignment</th>
+                    <th className="py-3 px-3 text-center">Testing Worksheets</th>
+                    <th className="py-3 px-3 text-center">Review &amp; Verify</th>
+                    <th className="py-3 px-3 text-center">QA Release &amp; CoA</th>
+                    <th className="py-3 px-3 text-center">Word Docs (.docx)</th>
+                    <th className="py-3 px-3 text-center">User Admin &amp; RBAC</th>
+                    <th className="py-3 px-3 text-center">Audit Trail Review</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-[11px]">
+                  {/* ADMIN */}
+                  <tr className="hover:bg-slate-50/80 font-medium">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
+                        ADMIN
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Administrator</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
+                  </tr>
+
+                  {/* QA_MANAGER */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 border border-purple-200">
+                        QA_MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QA Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold bg-purple-50/30">Authorize</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold bg-purple-50/30">Release CoA</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Upload &amp; View</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold">Full Audit</td>
+                  </tr>
+
+                  {/* MANAGER */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QC Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Approve</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Assign</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Supervise</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Verify</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Review</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Upload &amp; View</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Inspect</td>
+                  </tr>
+
+                  {/* DEPUTY_MANAGER */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-indigo-50/70 text-indigo-600 border border-indigo-200">
+                        DEPUTY_MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Deputy Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Access</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Assign</td>
+                    <td className="py-2.5 px-3 text-center text-slate-700">Supervise</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Verify</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
+                  </tr>
+
+                  {/* SHIFT_INCHARGE */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200">
+                        SHIFT_INCHARGE
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Shift In-Charge</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-700">Access</td>
+                    <td className="py-2.5 px-3 text-center text-cyan-700 font-bold bg-cyan-50/30">Delegate</td>
+                    <td className="py-2.5 px-3 text-center text-cyan-700 font-semibold">Monitor</td>
+                    <td className="py-2.5 px-3 text-center text-cyan-700 font-semibold">Preliminary</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-500">Read</td>
+                  </tr>
+
+                  {/* TESTING_ANALYST */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
+                        TESTING_ANALYST
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Testing Analyst</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Assigned Only</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-blue-700 font-bold bg-blue-50/30">Bench Assay</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                  </tr>
+
+                  {/* QC_ANALYST */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 border border-sky-200">
+                        QC_ANALYST
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QC Analyst</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Assigned Only</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-sky-700 font-bold bg-sky-50/30">Bench Assay</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                  </tr>
+
+                  {/* ANALYST */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-50/70 text-blue-600 border border-blue-200">
+                        ANALYST
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Analyst</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Assigned Only</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-blue-700 font-bold bg-blue-50/30">Bench Assay</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                  </tr>
+
+                  {/* LAB_TECHNICIAN */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-50 text-teal-700 border border-teal-200">
+                        LAB_TECHNICIAN
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Lab Technician</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-teal-700 font-bold bg-teal-50/30">Accession &amp; Log</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-500">View</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                  </tr>
+
+                  {/* DOCUMENTATION_MANAGER */}
+                  <tr className="hover:bg-slate-50/80 bg-teal-50/20">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-teal-50/40 font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-100 text-teal-800 border border-teal-200">
+                        DOCUMENTATION_MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-teal-900 mt-0.5">Documentation Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-teal-800 font-bold bg-teal-100/60">Upload, Replace, Version</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-teal-700 font-semibold">Product Audit</td>
+                  </tr>
+
+                  {/* AUDITOR */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
+                        AUDITOR
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Auditor</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-semibold">Read Only</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-semibold">Read Only</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-semibold">Read Only</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-semibold">Read Only</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-semibold">Read Only</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-semibold">Read Only</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-bold bg-amber-50/40">Full Regulatory Read</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: AUTHENTICATION & SECURITY POLICIES                                 */}
+      {/* ========================================================================= */}
+      {activeTab === 'AUTH_POLICIES' && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Card 1: JWT Architecture */}
+            <div className="enterprise-card rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2.5 text-blue-600">
+                <KeyRound className="w-5 h-5" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  JWT Stateless Session Security
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                State-of-the-art dual token architecture with automated background rotation and protected authorization headers.
+              </p>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs border border-slate-100 font-medium">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Access Token Lifetime:</span>
+                  <span className="font-mono font-bold text-slate-800">15 minutes (High Security)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Refresh Token Lifetime:</span>
+                  <span className="font-mono font-bold text-slate-800">7 days (Encrypted Storage)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Silent Auto-Renewal:</span>
+                  <span className="font-bold text-emerald-600">Enabled on 401 Expiry</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: 21 CFR Part 11 Signatures */}
+            <div className="enterprise-card rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2.5 text-purple-600">
+                <ShieldCheck className="w-5 h-5" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  21 CFR Part 11 Electronic Signatures
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Cryptographic signature hashing on all batch approvals, Certificate of Analysis issuances, and OOS closures.
+              </p>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs border border-slate-100 font-medium">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Signature Algorithm:</span>
+                  <span className="font-mono font-bold text-purple-700">SHA-256 HMAC Signature</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Re-Authentication:</span>
+                  <span className="font-bold text-slate-800">Required on CoA Final Sign-off</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ALCOA+ Traceability:</span>
+                  <span className="font-bold text-emerald-600">Immutable Audit Logs</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Multi-Lab Isolation */}
+            <div className="enterprise-card rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2.5 text-teal-600">
+                <FlaskConical className="w-5 h-5" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Multi-Laboratory Strict RBAC Isolation
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Prevents cross-contamination of testing records between General, Cephalosporin, and Penicillin facilities.
+              </p>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs border border-slate-100 font-medium">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">General Lab (GL):</span>
+                  <span className="font-bold text-blue-700">Oral Solids &amp; Liquids</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Cephalosporin (CEPH):</span>
+                  <span className="font-bold text-purple-700">Sterile Area Facility (SAF)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Penicillin (PEN):</span>
+                  <span className="font-bold text-amber-700">Dedicated Penicillin Block</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Credential Security */}
+            <div className="enterprise-card rounded-2xl p-5 space-y-3">
+              <div className="flex items-center gap-2.5 text-amber-600">
+                <Lock className="w-5 h-5" />
+                <h3 className="font-bold text-slate-900 text-sm">
+                  Credential Security &amp; Password Policies
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Secure password management, one-way cryptographic salting, and Part 11 compliant personnel deactivation.
+              </p>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-xs border border-slate-100 font-medium">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Password Encryption:</span>
+                  <span className="font-mono font-bold text-slate-800">Bcrypt (Salt Rounds: 10)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Part 11 Deletion Policy:</span>
+                  <span className="font-bold text-slate-800">Safe Deactivation (Preserves History)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">First-Time Login Flag:</span>
+                  <span className="font-bold text-emerald-600">mustChangePassword Support</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 1. VIEW USER MODAL (Displays complete user info & allows changing roles)  */}
