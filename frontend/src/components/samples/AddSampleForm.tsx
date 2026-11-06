@@ -57,16 +57,18 @@ export const addSampleSchema = z
     lotNumber: z.string().trim().min(1, 'Batch / Lot Number is required'),
     sampleType: z.string().trim().min(1, 'Stage / Sample Type is required'),
     customStage: z.string().optional(),
-    sampleQty: z.coerce
-      .number({ invalid_type_error: 'Received Quantity must be a valid number' })
-      .positive('Received Quantity must be greater than 0'),
+    sampleQty: z.preprocess(
+      (val) => (val === '' || val === undefined || val === null ? undefined : Number(val)),
+      z.number({ required_error: 'Received Quantity is required', invalid_type_error: 'Received Quantity must be a valid number' })
+        .positive('Received Quantity must be greater than 0')
+    ),
     unit: z.string().trim().min(1, 'Unit of measurement (UoM) is required'),
     customUnit: z.string().optional(),
     mfgDate: z.string().trim().min(1, 'Manufacturing Date is required'),
     expDate: z.string().trim().min(1, 'Expiry Date is required'),
     storageCondition: z.string().optional(),
-    submittedBy: z.string().trim().min(1, 'Submitted By personnel name is required'),
-    receivedBy: z.string().trim().min(1, 'Received By intake officer name is required'),
+    submittedBy: z.string().trim().optional().default(''),
+    receivedBy: z.string().trim().optional().default(''),
     samplingLocation: z.string().optional(),
     priority: z.enum(['ROUTINE', 'URGENT', 'STAT', 'STABILITY']),
     batchId: z.string().optional(),
@@ -179,14 +181,14 @@ export function AddSampleForm({
     lotNumber: '',
     sampleType: selectedSection === 'semi-base' ? SEMI_BASE_STAGES[0] : FORMULATION_STAGES[0],
     customStage: '',
-    sampleQty: 100,
+    sampleQty: '' as any,
     unit: 'tablets',
     customUnit: '',
     mfgDate: '',
     expDate: '',
     storageCondition: '',
-    submittedBy: user?.fullName ? `${user.fullName} (${user.department || 'Production Lead'})` : 'Production Line Lead',
-    receivedBy: user?.fullName ? `${user.fullName} (QC Accession Officer)` : 'QC Accession Desk',
+    submittedBy: '',
+    receivedBy: '',
     samplingLocation: '',
     priority: 'ROUTINE',
     batchId: '',
@@ -572,7 +574,6 @@ export function AddSampleForm({
                 type="text"
                 id="qcNumber"
                 {...register('qcNumber')}
-                placeholder="e.g. GL/SB-10"
                 className={cn(
                   'w-full px-3 py-2 text-xs font-mono font-bold rounded-lg border outline-none transition-all',
                   errors.qcNumber
@@ -597,12 +598,7 @@ export function AddSampleForm({
                 <span>Sampling Date & Time <span className="text-red-500">*</span></span>
               </label>
               <div className="flex items-center gap-1.5">
-                {isLiveClock ? (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-                    LIVE CLOCK
-                  </span>
-                ) : (
+                {!isLiveClock && (
                   <button
                     type="button"
                     onClick={() => {
@@ -654,7 +650,6 @@ export function AddSampleForm({
             type="text"
             id="nomenclature"
             {...register('nomenclature')}
-            placeholder="e.g. Paracetamol API / Cefixime Trihydrate USP"
             className={cn(
               'w-full px-3 py-2 text-xs rounded-lg border outline-none font-medium transition-all',
               errors.nomenclature
@@ -727,7 +722,6 @@ export function AddSampleForm({
               type="text"
               id="lotNumber"
               {...register('lotNumber')}
-              placeholder="e.g. CP-PCM-204"
               className={cn(
                 'w-full px-2.5 py-2 text-xs font-mono rounded-lg border outline-none transition-all',
                 errors.lotNumber
@@ -886,7 +880,6 @@ export function AddSampleForm({
               type="text"
               id="submittedBy"
               {...register('submittedBy')}
-              placeholder="e.g. Muhammad Aslam (Production Lead)"
               className={cn(
                 'w-full px-3 py-2 text-xs rounded-lg border outline-none transition-all',
                 errors.submittedBy
@@ -905,13 +898,12 @@ export function AddSampleForm({
           <div id="receivedBy-container">
             <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-teal-700" />
-              <span>Received By (QC Intake Officer) <span className="text-red-500">*</span></span>
+              <span>Received By (QC Intake Officer)</span>
             </label>
             <input
               type="text"
               id="receivedBy"
               {...register('receivedBy')}
-              placeholder="e.g. Dr. Muhammad Jamil (QC Intake Officer)"
               className={cn(
                 'w-full px-3 py-2 text-xs rounded-lg border outline-none transition-all',
                 errors.receivedBy

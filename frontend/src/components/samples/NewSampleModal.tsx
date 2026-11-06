@@ -64,9 +64,11 @@ export const sampleFormSchema = z
     customSampleId: z.string().optional(),
     sampleType: z.string().trim().min(1, 'Stage / Sample Type is required'),
     customStage: z.string().optional(),
-    sampleQty: z.coerce
-      .number({ invalid_type_error: 'Received Quantity must be a valid number' })
-      .positive('Received Quantity must be greater than 0'),
+    sampleQty: z.preprocess(
+      (val) => (val === '' || val === undefined || val === null ? undefined : Number(val)),
+      z.number({ required_error: 'Received Quantity is required', invalid_type_error: 'Received Quantity must be a valid number' })
+        .positive('Received Quantity must be greater than 0')
+    ),
     unit: z.string().trim().min(1, 'Unit of measurement (UoM) is required'),
     customUnit: z.string().optional(),
     batchId: z.string().optional(),
@@ -82,8 +84,8 @@ export const sampleFormSchema = z
       .string({ required_error: 'Expiry Date is required' })
       .trim()
       .min(1, 'Expiry Date is required and cannot be empty'),
-    submittedBy: z.string().trim().min(1, 'Submitted By name is required'),
-    receivedBy: z.string().trim().min(1, 'Received By name is required'),
+    submittedBy: z.string().trim().optional().default(''),
+    receivedBy: z.string().trim().optional().default(''),
     samplingLocation: z.string().optional(),
     storageCondition: z.string().optional(),
     priority: z.enum(['ROUTINE', 'URGENT', 'STAT', 'STABILITY']),
@@ -252,15 +254,15 @@ export function NewSampleModal({
     customSampleId: '',
     sampleType: defaultSection === 'semi-base' ? SEMI_BASE_STAGES[0] : FORMULATION_STAGES[0],
     customStage: '',
-    sampleQty: 100,
+    sampleQty: '' as any,
     unit: 'tablets',
     customUnit: '',
     batchId: '',
     lotNumber: '',
     mfgDate: '',
     expDate: '',
-    submittedBy: user?.fullName ? `${user.fullName} (${user.department || 'Production'})` : 'Production Line Lead',
-    receivedBy: user?.fullName ? `${user.fullName} (QC Intake Officer)` : 'QC Accession Desk',
+    submittedBy: '',
+    receivedBy: '',
     samplingLocation: '',
     storageCondition: '',
     priority: 'ROUTINE',
@@ -306,10 +308,9 @@ export function NewSampleModal({
       setValue('laboratory', targetLab, { shouldValidate: true, shouldDirty: true });
       setValue('sampleType', targetSec === 'semi-base' ? SEMI_BASE_STAGES[0] : FORMULATION_STAGES[0], { shouldValidate: true });
       setValue('samplingDateTime', getLocalISOString(now));
-      if (user?.fullName) {
-        setValue('submittedBy', `${user.fullName} (${user.department || 'Production'})`);
-        setValue('receivedBy', `${user.fullName} (QC Intake Officer)`);
-      }
+      setValue('submittedBy', '');
+      setValue('receivedBy', '');
+      setValue('sampleQty', '' as any);
       setSubmitError(null);
       setSuccessInfo(null);
       setShowDiscardConfirm(false);
@@ -876,13 +877,7 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
                   <span>Sampling Date & Time <span className="text-red-500">*</span></span>
                 </label>
                 <div className="flex items-center gap-1.5">
-                  {isLiveClock ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 -ml-2.5" />
-                      LIVE CLOCK
-                    </span>
-                  ) : (
+                  {!isLiveClock && (
                     <button
                       type="button"
                       onClick={() => {
@@ -952,11 +947,6 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
                 <label className="block text-xs font-bold text-slate-800 flex items-center gap-1">
                   <span>Sample ID & A. No. <span className="text-red-500">*</span></span>
                 </label>
-                {nextIdData?.accessionNo && (
-                  <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
-                    A. No: {nextIdData.accessionNo}
-                  </span>
-                )}
               </div>
 
               <div className="px-3 py-2 text-xs font-mono rounded-lg border border-blue-200 bg-blue-50/70 text-blue-950 flex items-center justify-between">
@@ -985,7 +975,6 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
               type="text"
               id="nomenclature"
               {...register('nomenclature')}
-              placeholder="e.g. Paracetamol API / Cefixime Trihydrate USP"
               className={cn(
                 'w-full px-3 py-2 text-xs rounded-lg border outline-none font-medium transition-all',
                 errors.nomenclature
@@ -1114,7 +1103,6 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
                 type="text"
                 id="lotNumber"
                 {...register('lotNumber')}
-                placeholder="e.g. CP-PCM-204"
                 className={cn(
                   'w-full px-2.5 py-2 text-xs font-mono rounded-lg border outline-none transition-all',
                   errors.lotNumber

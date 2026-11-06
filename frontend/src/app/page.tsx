@@ -29,6 +29,7 @@ import {
   FileSpreadsheet,
   Users,
   FileCheck2,
+  Activity,
 } from 'lucide-react';
 
 export default function WelcomePortalPage() {
@@ -100,17 +101,6 @@ export default function WelcomePortalPage() {
       arrowColor: 'text-slate-400 group-hover:text-[#16a34a]',
     },
     {
-      id: 'users',
-      title: 'User Management',
-      description: 'Role-based access control (RBAC), user authentication, laboratory permissions, and credential security.',
-      href: '/users',
-      icon: Users,
-      badgeText: 'RBAC & Auth',
-      cardBg: 'bg-[#faf5ff] border-[#f3e8ff] hover:border-[#d8b4fe] hover:shadow-md',
-      iconBg: 'bg-[#f3e8ff] text-[#9333ea]',
-      arrowColor: 'text-slate-400 group-hover:text-[#9333ea]',
-    },
-    {
       id: 'samples',
       title: 'Sample Registration',
       description: 'Manage samples, scan barcodes and track sample status across laboratories.',
@@ -167,17 +157,6 @@ export default function WelcomePortalPage() {
       cardBg: 'bg-[#f0fdf4] border-[#dcfce7] hover:border-[#86efac] hover:shadow-md',
       iconBg: 'bg-[#dcfce7] text-[#16a34a]',
       arrowColor: 'text-slate-400 group-hover:text-[#16a34a]',
-    },
-    {
-      id: 'products',
-      title: 'Products',
-      description: 'Browse pharmaceutical products, view analytical monographs (ATM), and launch QC testing & CoA calculation engines.',
-      href: '/products',
-      icon: Package,
-      badgeText: 'QC Products',
-      cardBg: 'bg-[#f5f3ff] border-[#e4e1fc] hover:border-[#c7d2fe] hover:shadow-md',
-      iconBg: 'bg-[#ede9fe] text-[#7c3aed]',
-      arrowColor: 'text-slate-400 group-hover:text-[#7c3aed]',
     },
     {
       id: 'analytics',

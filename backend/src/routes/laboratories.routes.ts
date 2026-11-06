@@ -21,6 +21,16 @@ router.post(
   requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.LAB_TECHNICIAN, Role.QC_ANALYST),
   (req, res, next) => laboratoriesController.logCalibration(req, res, next)
 );
+
+// Lab Operations Dashboard endpoints
+router.get('/operations/summary', (req, res, next) =>
+  laboratoriesController.getLabOperationsSummary(req, res, next)
+);
+
+router.get('/operations/:labId', (req, res, next) =>
+  laboratoriesController.getIndividualLabOperations(req, res, next)
+);
+
 router.get('/:laboratoryId/samples', (req, res, next) =>
   laboratoriesController.findLaboratorySamples(req, res, next)
 );

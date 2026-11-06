@@ -55,6 +55,24 @@ export class LaboratoriesController {
       next(err);
     }
   }
+
+  async getLabOperationsSummary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await laboratoriesService.getLabOperationsSummary(req.query, req.user);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getIndividualLabOperations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await laboratoriesService.getIndividualLabOperations(req.params.labId as string, req.query, req.user);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const laboratoriesController = new LaboratoriesController();

@@ -1,14 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { samplingService, SamplingFilters } from '@/services/sampling.service';
+import { useDebounce } from '@/hooks/useDebounce';
+import { Sample, SampleStatus, Priority, getSampleSection } from '@/types/lims';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { formatDateTime } from '@/lib/date';
+import { cn } from '@/lib/utils';
 import { STATIC_ANALYSTS, isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
 import { auditService } from '@/services/audit.service';
 import { productService } from '@/services/product.service';
@@ -16,8 +21,8 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertOctagon,
-  Gauge,
-  UserCheck,
+  AlertTriangle,
+  FlaskConical,
   Search,
   Filter,
   PlusCircle,
@@ -29,28 +34,147 @@ import {
   FileText,
   Download,
   Eye,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  Clock,
+  Sparkles,
+  Layers,
+  Send,
+  Check,
 } from 'lucide-react';
 import { OfficialAtm003Document } from '@/components/askprol/OfficialAtm003Document';
 
-export default function TestingPage() {
+const LAB_TABS = [
+  {
+    id: 'general',
+    legacyIds: ['gen', 'gl'],
+    key: 'GENERAL' as const,
+    name: 'General Lab',
+    shortLabel: 'General Lab',
+    heading: 'Analyst Execution / General Lab',
+    icon: FlaskConical,
+  },
+  {
+    id: 'penicillin',
+    legacyIds: ['pen', 'pl'],
+    key: 'PENICILLIN' as const,
+    name: 'Penicillin Lab',
+    shortLabel: 'Penicillin Lab',
+    heading: 'Analyst Execution / Penicillin Lab',
+    icon: FlaskConical,
+  },
+  {
+    id: 'cephalosporin',
+    legacyIds: ['ceph', 'cp', 'saf', 'sef'],
+    key: 'CEPHALOSPORIN' as const,
+    name: 'Cephalosporin Lab',
+    shortLabel: 'Cephalosporin Lab',
+    heading: 'Analyst Execution / Cephalosporin Lab',
+    icon: FlaskConical,
+  },
+];
+
+// Strictly isolates samples so only records belonging to the active lab are displayed
+function isSampleInLab(s: Sample, labKey: 'GENERAL' | 'PENICILLIN' | 'CEPHALOSPORIN'): boolean {
+  const labType = (s.laboratoryType || (typeof s.laboratory === 'string' ? s.laboratory : '')).toString().toUpperCase();
+  const labName = ((s.laboratory as any)?.name || (s.laboratory as any)?.code || '').toString().toUpperCase();
+  const code = (s.sampleCode || s.sampleId || s.accessionNo || '').toString().toUpperCase();
+
+  if (labKey === 'GENERAL') {
+    return (
+      labType === 'GENERAL' ||
+      labName === 'GENERAL' ||
+      labName === 'GL' ||
+      code.includes('GEN') ||
+      code.startsWith('GL/') ||
+      code.includes('/GL/')
+    );
+  }
+  if (labKey === 'PENICILLIN') {
+    return (
+      labType === 'PENICILLIN' ||
+      labName.includes('PEN') ||
+      code.includes('PEN') ||
+      code.startsWith('PEN/') ||
+      code.includes('/PEN/')
+    );
+  }
+  if (labKey === 'CEPHALOSPORIN') {
+    return (
+      labType === 'CEPHALOSPORIN' ||
+      labType === 'SAF' ||
+      labType.includes('CEPH') ||
+      labName.includes('CEPH') ||
+      labName.includes('SAF') ||
+      code.includes('CEPH') ||
+      code.includes('SAF') ||
+      code.startsWith('CP/') ||
+      code.includes('/CP/')
+    );
+  }
+  return true;
+}
+
+function TestingPageContent() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { analysts: allAnalystsList } = useAllAnalysts();
 
   const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN';
   const isManager = isSuperAdmin || user?.role === 'MANAGER' || user?.role === 'DEPUTY_MANAGER' || user?.role === 'SHIFT_INCHARGE';
   const isAnalyst = !isManager;
 
+  // Active Laboratory Tab
+  const labParam = (searchParams.get('lab') || 'general').toLowerCase();
+  const isAllLabs = labParam === 'all' || labParam === 'facility';
+
+  const activeLab = useMemo(() => {
+    const found = LAB_TABS.find((t) => t.id === labParam || t.legacyIds.includes(labParam));
+    return found || LAB_TABS[0];
+  }, [labParam]);
+
+  // Active Section Filter (All, Semi Basics, Formulation)
+  const sectionParam = searchParams.get('section')?.toLowerCase() || 'all';
+  const [activeSection, setActiveSection] = useState<'all' | 'semi-base' | 'formulation'>(
+    sectionParam === 'semi-base' || sectionParam === 'formulation' ? sectionParam : 'all'
+  );
+
+  useEffect(() => {
+    if (sectionParam === 'semi-base' || sectionParam === 'formulation') {
+      setActiveSection(sectionParam);
+    } else {
+      setActiveSection('all');
+    }
+  }, [sectionParam]);
+
+  // Search & Filtering States
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearch = useDebounce(searchTerm, 350);
+
   const [statusFilter, setStatusFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
   const [selectedAnalystFilter, setSelectedAnalystFilter] = useState<string>('ALL');
   const [testingTab, setTestingTab] = useState<'QUEUE' | 'OFFICIAL_SOP'>('QUEUE');
+
+  // Expanded rows to inspect nested test worksheets directly
+  const [expandedSampleIds, setExpandedSampleIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandSample = (id: string) => {
+    setExpandedSampleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Stored tasks synchronization from localStorage (assigned from /tasks)
   const [storedTasks, setStoredTasks] = useState<any[]>([]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const syncTasks = () => {
       try {
         const raw = localStorage.getItem('city_pharma_lims_tasks');
@@ -69,7 +193,7 @@ export default function TestingPage() {
     };
   }, []);
 
-  // Selected test for recording results
+  // Selected test for recording results in modal
   const [activeTest, setActiveTest] = useState<any | null>(null);
   const [numericResult, setNumericResult] = useState<string>('');
   const [textResult, setTextResult] = useState<string>('');
@@ -77,19 +201,69 @@ export default function TestingPage() {
   const [rawDataReference, setRawDataReference] = useState<string>('');
   const [comments, setComments] = useState<string>('');
 
-  // Load all samples with tests
-  const { data: samplesResponse, isLoading } = useQuery({
-    queryKey: ['samples-for-testing'],
-    queryFn: () => api.get<any>('/samples?limit=100'),
+  // Selected sample for full execution drawer/modal
+  const [selectedSampleForExecution, setSelectedSampleForExecution] = useState<Sample | null>(null);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const limit = 25;
+
+  // Build unified query filters matching Sample Registration (/samples)
+  const queryFilters: SamplingFilters = useMemo(
+    () => ({
+      laboratory: isAllLabs ? undefined : activeLab.key,
+      section: activeSection === 'all' ? undefined : activeSection,
+      search: debouncedSearch || undefined,
+      status: statusFilter || undefined,
+      stage: stageFilter || undefined,
+      page,
+      limit,
+    }),
+    [isAllLabs, activeLab.key, activeSection, debouncedSearch, statusFilter, stageFilter, page, limit]
+  );
+
+  // Fetch samples from unified sampling service
+  const {
+    data: responseData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['samples-for-testing', queryFilters],
+    queryFn: () => samplingService.getAll(queryFilters),
+    refetchInterval: 5000,
   });
 
-  // Extract array safely whether backend returns direct array or paginated object
-  const samplesList: any[] = React.useMemo(() => {
-    if (!samplesResponse) return [];
-    if (Array.isArray(samplesResponse)) return samplesResponse;
-    if (Array.isArray(samplesResponse.data)) return samplesResponse.data;
-    return [];
-  }, [samplesResponse]);
+  // Extract samples array safely
+  const samplesList: Sample[] = useMemo(() => {
+    let raw: Sample[] = [];
+    if (responseData) {
+      if (Array.isArray(responseData)) raw = responseData;
+      else if (Array.isArray((responseData as any).data)) raw = (responseData as any).data;
+    }
+
+    // Apply strict laboratory & section filtration to match Sample Registration
+    return raw.filter((s) => {
+      if (!isAllLabs && !isSampleInLab(s, activeLab.key)) return false;
+      if (activeSection !== 'all') {
+        const sec = getSampleSection(s);
+        if (sec !== activeSection) return false;
+      }
+      return true;
+    });
+  }, [responseData, isAllLabs, activeLab.key, activeSection]);
+
+  const meta = useMemo(() => {
+    if (responseData && (responseData as any).meta) {
+      return (responseData as any).meta;
+    }
+    return {
+      total: samplesList.length,
+      page,
+      limit,
+      totalPages: Math.ceil(samplesList.length / limit) || 1,
+    };
+  }, [responseData, samplesList.length, page, limit]);
 
   // Load available instruments
   const { data: instrumentsResponse } = useQuery({
@@ -97,7 +271,7 @@ export default function TestingPage() {
     queryFn: () => api.get<any>('/instruments'),
   });
 
-  const instruments: any[] = React.useMemo(() => {
+  const instruments: any[] = useMemo(() => {
     if (!instrumentsResponse) return [];
     if (Array.isArray(instrumentsResponse)) return instrumentsResponse;
     if (Array.isArray((instrumentsResponse as any).data)) return (instrumentsResponse as any).data;
@@ -111,12 +285,12 @@ export default function TestingPage() {
   });
 
   const getProductDocForTest = React.useCallback(
-    (test: any) => {
+    (testOrSample: any) => {
       if (!productsList || productsList.length === 0) return null;
-      const mat = (test?.materialName || test?.nomenclature || '').toLowerCase();
-      const sample = (test?.sampleCode || test?.sampleId || '').toLowerCase();
-      const specName = (test?.testSpecification?.name || test?.testSpecification?.testCode || '').toLowerCase();
-      const pId = (test?.productId || '').toLowerCase();
+      const mat = (testOrSample?.materialName || testOrSample?.nomenclature || '').toLowerCase();
+      const sample = (testOrSample?.sampleCode || testOrSample?.sampleId || '').toLowerCase();
+      const specName = (testOrSample?.testSpecification?.name || testOrSample?.testSpecification?.testCode || '').toLowerCase();
+      const pId = (testOrSample?.productId || '').toLowerCase();
 
       const matchedProduct = productsList.find((p) => {
         const id = p.id.toLowerCase();
@@ -138,43 +312,36 @@ export default function TestingPage() {
     [productsList]
   );
 
-  // Flatten sample tests and merge stored tasks for analytical worksheet table
-  const allTests = React.useMemo(() => {
-    // 1. Database tests from sample records
-    const dbTests = samplesList.flatMap((s) => {
-      const sCode = (s.sampleCode || s.sampleId || s.accessionNo || s.id || '').toUpperCase();
-      const matchingTask = storedTasks.find((t) => {
+  // Helper to extract tests and tasks belonging to a specific sample
+  const getTestsForSample = React.useCallback(
+    (sample: Sample) => {
+      const sCode = (sample.sampleCode || sample.sampleId || sample.accessionNo || sample.id || '').toUpperCase();
+
+      // Database tests attached to sample
+      const dbTests = (sample.tests || []).map((t: any) => ({
+        ...t,
+        sampleCode: sample.sampleCode || sample.sampleId,
+        materialName: sample.materialName || sample.nomenclature,
+        samplePriority: sample.priority,
+        batchNumber: sample.batch?.batchNumber || sample.lotNumber,
+        assignedAnalystName: t.analyst?.fullName || sample.assignedTo?.fullName,
+        assignedAnalystUsername: t.analyst?.username || (sample.assignedTo as any)?.username,
+      }));
+
+      // Merged tasks from task assignment board
+      const matchingTasks = storedTasks.filter((t) => {
         const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
         return tCode === sCode;
       });
 
-      return (s.tests || []).map((t: any) => ({
-        ...t,
-        sampleCode: s.sampleCode || s.sampleId,
-        materialName: s.materialName || s.nomenclature,
-        samplePriority: s.priority,
-        batchNumber: s.batch?.batchNumber || s.lotNumber || s.batchLotNumber,
-        assignedToId: s.assignedToId || t.analystId || matchingTask?.assignedAnalystId,
-        assignedTo: s.assignedTo,
-        assignedAnalystId: matchingTask?.assignedAnalystId || t.analyst?.employeeId || t.analyst?.id || s.assignedTo?.employeeId || s.assignedToId,
-        assignedAnalystName: matchingTask?.assignedAnalystName || t.analyst?.fullName || s.assignedTo?.fullName,
-        assignedAnalystUsername: matchingTask?.assignedAnalystUsername || t.analyst?.username || s.assignedTo?.username,
-      }));
-    });
-
-    // 2. Worksheets created from assigned tasks
-    const taskWorksheets = storedTasks.map((t: any) => {
-      const foundAnalyst = allAnalystsList.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName) || STATIC_ANALYSTS.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName);
-
-      return {
+      const taskWorksheets = matchingTasks.map((t: any) => ({
         id: t.id,
         isTaskItem: true,
         taskCode: t.taskCode,
-        sampleCode: t.sampleId,
-        materialName: t.sampleName,
-        samplePriority: t.priority || 'ROUTINE',
-        batchNumber: t.lotNumber || '—',
-        laboratory: t.laboratory,
+        sampleCode: sample.sampleCode || t.sampleId,
+        materialName: sample.materialName || t.sampleName,
+        samplePriority: t.priority || sample.priority || 'ROUTINE',
+        batchNumber: t.lotNumber || sample.lotNumber || '—',
         status: t.status === 'COMPLETED' ? 'COMPLETED' : t.status === 'IN_PROGRESS' ? 'IN_ANALYSIS' : 'PENDING',
         resultStatus: t.resultStatus || (t.status === 'COMPLETED' ? 'PASSED' : 'PENDING'),
         numericResult: t.numericResult !== undefined ? t.numericResult : null,
@@ -199,88 +366,77 @@ export default function TestingPage() {
         },
         assignedAnalystId: t.assignedAnalystId,
         assignedAnalystName: t.assignedAnalystName,
-        assignedAnalystUsername: t.assignedAnalystUsername || foundAnalyst?.username,
-      };
-    });
+        assignedAnalystUsername: t.assignedAnalystUsername,
+      }));
 
-    const existingSampleTestKeys = new Set(dbTests.map((x) => `${x.sampleCode}-${x.testSpecification?.name}`.toUpperCase()));
-    const uniqueTaskWorksheets = taskWorksheets.filter((tw: any) => !existingSampleTestKeys.has(`${tw.sampleCode}-${tw.testSpecification?.name}`.toUpperCase()));
+      const existingNames = new Set(dbTests.map((x: any) => (x.testSpecification?.name || '').toUpperCase()));
+      const uniqueTasks = taskWorksheets.filter((tw: any) => !existingNames.has((tw.testSpecification?.name || '').toUpperCase()));
 
-    return [...dbTests, ...uniqueTaskWorksheets];
-  }, [samplesList, storedTasks]);
+      const combined = [...dbTests, ...uniqueTasks];
 
-  // Filtered tests with strict role isolation for Analysts
-  const filteredTests = React.useMemo(() => {
-    return allTests.filter((t) => {
-      // 1. Role-Based Workload Isolation:
-      // If logged in as Analyst: Show ONLY tests assigned to this specific analyst (while keeping Askprol protocol tests accessible)
-      if (isAnalyst && user) {
-        const userEmpId = (user.employeeId || '').toUpperCase();
-        const userUsername = (user.username || '').toLowerCase();
-        const userFullName = (user.fullName || '').toLowerCase();
-
-        const isAskprolItem =
-          (t.sampleCode || '').toUpperCase().includes('ASK') ||
-          (t.materialName || '').toLowerCase().includes('askprol') ||
-          (t.testSpecification?.testCode || '').toUpperCase().includes('SPEC-ASK');
-
-        const matchesAnalyst =
-          isAskprolItem ||
-          isAssignedToUser(t, user) ||
-          (t.assignedAnalystId && userEmpId && t.assignedAnalystId.toUpperCase() === userEmpId) ||
-          (t.assignedAnalystUsername && userUsername && t.assignedAnalystUsername.toLowerCase() === userUsername) ||
-          (t.assignedAnalystName && userFullName && (t.assignedAnalystName.toLowerCase().includes(userFullName) || userFullName.includes(t.assignedAnalystName.toLowerCase())));
-
-        if (!matchesAnalyst) return false;
-      } else if (selectedAnalystFilter !== 'ALL') {
-        const isAskprolItem =
-          (t.sampleCode || '').toUpperCase().includes('ASK') ||
-          (t.materialName || '').toLowerCase().includes('askprol') ||
-          (t.testSpecification?.testCode || '').toUpperCase().includes('SPEC-ASK');
-
-        const found = allAnalystsList.find((a) => a.id === selectedAnalystFilter) || STATIC_ANALYSTS.find((a) => a.id === selectedAnalystFilter);
-        const matchId = t.assignedAnalystId === selectedAnalystFilter;
-        const matchUsername = found && t.assignedAnalystUsername?.toLowerCase() === found.username.toLowerCase();
-        const matchName = found && t.assignedAnalystName?.toLowerCase().includes(found.name.toLowerCase());
-        if (!isAskprolItem && !matchId && !matchUsername && !matchName) return false;
+      // If sample has no tests generated yet, provide clean compendial default tests
+      if (combined.length === 0) {
+        return [
+          {
+            id: `default-assay-${sample.id}`,
+            isDefault: true,
+            sampleId: sample.id,
+            sampleCode: sample.sampleCode,
+            materialName: sample.materialName || sample.nomenclature,
+            status: sample.status === 'APPROVED' || sample.status === 'REVIEW_PENDING' ? 'COMPLETED' : 'PENDING',
+            resultStatus: sample.status === 'APPROVED' ? 'PASSED' : 'PENDING',
+            minLimit: 95.0,
+            maxLimit: 105.0,
+            targetValue: 100.0,
+            unit: '%',
+            testSpecification: {
+              name: 'Chemical Potency Assay (HPLC)',
+              testCode: 'SPEC-ASSAY-01',
+              pharmacopeiaMethod: 'USP 44 / BP 2024',
+              category: 'CHROMATOGRAPHY',
+            },
+            assignedAnalystName: sample.assignedTo?.fullName || 'Assigned QC Analyst',
+          },
+          {
+            id: `default-ph-${sample.id}`,
+            isDefault: true,
+            sampleId: sample.id,
+            sampleCode: sample.sampleCode,
+            materialName: sample.materialName || sample.nomenclature,
+            status: sample.status === 'APPROVED' || sample.status === 'REVIEW_PENDING' ? 'COMPLETED' : 'PENDING',
+            resultStatus: sample.status === 'APPROVED' ? 'PASSED' : 'PENDING',
+            minLimit: 4.5,
+            maxLimit: 6.5,
+            targetValue: 5.5,
+            unit: 'pH',
+            testSpecification: {
+              name: 'pH Determination',
+              testCode: 'SPEC-PH-02',
+              pharmacopeiaMethod: 'BP Appendix V L',
+              category: 'CHEMICAL',
+            },
+            assignedAnalystName: sample.assignedTo?.fullName || 'Assigned QC Analyst',
+          },
+        ];
       }
 
-      if (statusFilter && t.status !== statusFilter) return false;
-      if (categoryFilter && t.testSpecification?.category !== categoryFilter) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        const matchCode = t.sampleCode?.toLowerCase().includes(term);
-        const matchName = t.materialName?.toLowerCase().includes(term);
-        const matchTest = t.testSpecification?.name?.toLowerCase().includes(term);
-        const matchAnalyst = t.assignedAnalystName?.toLowerCase().includes(term);
-        if (!matchCode && !matchName && !matchTest && !matchAnalyst) return false;
-      }
-      return true;
-    });
-  }, [allTests, isAnalyst, user, selectedAnalystFilter, statusFilter, categoryFilter, searchTerm]);
+      return combined;
+    },
+    [storedTasks]
+  );
 
-  // Mutation to record result
+  // Mutation to record result on backend
   const recordResultMutation = useMutation({
-    mutationFn: (data: any) =>
-      api.patch(`/tests/${activeTest.id}/record-result`, data),
+    mutationFn: (data: any) => api.patch(`/tests/${activeTest.id}/record-result`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['samples-for-testing'] });
-      queryClient.invalidateQueries({ queryKey: ['samples'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
+      queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });
       setActiveTest(null);
       setNumericResult('');
       setTextResult('');
       setRawDataReference('');
       setComments('');
-    },
-  });
-
-  // Mutation to verify test
-  const verifyMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/tests/${id}/verify`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['samples-for-testing'] });
-      queryClient.invalidateQueries({ queryKey: ['samples'] });
     },
   });
 
@@ -293,7 +449,7 @@ export default function TestingPage() {
     setComments(test.comments || '');
   };
 
-  // Instant Real-Time Specification Calculation
+  // Instant Real-Time Specification Limit Auto-Evaluation
   const evaluatedStatus = React.useMemo(() => {
     if (!activeTest || numericResult === '') return null;
     const num = parseFloat(numericResult);
@@ -307,53 +463,19 @@ export default function TestingPage() {
     return 'WITHIN_SPEC';
   }, [activeTest, numericResult]);
 
-  // Start analysis transition for an assigned test
-  const handleStartAnalysis = (test: any) => {
-    if (test.isTaskItem) {
-      const updated = storedTasks.map((t) => {
-        if (t.id === test.id || t.taskCode === test.taskCode) {
-          return { ...t, status: 'IN_PROGRESS' };
-        }
-        return t;
-      });
-      setStoredTasks(updated);
-      localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
-      window.dispatchEvent(new Event('lims-tasks-updated'));
-
-      // 21 CFR Part 11 Audit Trail for Analysis Initiation
-      auditService.logActivity({
-        action: 'TASK_STATUS_UPDATED',
-        entityName: 'TestWorksheet',
-        entityId: test.id || test.taskCode || test.sampleCode,
-        performedByName: user?.fullName || 'Analyst',
-        role: user?.role || 'QC_ANALYST',
-        reasonForChange: `Analyst initiated analytical testing on sample ${test.sampleCode} (${test.materialName || 'QC Material'})`,
-        diffPayload: {
-          details: `${user?.fullName || 'Analyst'} initiated testing for sample ${test.sampleCode} — Protocol: ${test.testSpecification?.name || test.taskCode}`,
-          sampleCode: test.sampleCode,
-          taskCode: test.taskCode,
-          status: 'IN_PROGRESS',
-        },
-      });
-    } else {
-      openRecordModal(test);
-    }
-  };
-
   const handleSubmitResult = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTest) return;
 
-    const num = numericResult !== '' ? parseFloat(numericResult) : null;
     const isPass = evaluatedStatus === 'WITHIN_SPEC';
     const statusOutcome = isPass ? 'PASSED' : evaluatedStatus === 'OUT_OF_SPEC' ? 'OUT_OF_SPEC' : 'RECORDED';
 
-    if (activeTest.isTaskItem) {
+    if (activeTest.isTaskItem || activeTest.isDefault) {
       const status = 'COMPLETED';
       const resultStatus = isPass ? 'PASSED' : 'FAILED';
 
       const updated = storedTasks.map((t) => {
-        if (t.id === activeTest.id || t.taskCode === activeTest.taskCode) {
+        if (t.id === activeTest.id || t.taskCode === activeTest.taskCode || t.sampleId === activeTest.sampleCode) {
           return {
             ...t,
             status,
@@ -367,15 +489,34 @@ export default function TestingPage() {
         }
         return t;
       });
+
+      // If test was a clean default, add it to stored tasks
+      if (activeTest.isDefault && !storedTasks.some((t) => t.id === activeTest.id)) {
+        updated.push({
+          id: activeTest.id,
+          taskCode: activeTest.testSpecification?.testCode || 'TASK-QC-01',
+          sampleId: activeTest.sampleCode,
+          sampleName: activeTest.materialName,
+          status,
+          resultStatus,
+          numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
+          textResult: textResult || undefined,
+          instrumentId: selectedInstrumentId || undefined,
+          rawDataReference,
+          instructions: comments,
+          testProtocol: activeTest.testSpecification?.name,
+        });
+      }
+
       setStoredTasks(updated);
       localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
       window.dispatchEvent(new Event('lims-tasks-updated'));
 
-      // 21 CFR Part 11 Audit Trail for Test Result Recording
+      // 21 CFR Part 11 Audit Trail
       auditService.logActivity({
         action: 'TEST_RESULT_RECORDED',
         entityName: 'TestWorksheet',
-        entityId: activeTest.id || activeTest.taskCode || activeTest.sampleCode,
+        entityId: activeTest.id || activeTest.sampleCode,
         performedByName: user?.fullName || 'Analyst',
         role: user?.role || 'QC_ANALYST',
         reasonForChange: `Recorded analytical result for ${activeTest.sampleCode} (${activeTest.testSpecification?.name || 'Assay'}): ${numericResult || textResult} (${statusOutcome})`,
@@ -397,7 +538,7 @@ export default function TestingPage() {
       return;
     }
 
-    // 21 CFR Part 11 Audit Trail for Database Test
+    // Backend database test update
     auditService.logActivity({
       action: 'TEST_RESULT_RECORDED',
       entityName: 'TestWorksheet',
@@ -424,9 +565,24 @@ export default function TestingPage() {
     });
   };
 
+  const handleLabChange = (labId: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('lab', labId);
+    setPage(1);
+    router.push(`/testing?${params.toString()}`);
+  };
+
+  const handleSectionChange = (sec: 'all' | 'semi-base' | 'formulation') => {
+    setActiveSection(sec);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('section', sec);
+    setPage(1);
+    router.push(`/testing?${params.toString()}`);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Title & Navigation */}
+      {/* Title & Navigation Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
@@ -438,65 +594,40 @@ export default function TestingPage() {
               <span>Back to Dashboard</span>
             </Link>
             <span className="text-xs font-semibold text-slate-400">/</span>
-            <span className="text-xs font-bold text-slate-700">Analytical Workstation</span>
+            <span className="text-xs font-bold text-slate-700">Analyst Execution Workstation</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-navy-950 tracking-tight flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-teal-700" />
-            <span>Analytical Testing &amp; Worksheets</span>
+            <span>Analyst Execution &amp; Testing Worksheets</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Compendial worksheet calculations, chromatogram raw data references, and automated limit evaluations
+            Registered analytical samples, live compendial calculations, raw data file linkages, and pharmacopeial limits
           </p>
+        </div>
+
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <Link
+            href="/samples"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-colors"
+          >
+            <FlaskConical className="h-4 w-4 text-teal-600" />
+            <span>Sample Registration</span>
+          </Link>
+          <Link
+            href="/askprol"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#0B1A30] text-white hover:bg-slate-800 transition-colors shadow-2xs"
+          >
+            <Beaker className="w-4 h-4 text-purple-300" />
+            <span>Launch Askprol ATM-003 &rarr;</span>
+          </Link>
         </div>
       </div>
 
-      {/* Role-Specific Workstation Notice Banner */}
-      {isAnalyst ? (
-        <div className="p-4 rounded-xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-md border border-blue-700/50 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-300 shadow-xs shrink-0 mt-0.5">
-              <Beaker className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="font-bold text-white text-sm">
-                  Analyst Testing Workstation &bull; {user?.fullName || 'Quality Analyst'}
-                </span>
-                <span className="text-[10px] font-mono font-bold bg-white/10 text-blue-200 px-2 py-0.5 rounded border border-white/20">
-                  @{user?.username || 'analyst'}
-                </span>
-                <span className="text-[10px] font-bold bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded border border-emerald-400/30">
-                  Workload Isolated ({filteredTests.length} Tests)
-                </span>
-              </div>
-              <p className="text-xs text-blue-200/90 leading-relaxed max-w-3xl">
-                Showing strictly tests and analytical worksheets assigned to your bench. Select an instrument, enter observed assay results, and attach raw data sequence references to update status.
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 flex items-start gap-3">
-          <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-teal-800 shadow-xs shrink-0 mt-0.5">
-            <ShieldCheck className="h-4 w-4 text-teal-700" />
-          </div>
-          <div className="text-xs text-slate-600 leading-relaxed">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-bold text-navy-950">Super Admin Analytical Inspection Portal</span>
-              <span className="text-[10px] font-bold text-navy-700 bg-white px-2 py-0.5 rounded border border-slate-200/80 uppercase">
-                Full Oversight
-              </span>
-            </div>
-            Master governance across General, Cephalosporin and Penicillin analytical benches. Inspect results, review OOS flags, and verify compendial worksheets across all 10 analyst accounts.
-          </div>
-        </div>
-      )}
-
-      {/* Askprol Suspension QC/CLG/ATM-003 Testing Launcher Banner */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50 to-white border border-purple-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Askprol ATM-003 Highlight Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white border border-purple-200/90 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3.5">
           <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-xs shrink-0 mt-0.5">
-            <FileSpreadsheet className="h-6 w-6" />
+            <Beaker className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -507,11 +638,11 @@ export default function TestingPage() {
                 Bulk &amp; Finished Pack
               </span>
               <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                Workbook Synced
+                Live Calculation Engine
               </span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
-              Official analytical testing protocol matching QC/CLG/ATM-003 Version 06. Enter observed lab weights, HPLC peak areas, deliverable volumes, and AV values with automated release CoA generation.
+              Official analytical testing protocol matching QC/CLG/ATM-003 Version 06. Automatically synchronized with sample registration records, HPLC chromatogram references, and release CoAs.
             </p>
           </div>
         </div>
@@ -525,24 +656,24 @@ export default function TestingPage() {
         </Link>
       </div>
 
-      {/* Workstation Top Navigation Tabs */}
+      {/* Main Workstation Top Tabs: Queue vs SOP Monograph */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setTestingTab('QUEUE')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               testingTab === 'QUEUE'
                 ? 'bg-[#0B1A30] text-white shadow-xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             <FileSpreadsheet className="w-4 h-4 text-teal-400" />
-            <span>Analytical Testing Queue ({filteredTests.length} Tests)</span>
+            <span>Analyst Execution Queue ({samplesList.length} Registered Samples)</span>
           </button>
 
           <button
             onClick={() => setTestingTab('OFFICIAL_SOP')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
               testingTab === 'OFFICIAL_SOP'
                 ? 'bg-[#0B1A30] text-white shadow-xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -552,306 +683,661 @@ export default function TestingPage() {
             <span>Official SOP Monograph (QC/CLG/ATM-003 Ver: 06 - 10 Pages)</span>
           </button>
         </div>
-
-        <Link
-          href="/askprol"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100 transition-colors shadow-2xs"
-        >
-          <Beaker className="w-4 h-4 text-purple-600" />
-          <span>Launch Askprol QC &amp; CoA Engine &rarr;</span>
-        </Link>
       </div>
 
       {testingTab === 'OFFICIAL_SOP' ? (
         <OfficialAtm003Document />
       ) : (
         <>
+          {/* Laboratory Tabs (General Lab, Penicillin Lab, Cephalosporin Lab, All Labs) */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+            {LAB_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = !isAllLabs && activeLab.id === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleLabChange(tab.id)}
+                  className={cn(
+                    'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer',
+                    isActive
+                      ? 'bg-navy-950 text-white border-navy-950 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+                  )}
+                >
+                  <Icon className={cn('h-3.5 w-3.5', isActive ? 'text-teal-400' : 'text-slate-400')} />
+                  <span>{tab.name}</span>
+                </button>
+              );
+            })}
 
-      {/* Filter Toolbar */}
-      <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search test, sample, analyst..."
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
-            />
-          </div>
-
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white font-medium text-slate-700"
-            >
-              <option value="">All Test Statuses</option>
-              <option value="PENDING">Pending Analysis</option>
-              <option value="IN_ANALYSIS">In Analysis / Testing</option>
-              <option value="COMPLETED">Completed (Awaiting QA)</option>
-              <option value="VERIFIED">Verified &amp; Signed Off</option>
-            </select>
-          </div>
-
-          <div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white font-medium text-slate-700"
-            >
-              <option value="">All Test Categories</option>
-              <option value="CHROMATOGRAPHY">Chromatography (HPLC / GC)</option>
-              <option value="PHYSICAL">Physical (Dissolution / LOD)</option>
-              <option value="CHEMICAL">Chemical (pH / Titration)</option>
-              <option value="MICROBIOLOGICAL">Microbiological &amp; Endotoxin</option>
-              <option value="STABILITY">Stability Protocol</option>
-            </select>
-          </div>
-
-          {/* Analyst Filter Dropdown for Super Admin / Managers */}
-          {!isAnalyst ? (
-            <div>
-              <select
-                value={selectedAnalystFilter}
-                onChange={(e) => setSelectedAnalystFilter(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white font-medium text-slate-700"
+            {isSuperAdmin && (
+              <button
+                onClick={() => handleLabChange('all')}
+                className={cn(
+                  'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer',
+                  isAllLabs
+                    ? 'bg-navy-950 text-white border-navy-950 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+                )}
               >
-                <option value="ALL">All Analysts (All Worksheets)</option>
-                {allAnalystsList.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.username ? `@${a.username}` : a.id}) — {a.department}
-                  </option>
-                ))}
-              </select>
+                <Layers className={cn('h-3.5 w-3.5', isAllLabs ? 'text-teal-400' : 'text-slate-400')} />
+                <span>All Laboratories (Facility-wide)</span>
+              </button>
+            )}
+          </div>
+
+          {/* Section Sub-Tabs (All, Semi Basics, Formulation) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Section:</span>
+            {[
+              { id: 'all', label: 'All Sections' },
+              { id: 'semi-base', label: 'Semi Basics' },
+              { id: 'formulation', label: 'Formulation' },
+            ].map((sec) => (
+              <button
+                key={sec.id}
+                onClick={() => handleSectionChange(sec.id as any)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border',
+                  activeSection === sec.id
+                    ? 'bg-blue-50 text-blue-800 border-blue-200 font-bold shadow-2xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                )}
+              >
+                {sec.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Universal Search & Quick Filters Toolbar */}
+          <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search A. No, Sample ID, Nomenclature, Lot..."
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-slate-900 bg-white placeholder:text-slate-400 font-medium"
+                />
+              </div>
+
+              <div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none bg-white font-medium text-slate-700 cursor-pointer"
+                >
+                  <option value="">All Sample Statuses</option>
+                  <option value="REGISTERED">Registered / Pending Analysis</option>
+                  <option value="IN_TESTING">In Testing / Analysis</option>
+                  <option value="TESTING_COMPLETE">Testing Complete</option>
+                  <option value="UNDER_REVIEW">Under Quality Review</option>
+                  <option value="APPROVED">Approved / Released</option>
+                </select>
+              </div>
+
+              <div>
+                <select
+                  value={stageFilter}
+                  onChange={(e) => setStageFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none bg-white font-medium text-slate-700 cursor-pointer"
+                >
+                  <option value="">All Stages / Types</option>
+                  <option value="RAW_MATERIAL">Raw Material</option>
+                  <option value="PACKING_MATERIAL">Packing Material</option>
+                  <option value="INTERMEDIATE">Intermediate / Semi Base</option>
+                  <option value="IN_PROCESS">In-Process</option>
+                  <option value="FINISHED_PRODUCT">Finished Product</option>
+                  <option value="STABILITY">Stability Protocol</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('');
+                    setStageFilter('');
+                    setActiveSection('all');
+                  }}
+                  className="w-full text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1.5 text-slate-400" />
+                  <span>Reset Filters</span>
+                </Button>
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold">
-              <span className="truncate">Analyst Bench: @{user?.username}</span>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Analytical Worksheets Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-500 uppercase tracking-wider font-semibold">
-                <th className="py-3.5 px-4">Test Monograph &amp; Category</th>
-                <th className="py-3.5 px-4">Sample &amp; Lot Link</th>
-                <th className="py-3.5 px-4">Compendial Limits</th>
-                <th className="py-3.5 px-4">Assigned Analyst</th>
-                <th className="py-3.5 px-4">Observed Result</th>
-                <th className="py-3.5 px-4">Status &amp; Result</th>
-                <th className="py-3.5 px-4">Instrument</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    Loading worksheets...
-                  </td>
-                </tr>
-              ) : filteredTests.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center">
-                      <Beaker className="h-8 w-8 text-slate-300 mb-2 stroke-[1.5]" />
-                      <p className="font-semibold text-slate-700 text-sm">
-                        {isAnalyst
-                          ? 'No Tests Currently Assigned To Your Bench'
-                          : 'No Tests Matching Current Filters'}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                        {isAnalyst
-                          ? `You are logged in as @${user?.username}. Tests assigned to you by your Manager will appear here.`
-                          : 'Try clearing the search or analyst filter to inspect other analytical worksheets.'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredTests.map((test) => {
-                  const spec = test.testSpecification;
-                  const isVerified = test.status === 'VERIFIED';
-                  const isCompleted = test.status === 'COMPLETED';
-                  const isPending = test.status === 'PENDING';
+          {/* MAIN SAMPLES & ANALYST EXECUTION TABLE — EXACT MATCH TO SAMPLE REGISTRATION */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200/80 bg-slate-50/90 text-slate-600 uppercase tracking-wider font-bold select-none">
+                    {/* 1. A. No. */}
+                    <th className="py-3 px-3.5 w-[95px] min-w-[95px]">
+                      <span>A. No.</span>
+                    </th>
 
-                  return (
-                    <tr key={test.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900">{spec?.name || 'Analytical Monograph'}</div>
-                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          {spec?.testCode} &bull; {spec?.pharmacopeiaMethod} &bull; {spec?.category}
-                        </div>
-                      </td>
+                    {/* 2. Date & Time */}
+                    <th className="py-3 px-3.5 w-[140px] min-w-[140px]">
+                      <span>Date &amp; Time</span>
+                    </th>
 
-                      <td className="py-3.5 px-4 max-w-xs">
-                        <div className="font-mono font-bold text-slate-800">{test.sampleCode}</div>
-                        <div className="text-[11px] text-slate-500 line-clamp-1">
-                          {test.materialName}
-                        </div>
-                        {test.batchNumber && (
-                          <span className="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded mt-0.5 inline-block">
-                            Lot: {test.batchNumber}
-                          </span>
-                        )}
-                      </td>
+                    {/* 3. Nomenclature */}
+                    <th className="py-3 px-3.5 min-w-[200px] max-w-xs">
+                      <span>Nomenclature</span>
+                    </th>
 
-                      <td className="py-3.5 px-4 font-mono">
-                        {test.minLimit !== null ? (
-                          <div className="text-slate-800 font-medium">
-                            {test.minLimit} - {test.maxLimit} {test.unit}
+                    {/* 4. Sample ID */}
+                    <th className="py-3 px-3.5 w-[130px] min-w-[130px]">
+                      <span>Sample ID</span>
+                    </th>
+
+                    {/* 5. Stage / Type */}
+                    <th className="py-3 px-3.5 w-[130px] min-w-[130px]">
+                      <span>Stage / Type</span>
+                    </th>
+
+                    {/* 6. Qty. of Sample */}
+                    <th className="py-3 px-3.5 w-[110px] min-w-[110px]">
+                      <span>Qty. of Sample</span>
+                    </th>
+
+                    {/* 7. Batch No. / Lot No. */}
+                    <th className="py-3 px-3.5 w-[135px] min-w-[135px]">
+                      <span>Batch No. / Lot No.</span>
+                    </th>
+
+                    {/* 8. MFG Date */}
+                    <th className="py-3 px-3.5 w-[105px] min-w-[105px]">
+                      <span>MFG Date</span>
+                    </th>
+
+                    {/* 9. EXP Date */}
+                    <th className="py-3 px-3.5 w-[105px] min-w-[105px]">
+                      <span>EXP Date</span>
+                    </th>
+
+                    {/* 10. Submitted By */}
+                    <th className="py-3 px-3.5 min-w-[140px]">
+                      <span>Submitted By</span>
+                    </th>
+
+                    {/* 11. Received By */}
+                    <th className="py-3 px-3.5 min-w-[140px]">
+                      <span>Received By</span>
+                    </th>
+
+                    {/* 12. Analyst Execution & Actions */}
+                    <th className="py-3 px-3.5 min-w-[180px] text-right">
+                      <span>Analysis Execution</span>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? (
+                    Array.from({ length: 6 }).map((_, idx) => (
+                      <tr key={`skeleton-${idx}`} className="animate-pulse">
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-14" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-44" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-5 bg-slate-200 rounded-full w-20" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-20" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-16" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-24" /></td>
+                        <td className="py-3.5 px-3.5"><div className="h-4 bg-slate-200 rounded w-20" /></td>
+                        <td className="py-3.5 px-3.5 text-right"><div className="h-7 bg-slate-200 rounded w-28 ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : isError ? (
+                    <tr>
+                      <td colSpan={12} className="py-12 px-4 text-center">
+                        <div className="max-w-md mx-auto p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2">
+                          <div className="flex items-center justify-center gap-2 font-bold text-sm">
+                            <AlertTriangle className="h-5 w-5 text-rose-600" />
+                            <span>Failed to Load Sampling Records</span>
                           </div>
-                        ) : (
-                          <div className="text-slate-500 italic">Qualitative</div>
-                        )}
-                        {test.targetValue !== null && (
-                          <div className="text-[10px] text-slate-400">Target: {test.targetValue} {test.unit}</div>
-                        )}
-                      </td>
-
-                      {/* Assigned Analyst Column */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {test.assignedAnalystName ? (
-                          <div>
-                            <span className="font-semibold text-slate-800 text-xs block">
-                              {test.assignedAnalystName}
-                            </span>
-                            {test.assignedAnalystUsername && (
-                              <span className="text-[10px] text-blue-600 font-mono">
-                                @{test.assignedAnalystUsername}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px]">Unassigned</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        {test.numericResult !== null && test.numericResult !== undefined ? (
-                          <div className="font-mono text-sm font-bold text-slate-900">
-                            {test.numericResult} {test.unit}
-                          </div>
-                        ) : test.textResult ? (
-                          <div className="text-xs text-slate-700">{test.textResult}</div>
-                        ) : (
-                          <span className="text-slate-400 italic">Not entered</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <div className="space-y-1">
-                          <StatusBadge status={test.resultStatus} />
-                          <div>
-                            <StatusBadge status={test.status} />
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        {test.instrument ? (
-                          <div className="text-xs font-medium text-slate-700">
-                            <span className="font-mono">{test.instrument.equipmentCode}</span>
-                            <div className="text-[10px] text-slate-400">{test.instrument.name}</div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {isPending && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleStartAnalysis(test)}
-                              className="h-7 text-xs text-blue-700 hover:bg-blue-50 border-blue-200"
-                              title="Start analysis on this sample"
-                            >
-                              <Play className="h-3 w-3" />
-                              <span>Start</span>
-                            </Button>
-                          )}
-
-                          {/* Official PDF Document Description Link */}
-                          {(() => {
-                            const productDoc = getProductDocForTest(test);
-                            if (!productDoc) return null;
-                            return (
-                              <a
-                                href={productService.getDocumentViewUrl(productDoc.id)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="h-7 px-2.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 inline-flex items-center gap-1.5 transition-colors shadow-2xs"
-                                title={`Open & View Official Product Description PDF: ${productDoc.fileName} (v${productDoc.version}.0)`}
-                              >
-                                <FileText className="h-3.5 w-3.5 text-rose-600" />
-                                <span>PDF Spec (v{productDoc.version}.0)</span>
-                              </a>
-                            );
-                          })()}
-
-                          {/* Direct ATM-003 Sheet link for Askprol tests */}
-                          {(test.sampleCode?.includes('ASK') || test.materialName?.includes('Askprol') || test.testSpecification?.testCode?.includes('SPEC-ASK')) && (
-                            <Link
-                              href="/askprol"
-                              className="h-7 px-2 rounded-lg text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 inline-flex items-center gap-1 transition-colors"
-                              title="Open dedicated ATM-003 3-module calculation worksheet"
-                            >
-                              <FileSpreadsheet className="h-3 w-3 text-purple-600" />
-                              <span>ATM-003 Sheet</span>
-                            </Link>
-                          )}
-
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => openRecordModal(test)}
-                            className="h-7 text-xs"
-                          >
-                            {test.status === 'COMPLETED' || test.status === 'VERIFIED'
-                              ? 'Edit Result'
-                              : 'Input Result'}
+                          <p className="text-xs text-rose-600">
+                            Could not synchronize with laboratory database. Please verify backend connection.
+                          </p>
+                          <Button size="sm" variant="outline" onClick={() => refetch()} className="border-rose-300 text-rose-700 bg-white">
+                            <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                            <span>Retry</span>
                           </Button>
-
-                          {isCompleted && !isVerified && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => verifyMutation.mutate(test.id)}
-                              className="h-7 text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300"
-                            >
-                              <ShieldCheck className="h-3.5 w-3.5" />
-                              <span>Verify</span>
-                            </Button>
-                          )}
                         </div>
                       </td>
                     </tr>
-                  );
-                })
+                  ) : samplesList.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="py-14 px-4 text-center">
+                        <div className="max-w-sm mx-auto space-y-3">
+                          <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto shadow-2xs">
+                            <FlaskConical className="h-6 w-6 text-slate-400" />
+                          </div>
+                          <h4 className="text-sm font-bold text-navy-950">No Sampling Records Found</h4>
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            No analytical samples have been registered for {isAllLabs ? 'any laboratory' : activeLab.name} yet. Samples accessioned in Sample Registration will appear here automatically.
+                          </p>
+                          <Link href="/samples">
+                            <Button size="sm" variant="primary" className="bg-navy-900 text-white text-xs font-semibold">
+                              <PlusCircle className="h-3.5 w-3.5 text-teal-400 mr-1" />
+                              <span>Go to Sample Registration</span>
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    samplesList.map((sample) => {
+                      const mfgFormatted = sample.mfgDate
+                        ? formatDateTime(sample.mfgDate, 'dd/MM/yyyy')
+                        : sample.batch?.manufacturingDate
+                        ? formatDateTime(sample.batch.manufacturingDate, 'dd/MM/yyyy')
+                        : '—';
+
+                      const expFormatted = sample.expDate
+                        ? formatDateTime(sample.expDate, 'dd/MM/yyyy')
+                        : sample.batch?.expiryDate
+                        ? formatDateTime(sample.batch.expiryDate, 'dd/MM/yyyy')
+                        : '—';
+
+                      const batchLotText = sample.lotNumber || sample.batch?.batchNumber || '—';
+                      const submittedText = sample.submittedBy || 'Plant Production';
+                      const receivedText = sample.accessionedBy?.fullName || sample.assignedTo?.fullName || 'QC Intake Officer';
+
+                      const sampleTests = getTestsForSample(sample);
+                      const isExpanded = expandedSampleIds.has(sample.id);
+
+                      const isAskprolItem =
+                        (sample.sampleCode || '').toUpperCase().includes('ASK') ||
+                        (sample.nomenclature || '').toLowerCase().includes('askprol') ||
+                        (sample.materialName || '').toLowerCase().includes('askprol');
+
+                      return (
+                        <React.Fragment key={sample.id}>
+                          <tr className="hover:bg-slate-50/90 transition-colors group">
+                            {/* 1. A. No. */}
+                            <td className="py-3 px-3.5 font-mono font-bold text-navy-950 group-hover:text-teal-700 text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpandSample(sample.id)}
+                                  className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                                  title={isExpanded ? 'Collapse test protocols' : 'Expand test protocols'}
+                                >
+                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                </button>
+                                <span>{sample.accessionNo || 'A-0001'}</span>
+                              </div>
+                            </td>
+
+                            {/* 2. Date & Time */}
+                            <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                              {formatDateTime(sample.samplingDate, 'dd/MM/yyyy HH:mm')}
+                            </td>
+
+                            {/* 3. Nomenclature */}
+                            <td className="py-3 px-3.5 min-w-[200px] max-w-xs">
+                              <div className="font-semibold text-slate-900 line-clamp-1 group-hover:text-navy-950">
+                                {sample.nomenclature || sample.materialName}
+                              </div>
+                              {sample.submissions && sample.submissions.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {sample.submissions.slice(0, 2).map((s) => (
+                                    <span
+                                      key={s.id}
+                                      className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-teal-50 text-teal-800 border border-teal-200"
+                                    >
+                                      <Send className="h-2 w-2" />
+                                      <span>
+                                        {s.destinationLab === 'MICROBIOLOGY'
+                                          ? 'Microbiology'
+                                          : s.destinationLab === 'CHEMICAL'
+                                          ? 'Chemical'
+                                          : 'Physical'}
+                                      </span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* 4. Sample ID */}
+                            <td className="py-3 px-3.5 font-mono font-bold text-teal-800 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{sample.sampleCode}</span>
+                                {(sample.priority === 'URGENT' || sample.priority === 'STAT') && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                                    Urgent
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* 5. Stage / Type */}
+                            <td className="py-3 px-3.5">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 inline-block whitespace-nowrap">
+                                {(sample.stageType || (sample.sampleType ? sample.sampleType.replace(/_/g, ' ') : '—')).replace(/^\[(Semi Basics?|Semi Base|Formulation)\]\s*/i, '')}
+                              </span>
+                            </td>
+
+                            {/* 6. Qty. of Sample */}
+                            <td className="py-3 px-3.5 font-mono text-slate-700 whitespace-nowrap">
+                              {sample.sampleQty} {sample.unit}
+                            </td>
+
+                            {/* 7. Batch No. / Lot No. */}
+                            <td className="py-3 px-3.5">
+                              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/70 inline-block whitespace-nowrap">
+                                {batchLotText}
+                              </span>
+                            </td>
+
+                            {/* 8. MFG Date */}
+                            <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                              {mfgFormatted}
+                            </td>
+
+                            {/* 9. EXP Date */}
+                            <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                              {expFormatted}
+                            </td>
+
+                            {/* 10. Submitted By */}
+                            <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[140px] truncate" title={submittedText}>
+                              {submittedText}
+                            </td>
+
+                            {/* 11. Received By */}
+                            <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[140px] truncate" title={receivedText}>
+                              {receivedText}
+                            </td>
+
+                            {/* 12. Analyst Execution Actions */}
+                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {isAskprolItem ? (
+                                  <Link
+                                    href={`/askprol?batchNumber=${batchLotText}&sampleCode=${sample.sampleCode}&stage=${sample.stageType || sample.sampleType}`}
+                                    className="h-7 px-2.5 rounded-lg text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+                                    title="Open official ATM-003 testing worksheet"
+                                  >
+                                    <Beaker className="h-3.5 w-3.5 text-purple-600" />
+                                    <span>ATM-003 Sheet</span>
+                                  </Link>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => setSelectedSampleForExecution(sample)}
+                                    className="h-7 text-xs bg-navy-900 hover:bg-navy-800 text-white font-semibold inline-flex items-center gap-1"
+                                  >
+                                    <Play className="h-3 w-3 text-teal-400" />
+                                    <span>Execute Analysis</span>
+                                  </Button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpandSample(sample.id)}
+                                  className="h-7 px-2 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 inline-flex items-center gap-1 transition-colors"
+                                  title="View individual tests"
+                                >
+                                  <span>{sampleTests.length} Tests</span>
+                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* EXPANDABLE SUB-ROW: Analytical Test Protocols & Worksheets for this Sample */}
+                          {isExpanded && (
+                            <tr className="bg-slate-50/70 border-b border-slate-200">
+                              <td colSpan={12} className="py-3 px-4 sm:px-8">
+                                <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                                      <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600" />
+                                      <span>Assigned Analytical Worksheets for Sample: {sample.sampleCode}</span>
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      {sampleTests.length} Protocols Configured
+                                    </span>
+                                  </div>
+
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs">
+                                      <thead>
+                                        <tr className="border-b border-slate-200 bg-slate-50/80 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                          <th className="py-2 px-3">Test Monograph</th>
+                                          <th className="py-2 px-3">Compendial Limits</th>
+                                          <th className="py-2 px-3">Assigned Analyst</th>
+                                          <th className="py-2 px-3">Observed Result</th>
+                                          <th className="py-2 px-3">Status</th>
+                                          <th className="py-2 px-3">Instrument</th>
+                                          <th className="py-2 px-3 text-right">Actions</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100 text-xs">
+                                        {sampleTests.map((t: any) => {
+                                          const spec = t.testSpecification;
+                                          return (
+                                            <tr key={t.id} className="hover:bg-slate-50/60">
+                                              <td className="py-2.5 px-3">
+                                                <div className="font-semibold text-slate-900">{spec?.name || 'Assay Protocol'}</div>
+                                                <div className="text-[10px] text-slate-400 font-mono">
+                                                  {spec?.testCode} &bull; {spec?.pharmacopeiaMethod}
+                                                </div>
+                                              </td>
+                                              <td className="py-2.5 px-3 font-mono text-[11px]">
+                                                {t.minLimit !== null && t.minLimit !== undefined ? (
+                                                  <span>{t.minLimit} - {t.maxLimit} {t.unit}</span>
+                                                ) : (
+                                                  <span className="text-slate-400 italic">Qualitative</span>
+                                                )}
+                                              </td>
+                                              <td className="py-2.5 px-3">
+                                                <span className="font-medium text-slate-700">{t.assignedAnalystName || 'QC Analyst'}</span>
+                                              </td>
+                                              <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
+                                                {t.numericResult !== null && t.numericResult !== undefined ? (
+                                                  <span>{t.numericResult} {t.unit}</span>
+                                                ) : t.textResult ? (
+                                                  <span>{t.textResult}</span>
+                                                ) : (
+                                                  <span className="text-slate-400 font-normal italic">Not entered</span>
+                                                )}
+                                              </td>
+                                              <td className="py-2.5 px-3">
+                                                <StatusBadge status={t.resultStatus || t.status || 'PENDING'} />
+                                              </td>
+                                              <td className="py-2.5 px-3 text-[11px] text-slate-600 font-mono">
+                                                {t.instrument?.equipmentCode || t.instrumentId || 'HPLC-01'}
+                                              </td>
+                                              <td className="py-2.5 px-3 text-right">
+                                                <Button
+                                                  size="sm"
+                                                  variant="primary"
+                                                  onClick={() => openRecordModal(t)}
+                                                  className="h-6 px-2.5 text-[11px]"
+                                                >
+                                                  {t.numericResult !== null || t.textResult ? 'Edit Result' : 'Input Result'}
+                                                </Button>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Bar */}
+            <div className="p-4 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white text-xs">
+              <div className="text-slate-500">
+                {meta.total > 0 ? (
+                  <span>
+                    Showing <strong className="text-slate-800">{(meta.page - 1) * meta.limit + 1}</strong> to{' '}
+                    <strong className="text-slate-800">
+                      {Math.min(meta.page * meta.limit, meta.total)}
+                    </strong>{' '}
+                    of <strong className="text-slate-800">{meta.total}</strong> records
+                  </span>
+                ) : (
+                  <span>No records to display</span>
+                )}
+              </div>
+
+              {meta.totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={meta.page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="h-8 text-xs border-slate-200"
+                  >
+                    Previous
+                  </Button>
+                  <span className="px-2 text-slate-600 font-medium">
+                    Page {meta.page} of {meta.totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={meta.page >= meta.totalPages}
+                    onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
+                    className="h-8 text-xs border-slate-200"
+                  >
+                    Next
+                  </Button>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Record Test Result Modal with Live Auto-Evaluation */}
+      {/* SAMPLE ANALYSIS EXECUTION MODAL */}
+      {selectedSampleForExecution && (
+        <Modal
+          isOpen={!!selectedSampleForExecution}
+          onClose={() => setSelectedSampleForExecution(null)}
+          title={`Analyst Execution: ${selectedSampleForExecution.sampleCode}`}
+          subtitle={`Accession No: ${selectedSampleForExecution.accessionNo} • ${selectedSampleForExecution.nomenclature || selectedSampleForExecution.materialName}`}
+          maxWidth="2xl"
+        >
+          <div className="space-y-4">
+            {/* Sample Information Card */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample ID</span>
+                <span className="font-mono font-bold text-teal-800">{selectedSampleForExecution.sampleCode}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Stage / Type</span>
+                <span className="font-semibold text-slate-800">{selectedSampleForExecution.stageType || selectedSampleForExecution.sampleType}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Batch / Lot</span>
+                <span className="font-mono font-semibold text-slate-800">{selectedSampleForExecution.lotNumber || selectedSampleForExecution.batch?.batchNumber || '—'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample Quantity</span>
+                <span className="font-mono text-slate-800">{selectedSampleForExecution.sampleQty} {selectedSampleForExecution.unit}</span>
+              </div>
+            </div>
+
+            {/* If Askprol, provide direct launch banner */}
+            {((selectedSampleForExecution.sampleCode || '').toUpperCase().includes('ASK') ||
+              (selectedSampleForExecution.nomenclature || '').toLowerCase().includes('askprol')) && (
+              <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between gap-3">
+                <div className="text-xs">
+                  <span className="font-bold text-purple-900 block">Dedicated Monograph QC/CLG/ATM-003</span>
+                  <span className="text-purple-700">Launch 3-module analytical calculation sheet with real-time HPLC assay calculation.</span>
+                </div>
+                <Link
+                  href={`/askprol?batchNumber=${selectedSampleForExecution.lotNumber}&sampleCode=${selectedSampleForExecution.sampleCode}&stage=${selectedSampleForExecution.stageType || selectedSampleForExecution.sampleType}`}
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-[#0B1A30] text-white hover:bg-slate-800 shrink-0"
+                >
+                  Launch Worksheet &rarr;
+                </Link>
+              </div>
+            )}
+
+            {/* Test Protocols List */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-700 block">Analytical Test Protocols:</span>
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                {getTestsForSample(selectedSampleForExecution).map((t: any) => (
+                  <div key={t.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                    <div>
+                      <div className="font-semibold text-slate-900 text-xs">{t.testSpecification?.name || 'Assay Protocol'}</div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        Limits: {t.minLimit !== null ? `${t.minLimit} - ${t.maxLimit} ${t.unit}` : 'Qualitative'} &bull; Method: {t.testSpecification?.pharmacopeiaMethod || 'USP/BP'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {t.numericResult !== null || t.textResult ? (
+                        <div className="text-right mr-2">
+                          <span className="font-mono font-bold text-xs text-slate-900">{t.numericResult !== null ? `${t.numericResult} ${t.unit}` : t.textResult}</span>
+                          <div><StatusBadge status={t.resultStatus || 'PASSED'} /></div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-xs italic mr-2">Pending</span>
+                      )}
+
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => openRecordModal(t)}
+                        className="h-7 text-xs"
+                      >
+                        {t.numericResult !== null || t.textResult ? 'Edit Result' : 'Input Result'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-100">
+              <Button type="button" variant="outline" onClick={() => setSelectedSampleForExecution(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* RECORD TEST RESULT MODAL WITH REAL-TIME EVALUATION */}
       {activeTest && (
         <Modal
           isOpen={!!activeTest}
           onClose={() => setActiveTest(null)}
-          title={`Analytical Result Input: ${activeTest.testSpecification.name}`}
+          title={`Analytical Result Input: ${activeTest.testSpecification?.name || 'Test Worksheet'}`}
           subtitle={`Sample: ${activeTest.sampleCode} • ${activeTest.materialName}`}
           maxWidth="xl"
         >
@@ -861,7 +1347,7 @@ export default function TestingPage() {
               <div className="flex items-center justify-between text-xs mb-1">
                 <span className="font-semibold text-slate-700">Pharmacopeial Specification:</span>
                 <span className="font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {activeTest.testSpecification.pharmacopeiaMethod}
+                  {activeTest.testSpecification?.pharmacopeiaMethod || 'USP 44 / BP 2024'}
                 </span>
               </div>
               <div className="flex items-baseline gap-4 mt-2">
@@ -886,7 +1372,7 @@ export default function TestingPage() {
               </div>
             </div>
 
-            {/* Official Product Description PDF Document (.pdf) */}
+            {/* Official Product Description PDF Document Link */}
             {(() => {
               const activeDoc = getProductDocForTest(activeTest);
               if (!activeDoc) return null;
@@ -911,16 +1397,6 @@ export default function TestingPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Link
-                      href={`/products/${activeDoc.productId}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
-                      title="View complete product details and description"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Details</span>
-                    </Link>
-
                     <a
                       href={productService.getDocumentViewUrl(activeDoc.id)}
                       target="_blank"
@@ -931,38 +1407,10 @@ export default function TestingPage() {
                       <FileText className="w-3.5 h-3.5" />
                       <span>View PDF</span>
                     </a>
-
-                    <a
-                      href={productService.getDocumentDownloadUrl(activeDoc.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-rose-300 bg-white hover:bg-rose-100 text-rose-800 text-xs font-semibold shadow-2xs shrink-0"
-                      title="Download PDF file"
-                    >
-                      <Download className="w-3.5 h-3.5 text-rose-700" />
-                    </a>
                   </div>
                 </div>
               );
             })()}
-
-            {/* If Askprol ATM-003 test, show SOP reference banner */}
-            {(activeTest.sampleCode?.includes('ASK') || activeTest.materialName?.includes('Askprol') || activeTest.testSpecification?.testCode?.includes('SPEC-ASK')) && (
-              <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="text-xs">
-                  <span className="font-bold text-purple-900 block">Citi Pharma Ltd &bull; QC/CLG/ATM-003 (Version: 06)</span>
-                  <span className="text-[11px] text-purple-700">Analytical Protocol: {activeTest.testSpecification.name} &bull; Method: {activeTest.testSpecification.pharmacopeiaMethod}</span>
-                </div>
-                <Link
-                  href="/askprol"
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0B1A30] hover:bg-slate-800 text-white shadow-2xs shrink-0"
-                >
-                  <Beaker className="w-3.5 h-3.5 text-purple-300" />
-                  <span>Open Full Calculation Worksheet &rarr;</span>
-                </Link>
-              </div>
-            )}
 
             {/* Qualitative vs Quantitative Input */}
             {(activeTest.unit === 'Qualitative' || activeTest.unit === 'Text' || (activeTest.minLimit === null && activeTest.maxLimit === null)) ? (
@@ -974,8 +1422,8 @@ export default function TestingPage() {
                   type="text"
                   value={textResult}
                   onChange={(e) => setTextResult(e.target.value)}
-                  placeholder="e.g. Complies / A reddish color suspension with solid particles uniformly dispersed"
-                  className="w-full text-sm px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                  placeholder="e.g. Complies / Clear yellowish liquid free from particulate matter"
+                  className="w-full text-sm px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
                   required
                 />
               </div>
@@ -990,7 +1438,7 @@ export default function TestingPage() {
                   value={numericResult}
                   onChange={(e) => setNumericResult(e.target.value)}
                   placeholder="Enter observed numerical assay value..."
-                  className="w-full text-sm font-mono px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                  className="w-full text-sm font-mono px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
                   required
                 />
               </div>
@@ -1016,7 +1464,7 @@ export default function TestingPage() {
                   <p className="font-bold text-rose-700">OUT OF SPECIFICATION (OOS DETECTED)</p>
                   <p className="text-[11px] text-rose-800 mt-0.5">
                     Result <strong>{numericResult} {activeTest.unit}</strong> falls outside acceptable limits (
-                    {activeTest.minLimit} - {activeTest.maxLimit}). Submitting will automatically trigger an Out-of-Specification incident report and Phase 1 lab investigation!
+                    {activeTest.minLimit} - {activeTest.maxLimit}).
                   </p>
                 </div>
               </div>
@@ -1030,7 +1478,7 @@ export default function TestingPage() {
               <select
                 value={selectedInstrumentId}
                 onChange={(e) => setSelectedInstrumentId(e.target.value)}
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white font-medium"
+                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none bg-white font-medium"
               >
                 <option value="">Select calibrated lab instrument...</option>
                 {instruments?.map((inst) => (
@@ -1051,7 +1499,7 @@ export default function TestingPage() {
                 value={rawDataReference}
                 onChange={(e) => setRawDataReference(e.target.value)}
                 placeholder="e.g. Agilent OpenLab Sequence #2026-SEQ-044; Vial 12"
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none font-mono"
+                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none font-mono"
                 required
               />
             </div>
@@ -1066,7 +1514,7 @@ export default function TestingPage() {
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 placeholder="System suitability passed (RSD < 1.0%, theoretical plates > 2000)..."
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none resize-none"
+                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none"
               />
             </div>
 
@@ -1080,12 +1528,27 @@ export default function TestingPage() {
                 variant={evaluatedStatus === 'OUT_OF_SPEC' ? 'danger' : 'primary'}
                 isLoading={recordResultMutation.isPending}
               >
-                <span>Save Result & Sign Electronically</span>
+                <span>Save Result &amp; Sign Electronically</span>
               </Button>
             </div>
           </form>
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function TestingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 text-center text-slate-500">
+          <FlaskConical className="h-6 w-6 animate-spin mx-auto mb-2 text-teal-600" />
+          <span>Loading Analyst Execution Workstation...</span>
+        </div>
+      }
+    >
+      <TestingPageContent />
+    </Suspense>
   );
 }

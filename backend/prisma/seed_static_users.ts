@@ -99,7 +99,7 @@ async function main() {
     update: {
       username: 'admin',
       passwordHash: adminHash,
-      fullName: 'Dr. Muhammad Jamil (Administrator)',
+      fullName: 'Zohaib Zeeshan (Administrator)',
       department: 'QC & Administration',
       role: Role.ADMIN,
       isActive: true,
@@ -108,7 +108,7 @@ async function main() {
       email: 'admin@citypharma.com',
       username: 'admin',
       passwordHash: adminHash,
-      fullName: 'Dr. Muhammad Jamil (Administrator)',
+      fullName: 'Zohaib Zeeshan (Administrator)',
       employeeId: 'EMP-001',
       department: 'QC & Administration',
       role: Role.ADMIN,

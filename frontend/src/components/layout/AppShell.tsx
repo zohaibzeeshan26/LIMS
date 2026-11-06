@@ -1,19 +1,35 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { NewSampleModal } from '@/components/samples/NewSampleModal';
-import { FlaskConical, Loader2, ShieldCheck, ArrowLeft, LogOut, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  FlaskConical,
+  Loader2,
+  ShieldCheck,
+  ArrowLeft,
+  LogOut,
+  ArrowRight,
+  PanelLeft,
+  LayoutDashboard,
+} from 'lucide-react';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading, logout } = useAuth();
   const [isAccessionOpen, setIsAccessionOpen] = useState(false);
 
+  const isPortalPage = pathname === '/';
+  // STRICT REQUIREMENT: Slider is ONLY shown when the user opens the Dashboard (/dashboard)
+  const isDashboardPage = pathname.startsWith('/dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   // Auto-redirect if unauthenticated on protected routes
-  React.useEffect(() => {
+  useEffect(() => {
     if (pathname === '/login') return;
     if (!user && !isLoading) {
       const timer = setTimeout(() => {
@@ -68,60 +84,122 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isPortalPage = pathname === '/';
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Workspace Top Header (shown on all pages except Portal Hub which has its own header) */}
-      {!isPortalPage && (
-        <header className="sticky top-0 z-40 bg-white border-b border-slate-200/90 shadow-2xs px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4 shrink-0">
-          {/* Left: Back to Portal Button */}
-          <Link
-            href="/"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold shadow-2xs transition-all cursor-pointer"
-            title="Return to Main Portal"
-          >
-            <ArrowLeft className="h-4 w-4 text-slate-600" />
-            <span>Back to Portal</span>
-          </Link>
-
-          {/* Center: Official Citi Pharma Logo & LIMS Branding */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="h-9 w-9 rounded-xl bg-[#0B1A30] p-1 flex items-center justify-center border border-slate-200 shadow-xs group-hover:scale-105 transition-transform">
-              <img
-                src="/city-pharma-logo.png"
-                alt="Citi Pharma Logo"
-                className="h-full w-full object-contain"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-black text-slate-900 tracking-tight text-base leading-none">Citi Pharma</span>
-              <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#0066FF] text-white shadow-2xs">
-                LIMS
-              </span>
-            </div>
-          </Link>
-
-          {/* Right: Sign Out Action */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => logout()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-rose-600 transition-colors cursor-pointer shadow-2xs"
-              title="Sign Out"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          </div>
-        </header>
+      {/* Left Slider Navigation Drawer — STRICTLY shown ONLY on Dashboard */}
+      {isDashboardPage && (
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       )}
 
-      {/* Main Full-Width Content View */}
-      <main className="flex-1 overflow-y-auto">
-        <div className={`p-4 sm:p-6 lg:p-8 ${isPortalPage ? 'max-w-6xl' : 'max-w-7xl'} w-full mx-auto`}>
-          {children}
-        </div>
-      </main>
+      {/* Main Container — Automatically offsets padding-left (lg:pl-64) ONLY when on Dashboard and left slider is active */}
+      <div
+        className={cn(
+          'flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out',
+          isDashboardPage && sidebarOpen ? 'lg:pl-64' : 'pl-0'
+        )}
+      >
+        {/* Workspace Top Header (shown on all pages except Portal Hub which has its own header) */}
+        {!isPortalPage && (
+          <header className="sticky top-0 z-40 bg-white border-b border-slate-200/90 shadow-2xs px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4 shrink-0">
+            {/* Left Actions */}
+            <div className="flex items-center gap-2">
+              {isDashboardPage ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                    title={sidebarOpen ? 'Collapse Left Slider' : 'Open Left Slider'}
+                  >
+                    <PanelLeft className="h-4 w-4" />
+                    <span>{sidebarOpen ? 'Collapse Slider' : 'Slider'}</span>
+                  </button>
+
+                  <Link
+                    href="/"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                    title="Return to Main Portal"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Portal Hub</span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                    title="Return to Main Portal"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Portal Hub</span>
+                  </Link>
+
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                    title="Go to QC Dashboard (with Left Slider)"
+                  >
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    <span>QC Dashboard</span>
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Center: Brand (visible on non-dashboard pages, or when slider is collapsed) */}
+            <div
+              className={cn(
+                'flex items-center gap-2 transition-opacity',
+                isDashboardPage && sidebarOpen ? 'lg:opacity-0 lg:pointer-events-none' : 'opacity-100'
+              )}
+            >
+              <Link href="/" className="flex items-center gap-2 group">
+                <div className="h-8 w-8 rounded-lg bg-[#0B1A30] p-1 flex items-center justify-center border border-slate-200 shadow-xs">
+                  <img
+                    src="/city-pharma-logo.png"
+                    alt="Citi Pharma Logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-black text-slate-900 tracking-tight text-sm">Citi Pharma</span>
+                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0066FF] text-white">
+                    LIMS
+                  </span>
+                </div>
+              </Link>
+            </div>
+
+            {/* Right: Authenticated User Badge & Sign Out */}
+            <div className="flex items-center gap-2.5">
+              <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="truncate max-w-[160px]">{user?.fullName || 'Authorized Staff'}</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200">
+                  {user?.role || 'QC'}
+                </span>
+              </div>
+
+              <button
+                onClick={() => logout()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-rose-600 transition-colors cursor-pointer shadow-2xs"
+                title="Sign Out"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
+            </div>
+          </header>
+        )}
+
+        {/* Main Full-Width Content View */}
+        <main className="flex-1 overflow-y-auto">
+          <div className={`p-4 sm:p-6 lg:p-8 ${isPortalPage ? 'max-w-6xl' : 'max-w-7xl'} w-full mx-auto`}>
+            {children}
+          </div>
+        </main>
+      </div>
 
       <NewSampleModal
         isOpen={isAccessionOpen}

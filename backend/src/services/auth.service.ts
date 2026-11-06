@@ -28,7 +28,8 @@ export class AuthService {
       if (
         lower === 'admin' ||
         lower.includes('admin') ||
-        lower.includes('jamil') ||
+        lower.includes('zohaib') ||
+        lower.includes('zeeshan') ||
         lower.includes('tariq') ||
         lower.includes('director') ||
         lower === 'lims.offics' ||

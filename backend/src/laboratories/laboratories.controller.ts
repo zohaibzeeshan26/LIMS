@@ -32,6 +32,22 @@ export class LaboratoriesController {
     return this.laboratoriesService.findAllLaboratories();
   }
 
+  @Get('operations/summary')
+  @ApiOperation({ summary: 'Get unified laboratory operations summary across General, Cephalosporin, and Penicillin labs' })
+  getOperationsSummary(@Query() query: any, @Request() req: any) {
+    return this.laboratoriesService.getLabOperationsSummary(query, req.user);
+  }
+
+  @Get('operations/:labId')
+  @ApiOperation({ summary: 'Get detailed operations metrics, analyst workload, and sample history for a specific laboratory' })
+  getIndividualOperations(
+    @Param('labId') labId: string,
+    @Query() query: any,
+    @Request() req: any,
+  ) {
+    return this.laboratoriesService.getIndividualLabOperations(labId, query, req.user);
+  }
+
   @Get(':laboratoryId/samples')
   @ApiOperation({ summary: 'Get all samples belonging to a specific laboratory with pagination and filters' })
   @ApiResponse({ status: 200, description: 'Paginated laboratory sample records' })

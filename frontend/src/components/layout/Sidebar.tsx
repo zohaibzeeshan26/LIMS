@@ -24,6 +24,8 @@ import {
   LogOut,
   FileSpreadsheet,
   FileCheck2,
+  Activity,
+  ChevronLeft,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -75,30 +77,10 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
     searchParams.get('lab')?.toLowerCase() ||
     (userAccess === 'ALL' ? 'general' : userAccess.toLowerCase());
 
-  const visibleLaboratories = React.useMemo(() => {
-    // When inside a specific laboratory view on /samples, isolate sidebar to show only that active laboratory
-    if (isOnSamples && activeLabParam) {
-      const currentLab = LABORATORIES.find(
-        (l) =>
-          l.id === activeLabParam ||
-          (l.id === 'general' && (activeLabParam === 'gen' || activeLabParam === 'gl')) ||
-          (l.id === 'penicillin' && (activeLabParam === 'pen' || activeLabParam === 'pl')) ||
-          (l.id === 'cephalosporin' && (activeLabParam === 'ceph' || activeLabParam === 'cp' || activeLabParam === 'saf'))
-      );
-      if (currentLab) return [currentLab];
-    }
-    if (userAccess === 'ALL') return LABORATORIES;
-    return LABORATORIES.filter((l) => l.code === userAccess);
-  }, [userAccess, isOnSamples, activeLabParam]);
+  // Always keep all 3 laboratories visible in the slider so nothing disappears
+  const visibleLaboratories = LABORATORIES;
 
-  const labBadgeLabel =
-    userAccess === 'ALL'
-      ? '3 Labs'
-      : userAccess === 'PENICILLIN'
-      ? 'Penicillin Lab'
-      : userAccess === 'CEPHALOSPORIN'
-      ? 'Cephalosporin Lab'
-      : 'General Lab';
+  const labBadgeLabel = '3 Labs';
 
   // Dedicated query to fetch ALL active expedited (Immediate / STAT & Urgent) samples
   const { data: expeditedSamplesData } = useQuery({
@@ -192,6 +174,12 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         icon: LayoutDashboard,
       },
       {
+        name: 'Lab Operations',
+        href: '/dashboard?tab=lab-operations',
+        icon: Activity,
+        badge: '3 Labs',
+      },
+      {
         name: 'Priority Notice',
         href: '/priority-notice',
         icon: AlertCircle,
@@ -235,25 +223,10 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         icon: FileCheck2,
         badge: 'CoA',
       },
-      {
-        name: 'Products',
-        href: '/products',
-        icon: Package,
-        badge: 'Products',
-      },
-      {
-        name: 'Batches & Inventory',
-        href: '/batches',
-        icon: Package,
-      },
     ];
 
-  // Filter items by role so users only see their authorized tools
-  const visibleItems = menuItems.filter((item) => {
-        if (item.adminOnly && !isAdmin) return false;
-        if (item.roles && !item.roles.includes(role) && !isAdmin) return false;
-        return true;
-      });
+  // Keep all menu items visible in the slider so nothing disappears
+  const visibleItems = menuItems;
 
   return (
     <>
@@ -268,7 +241,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
 
       <aside
         className={cn(
-          'fixed top-0 bottom-0 left-0 z-50 lg:z-30 w-64 bg-[#0B1A30] text-slate-100 flex flex-col transition-transform duration-200 ease-in-out lg:translate-x-0 overflow-hidden shadow-2xl border-r border-[#152744]',
+          'fixed top-0 bottom-0 left-0 z-50 lg:z-30 w-64 bg-[#0B1A30] text-slate-100 flex flex-col transition-transform duration-300 ease-in-out overflow-hidden shadow-2xl border-r border-[#152744]',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -298,13 +271,15 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
             </div>
           </Link>
 
-          {/* Close button for mobile screens */}
+          {/* Slider close / collapse button */}
           <button
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            aria-label="Close sidebar"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            aria-label="Collapse slider"
+            title="Collapse slider"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4 lg:hidden" />
+            <ChevronLeft className="h-4 w-4 hidden lg:block" />
           </button>
         </div>
 
@@ -314,15 +289,32 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isDashboard = item.href === '/';
-            const isActive = isDashboard
-              ? pathname === '/'
-              : pathname === item.href || (item.href === '/samples' && pathname === '/samples' && !searchParams.get('lab'));
+            const isLabOperationsItem = item.href === '/dashboard?tab=lab-operations';
+            const isQcDashboardItem = item.href === '/dashboard';
+            const currentTab = searchParams?.get('tab');
+
+            let isActive = false;
+            if (isDashboard) {
+              isActive = pathname === '/';
+            } else if (isLabOperationsItem) {
+              isActive = (pathname === '/dashboard' && currentTab === 'lab-operations') || pathname === '/lab-operations';
+            } else if (isQcDashboardItem) {
+              isActive = pathname === '/dashboard' && currentTab !== 'lab-operations';
+            } else if (item.href === '/samples' && pathname === '/samples' && !searchParams?.get('lab')) {
+              isActive = true;
+            } else {
+              isActive = pathname === item.href;
+            }
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={() => onClose && onClose()}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                    onClose && onClose();
+                  }
+                }}
                 className={cn(
                   'group flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150',
                   isActive
@@ -373,9 +365,9 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
           {/* Dedicated Analytical Laboratories Section (Always Visible) */}
           <div className="pt-4 pb-1.5 px-3">
             <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>{isOnSamples ? 'Active Laboratory' : 'Analytical Laboratories'}</span>
+              <span>Analytical Laboratories</span>
               <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold">
-                {visibleLaboratories.length} {visibleLaboratories.length === 1 ? 'Unit' : 'Units'}
+                3 Units
               </span>
             </div>
           </div>
@@ -394,7 +386,11 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
                 <Link
                   key={lab.id}
                   href={lab.href}
-                  onClick={() => onClose && onClose()}
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                      onClose && onClose();
+                    }
+                  }}
                   className={cn(
                     'group flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150',
                     isThisLabActive

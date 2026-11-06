@@ -22,7 +22,7 @@ export function EditSampleModal({ isOpen, onClose, sample }: EditSampleModalProp
   const [formData, setFormData] = useState({
     nomenclature: '',
     lotNumber: '',
-    sampleQty: 100,
+    sampleQty: '' as any,
     unit: 'tablets',
     customUnit: '',
     sampleType: 'Finished Product',
@@ -47,7 +47,7 @@ export function EditSampleModal({ isOpen, onClose, sample }: EditSampleModalProp
       setFormData({
         nomenclature: sample.nomenclature || sample.materialName || '',
         lotNumber: sample.lotNumber || sample.batch?.batchNumber || '',
-        sampleQty: sample.sampleQty || 100,
+        sampleQty: sample.sampleQty || ('' as any),
         unit: ['tablets', 'capsules', 'raw data'].includes((sample.unit || '').toLowerCase())
           ? (sample.unit || '').toLowerCase()
           : 'Other',
@@ -349,7 +349,6 @@ export function EditSampleModal({ isOpen, onClose, sample }: EditSampleModalProp
               value={formData.submittedBy}
               onChange={(e) => setFormData({ ...formData, submittedBy: e.target.value })}
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none"
-              placeholder="e.g. Dr. Muhammad Jamil (Granulation Suite 3)"
             />
           </div>
 

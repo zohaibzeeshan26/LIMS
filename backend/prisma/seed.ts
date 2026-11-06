@@ -62,7 +62,7 @@ async function main() {
       email: 'admin@citypharma.com',
       username: 'admin',
       passwordHash,
-      fullName: 'Dr. Muhammad Jamil (Administrator)',
+      fullName: 'Zohaib Zeeshan (Administrator)',
       employeeId: 'EMP-001',
       department: 'QC & Administration',
       role: Role.ADMIN,

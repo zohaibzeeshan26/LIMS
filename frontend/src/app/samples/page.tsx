@@ -656,9 +656,6 @@ function SamplesPageInner() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Analytical Laboratory
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                Active Facility
-              </span>
             </div>
             <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
               {activeLab.name}
@@ -867,9 +864,6 @@ function SamplesPageInner() {
             <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Search & Filter Sampling Records
             </span>
-            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-              {samplesList.length} matching
-            </span>
           </div>
 
           {hasActiveFilters && (
@@ -898,7 +892,6 @@ function SamplesPageInner() {
                 setGlobalSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Type anything here (e.g. batch 1212, 2026-10-27, Vendor Sample, Lenori)..."
               className="w-full pl-8 pr-7 py-2 text-xs rounded-xl border border-blue-200 bg-blue-50/20 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 outline-none font-medium transition-all"
             />
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-500" />
@@ -925,7 +918,6 @@ function SamplesPageInner() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="e.g. GL/SB-2 or ACC-..."
                 value={sampleIdSearch}
                 onChange={(e) => {
                   setSampleIdSearch(e.target.value);
@@ -955,7 +947,6 @@ function SamplesPageInner() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="e.g. Lenori, Brufen..."
                 value={nomenclatureSearch}
                 onChange={(e) => {
                   setNomenclatureSearch(e.target.value);
@@ -985,7 +976,6 @@ function SamplesPageInner() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="e.g. 1212, BATCH-01..."
                 value={batchSearch}
                 onChange={(e) => {
                   setBatchSearch(e.target.value);
@@ -1015,7 +1005,6 @@ function SamplesPageInner() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="e.g. Vendor Sample, Raw Material..."
                 value={categorySearch}
                 onChange={(e) => {
                   setCategorySearch(e.target.value);
@@ -1037,66 +1026,8 @@ function SamplesPageInner() {
           </div>
         </div>
 
-        {/* Row 2: Date Filters (MFG Date, EXP Date, From/To Sampling Date) & Select Dropdowns */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-1 border-t border-slate-100">
-          {/* MFG Date */}
-          <div className="relative">
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-slate-400" />
-              <span>Search MFG Date</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="YYYY-MM-DD or date"
-                value={mfgDateFilter}
-                onChange={(e) => {
-                  setMfgDateFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-800 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-mono"
-              />
-              {mfgDateFilter && (
-                <button
-                  type="button"
-                  onClick={() => setMfgDateFilter('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* EXP Date */}
-          <div className="relative">
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-slate-400" />
-              <span>Search EXP Date</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="YYYY-MM-DD or date"
-                value={expDateFilter}
-                onChange={(e) => {
-                  setExpDateFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-800 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-mono"
-              />
-              {expDateFilter && (
-                <button
-                  type="button"
-                  onClick={() => setExpDateFilter('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
+        {/* Row 2: Date Filters & Preset Dropdowns */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100">
           {/* Sampling Start Date */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
@@ -1163,30 +1094,6 @@ function SamplesPageInner() {
               ))}
             </select>
           </div>
-
-          {/* Filter by Status */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Workflow Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-medium"
-            >
-              <option value="">All Statuses</option>
-              <option value="RECEIVED">Received</option>
-              <option value="LOGGED">Logged</option>
-              <option value="ASSIGNED">Assigned</option>
-              <option value="TESTING_IN_PROGRESS">Testing In Progress</option>
-              <option value="REVIEW_PENDING">Review Pending</option>
-              <option value="APPROVED">Approved / Released</option>
-              <option value="REJECTED">Rejected</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -1222,10 +1129,6 @@ function SamplesPageInner() {
               </select>
               <span>per page</span>
             </div>
-
-            <span className="text-[11px] font-mono text-slate-400 border-l pl-3 border-slate-200">
-              {isAllLabs ? 'FACILITY_ALL' : `SUITE_${activeLab.key}`}
-            </span>
           </div>
         </div>
 

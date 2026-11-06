@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -58,11 +58,27 @@ import {
   Activity,
   RefreshCw,
   Gauge,
+  LayoutDashboard,
 } from 'lucide-react';
 import { STATIC_ANALYSTS, isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
+import { LabOperationsView } from '@/components/dashboard/LabOperationsView';
 
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'overview' | 'lab-operations'>(
+    tabParam === 'lab-operations' ? 'lab-operations' : 'overview'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'lab-operations') {
+      setActiveTab('lab-operations');
+    } else if (tabParam === 'overview') {
+      setActiveTab('overview');
+    }
+  }, [tabParam]);
+
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading } = useAuth();
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -873,96 +889,110 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 font-sans pb-10">
       
-      {/* Top Header: Dashboard title, welcome message, and LIVE date dropdown button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-              title="Return to Main Operations Portal"
-            >
-              <span>&larr; Portal</span>
-            </Link>
+      {/* Top Header: Dashboard title, Portal navigation, and Tab Switcher */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+            title="Return to Main Operations Portal"
+          >
+            <span>&larr; Portal</span>
+          </Link>
+          <div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-              QC Executive Dashboard
+              {activeTab === 'lab-operations' ? 'Lab Operations Dashboard' : 'QC Executive Dashboard'}
             </h1>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-              QC Central Unit
-            </span>
+            <p className="text-[11px] text-slate-500 font-medium">
+              {activeTab === 'lab-operations'
+                ? 'Real-time operational intake, workload comparison & testing tracking across General, Cephalosporin & Penicillin laboratories'
+                : 'Real-time laboratory governance, testing operations & analytical release control'}
+            </p>
           </div>
         </div>
 
-        {/* Calendar Date Range Filter Selector */}
-        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
-          {/* Live Date Selector Dropdown Button */}
-          <div className="relative">
-            <button
-              onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
-              className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-slate-200 shadow-xs text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
-              title="Current Live System Date"
-            >
-              <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
-              <span>{activeDateRange || formatLiveDate(currentTime)}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-            </button>
+        {/* Filters & Actions */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Calendar Date Range Filter Selector (Executive Overview tab) */}
+          {activeTab === 'overview' && (
+            <div className="relative">
+              <button
+                onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
+                className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-slate-200 shadow-xs text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
+                title="Current Live System Date"
+              >
+                <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
+                <span>{activeDateRange || formatLiveDate(currentTime)}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              </button>
 
-            {isDateMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setIsDateMenuOpen(false)} />
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-200 p-2 z-40 animate-in fade-in zoom-in-95">
-                  <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Calendar Range Options
+              {isDateMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsDateMenuOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-200 p-2 z-40 animate-in fade-in zoom-in-95">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Calendar Range Options
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedRangeKey('today');
+                        setActiveDateRange(formatLiveDate(currentTime));
+                        setIsDateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between"
+                    >
+                      <span>Today ({formatShortLiveDate(currentTime)})</span>
+                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-bold">Active Live</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedRangeKey('yesterday');
+                        const y = new Date(currentTime);
+                        y.setDate(y.getDate() - 1);
+                        setActiveDateRange(`Yesterday (${formatShortLiveDate(y)})`);
+                        setIsDateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
+                    >
+                      <span>Yesterday</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedRangeKey('week');
+                        setActiveDateRange('Last 7 Days');
+                        setIsDateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
+                    >
+                      <span>Last 7 Days</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedRangeKey('month');
+                        setActiveDateRange('This Month');
+                        setIsDateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
+                    >
+                      <span>This Month</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedRangeKey('today');
-                      setActiveDateRange(formatLiveDate(currentTime));
-                      setIsDateMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between"
-                  >
-                    <span>Today ({formatShortLiveDate(currentTime)})</span>
-                    <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-bold">Active Live</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedRangeKey('yesterday');
-                      const y = new Date(currentTime);
-                      y.setDate(y.getDate() - 1);
-                      setActiveDateRange(`Yesterday (${formatShortLiveDate(y)})`);
-                      setIsDateMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
-                  >
-                    <span>Yesterday</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedRangeKey('week');
-                      setActiveDateRange('Last 7 Days');
-                      setIsDateMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
-                  >
-                    <span>Last 7 Days</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedRangeKey('month');
-                      setActiveDateRange('This Month');
-                      setIsDateMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
-                  >
-                    <span>This Month</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {activeTab === 'lab-operations' ? (
+        <LabOperationsView
+          onBackToOverview={() => {
+            setActiveTab('overview');
+            router.replace('/dashboard', { scroll: false });
+          }}
+        />
+      ) : (
+        <>
 
 
       {/* Role-Based Workstation Banner */}
@@ -1027,9 +1057,6 @@ export default function DashboardPage() {
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
                 Executive Governance &bull; {user?.fullName || 'System Administrator'}
               </h2>
-              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                Full authority over General, Cephalosporin &amp; Penicillin laboratories, User Management CRUD, password resets, and sample assignment across 10 analyst workstations.
-              </p>
             </div>
             <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
               <button
@@ -1110,9 +1137,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                GL
-              </span>
             </div>
           </Link>
 
@@ -1133,9 +1157,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
-                CEPH
-              </span>
             </div>
           </Link>
 
@@ -1156,9 +1177,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
-                PEN
-              </span>
             </div>
           </Link>
         </div>
@@ -1185,9 +1203,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                ASSIGNED
-              </span>
+
             </div>
           </Link>
 
@@ -1209,9 +1225,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                QUEUED
-              </span>
             </div>
           </Link>
 
@@ -1233,9 +1246,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                TESTING
-              </span>
             </div>
           </Link>
 
@@ -1257,9 +1267,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                PASSED
-              </span>
             </div>
           </Link>
 
@@ -1281,9 +1288,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
-                EXPEDITE
-              </span>
             </div>
           </Link>
         </div>
@@ -1307,9 +1311,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                ALL
-              </span>
             </div>
           </Link>
 
@@ -1331,9 +1332,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                QUEUED
-              </span>
             </div>
           </Link>
 
@@ -1355,9 +1353,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                MFG
-              </span>
             </div>
           </Link>
 
@@ -1379,9 +1374,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                CoA
-              </span>
             </div>
           </Link>
 
@@ -1403,9 +1395,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
-                USERS
-              </span>
             </div>
           </Link>
         </div>
@@ -2523,6 +2512,8 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Accession Modal for Quick Registration */}
       <NewSampleModal
@@ -2670,5 +2661,22 @@ export default function DashboardPage() {
       )}
 
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center gap-3 text-slate-500 text-sm font-medium">
+            <div className="h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <span>Loading QC Dashboard...</span>
+          </div>
+        </div>
+      }
+    >
+      <DashboardInner />
+    </Suspense>
   );
 }
