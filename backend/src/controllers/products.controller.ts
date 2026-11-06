@@ -11,7 +11,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-// Multer Storage Configuration for PDF Documents (.pdf)
+// Multer Storage Configuration for All Document Types
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     if (!fs.existsSync(UPLOAD_DIR)) {
@@ -22,30 +22,20 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const productId = req.body?.productId || req.params?.id || 'doc';
     const cleanProdId = String(productId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const ext = path.extname(file.originalname).toLowerCase() || '.bin';
     const safeBase = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9_-]/g, '_');
-    cb(null, `${cleanProdId}-${Date.now()}-${safeBase}.pdf`);
+    cb(null, `${cleanProdId}-${Date.now()}-${safeBase}${ext}`);
   },
 });
 
 export const uploadPdfMiddleware = multer({
   storage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max file size
+    fileSize: 100 * 1024 * 1024, // 100MB max file size
   },
-  fileFilter: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const isPdfExtension = ext === '.pdf';
-    const isPdfMime =
-      file.mimetype === 'application/pdf' ||
-      file.mimetype === 'application/x-pdf' ||
-      file.mimetype === 'application/acrobat' ||
-      file.mimetype === 'applications/vnd.pdf';
-
-    if (isPdfExtension || isPdfMime) {
-      cb(null, true);
-    } else {
-      cb(new AppError('Only official PDF documents (.pdf) are allowed. Other file formats are strictly rejected.', 400));
-    }
+  fileFilter: (_req, _file, cb) => {
+    // Allow any document file format (PDF, Word, Excel, PowerPoint, Text, Images, etc.)
+    cb(null, true);
   },
 });
 
@@ -91,24 +81,22 @@ export class ProductsController {
     try {
       const rawProductId = req.body.productId || req.params.id;
       const productId = rawProductId ? String(rawProductId) : '';
-      const { title, versionNotes } = req.body;
+      const { title, versionNotes, laboratory, labName } = req.body;
       const file = req.file;
 
       if (!productId) {
-        throw new AppError('Product ID is required', 400);
+        throw new AppError('Product ID / Name is required', 400);
       }
       if (!file) {
-        throw new AppError('Product description PDF document (.pdf) is required', 400);
-      }
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (ext !== '.pdf') {
-        throw new AppError('Only PDF files (.pdf) are allowed. Other file formats are strictly rejected.', 400);
+        throw new AppError('Document file is required', 400);
       }
 
       const document = await productsService.uploadDocument({
         productId,
         title,
         versionNotes,
+        laboratory,
+        labName,
         file,
         user: req.user,
       });

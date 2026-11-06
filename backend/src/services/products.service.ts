@@ -186,14 +186,31 @@ export class ProductsService {
     productId: string;
     title?: string;
     versionNotes?: string;
+    laboratory?: string;
+    labName?: string;
     file: Express.Multer.File;
     user: any;
   }) {
     if (!data.file) {
-      throw new AppError('Word document file (.doc or .docx) is required', 400);
+      throw new AppError('Document file is required', 400);
     }
 
-    const product = await prisma.product.findUnique({
+    const targetLab = data.laboratory?.trim().toUpperCase() || 'GENERAL';
+    const targetLabName =
+      data.labName?.trim() ||
+      (targetLab === 'GENERAL'
+        ? 'General Quality Control Lab'
+        : targetLab === 'PENICILLIN'
+        ? 'Penicillin QC Lab'
+        : targetLab === 'CEPHALOSPORIN'
+        ? 'Cephalosporin Lab'
+        : targetLab === 'MICROBIOLOGY'
+        ? 'Microbiology Lab'
+        : targetLab === 'SAF'
+        ? 'Semi-Automated Formulation Lab'
+        : `${targetLab.charAt(0) + targetLab.slice(1).toLowerCase()} Lab`);
+
+    let product = await prisma.product.findUnique({
       where: { id: data.productId },
       include: {
         documents: true,
@@ -201,10 +218,46 @@ export class ProductsService {
     });
 
     if (!product) {
-      if (fs.existsSync(data.file.path)) {
-        try { fs.unlinkSync(data.file.path); } catch (e) {}
-      }
-      throw new AppError(`Product with ID "${data.productId}" not found`, 404);
+      product = await prisma.product.findFirst({
+        where: { brandName: { equals: data.productId.trim(), mode: 'insensitive' } },
+        include: { documents: true },
+      });
+    }
+
+    if (!product) {
+      // Auto-create product for manual entry
+      const cleanName = data.productId.trim();
+      const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'doc-prod';
+      const newId = `${baseSlug}-${Date.now().toString(36)}`;
+      product = await prisma.product.create({
+        data: {
+          id: newId,
+          brandName: cleanName,
+          genericName: cleanName,
+          dosageForm: 'Pharmaceutical Document / Spec',
+          strength: 'Standard',
+          packSize: 'Commercial',
+          laboratory: targetLab,
+          labName: targetLabName,
+          atmCode: `QC/DOC/ATM-${Math.floor(100 + Math.random() * 900)}`,
+          version: 'Version: 01',
+          status: 'COMPENDIAL_READY',
+          specs: 'Approved Specification Document',
+          description: `Document record entry for ${cleanName}.`,
+          parameters: ['Document Review', 'Monograph Verification'],
+        },
+        include: { documents: true },
+      });
+    } else if (data.laboratory && product.laboratory !== targetLab) {
+      // Update existing product's lab if user selected a different lab
+      product = await prisma.product.update({
+        where: { id: product.id },
+        data: {
+          laboratory: targetLab,
+          labName: targetLabName,
+        },
+        include: { documents: true },
+      });
     }
 
     // Determine document version
@@ -219,9 +272,9 @@ export class ProductsService {
       data: { isCurrent: false },
     });
 
-    const mimeType = 'application/pdf';
+    const mimeType = data.file.mimetype || 'application/octet-stream';
 
-    const defaultTitle = `${product.brandName} - Product Description PDF Document (v${nextVersion})`;
+    const defaultTitle = `${product.brandName} - Document Specification (v${nextVersion})`;
     const defaultNotes = nextVersion === 1
       ? 'Initial product description PDF document upload'
       : (data.versionNotes?.trim() || `Superseded previous revision with version ${nextVersion}`);

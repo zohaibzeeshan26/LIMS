@@ -990,7 +990,6 @@ export function AddSampleForm({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white tracking-tight">Confirm Sample Registration Details</h3>
-                  <p className="text-[11px] text-slate-300">21 CFR Part 11 Electronic cGMP Record Verification</p>
                 </div>
               </div>
               <button

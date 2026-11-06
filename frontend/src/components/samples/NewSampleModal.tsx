@@ -768,7 +768,6 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
             <div className="pb-4 mb-6 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">Create Sampling Record</h2>
-                <p className="text-xs text-slate-500 mt-1">21 CFR Part 11 compliant pharmaceutical sample intake and registration form.</p>
               </div>
               <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                 {selectedLab === 'PENICILLIN' ? 'Penicillin Lab' : selectedLab === 'CEPHALOSPORIN' ? 'Cephalosporin Lab' : 'General Lab'}
@@ -1449,7 +1448,6 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white tracking-tight">Confirm Sample Registration Details</h3>
-                  <p className="text-[11px] text-slate-300">21 CFR Part 11 Electronic cGMP Record Verification</p>
                 </div>
               </div>
               <button
