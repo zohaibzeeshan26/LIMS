@@ -911,7 +911,7 @@ export function AddSampleForm({
               type="text"
               id="receivedBy"
               {...register('receivedBy')}
-              placeholder="e.g. Tariq Mehmood (QC Intake Officer)"
+              placeholder="e.g. Dr. Muhammad Jamil (QC Intake Officer)"
               className={cn(
                 'w-full px-3 py-2 text-xs rounded-lg border outline-none transition-all',
                 errors.receivedBy
@@ -953,7 +953,6 @@ export function AddSampleForm({
           >
             <option value="ROUTINE">Routine (Standard 5 - 15 Days)</option>
             <option value="URGENT">Urgent (Expedited 1 Hr - 2 Days)</option>
-            <option value="STABILITY">Stability Protocol (Scheduled Interval)</option>
           </select>
         </div>
 

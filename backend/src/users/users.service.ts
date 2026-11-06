@@ -70,7 +70,7 @@ export class UsersService {
 
   async create(data: {
     fullName: string;
-    email: string;
+    email?: string;
     username?: string;
     employeeId: string;
     department: string;
@@ -80,20 +80,32 @@ export class UsersService {
     isActive?: boolean;
     mustChangePassword?: boolean;
   }) {
-    if (!data.fullName || !data.email || !data.employeeId || !data.department || !data.role || !data.password) {
-      throw new BadRequestException('Full Name, Email, Employee ID, Department, Role, and Password are required');
+    if (!data.fullName || !data.employeeId || !data.department || !data.role || !data.password) {
+      throw new BadRequestException('Full Name, Employee ID, Department, Role, and Password are required');
     }
 
     if (data.password.length < 6) {
       throw new BadRequestException('Password must be at least 6 characters long');
     }
 
-    const cleanEmail = data.email.trim().toLowerCase();
     const cleanEmployeeId = data.employeeId.trim().toUpperCase();
     const cleanUsername = data.username ? data.username.trim().toLowerCase() : null;
 
-    const existingEmail = await this.prisma.user.findUnique({ where: { email: cleanEmail } });
-    if (existingEmail) throw new ConflictException(`User with email "${cleanEmail}" already exists`);
+    let cleanEmail = data.email?.trim().toLowerCase();
+    if (!cleanEmail) {
+      const basePrefix = (cleanUsername || cleanEmployeeId || 'user')
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '');
+      cleanEmail = `${basePrefix}@citypharma.local`;
+      let counter = 1;
+      while (await this.prisma.user.findUnique({ where: { email: cleanEmail } })) {
+        cleanEmail = `${basePrefix}${counter}@citypharma.local`;
+        counter++;
+      }
+    } else {
+      const existingEmail = await this.prisma.user.findUnique({ where: { email: cleanEmail } });
+      if (existingEmail) throw new ConflictException(`User with email "${cleanEmail}" already exists`);
+    }
 
     const existingEmp = await this.prisma.user.findUnique({ where: { employeeId: cleanEmployeeId } });
     if (existingEmp) throw new ConflictException(`User with Employee ID "${cleanEmployeeId}" already exists`);

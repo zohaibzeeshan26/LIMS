@@ -349,7 +349,7 @@ export function EditSampleModal({ isOpen, onClose, sample }: EditSampleModalProp
               value={formData.submittedBy}
               onChange={(e) => setFormData({ ...formData, submittedBy: e.target.value })}
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none"
-              placeholder="e.g. Tariq Mehmood (Granulation Suite 3)"
+              placeholder="e.g. Dr. Muhammad Jamil (Granulation Suite 3)"
             />
           </div>
 

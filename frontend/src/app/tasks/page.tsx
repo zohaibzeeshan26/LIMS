@@ -117,7 +117,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     assignedAnalystName: 'Zubair Raza',
     assignedAnalystId: 'EMP-003',
     testProtocol: 'HPLC Potency Assay & Chromatographic Purity',
-    priority: 'STAT',
+    priority: 'URGENT',
     shift: 'Morning Shift (08:00 - 16:00)',
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
@@ -144,7 +144,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     assignedAnalystName: 'Cephalosporin Lab Analyst',
     assignedAnalystId: 'EMP-004',
     testProtocol: 'Sterility & Bacterial Endotoxin Test (LAL)',
-    priority: 'STAT',
+    priority: 'URGENT',
     shift: 'Morning Shift (08:00 - 16:00)',
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
@@ -252,7 +252,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     assignedAnalystName: 'Penicillin Lab Analyst',
     assignedAnalystId: 'EMP-005',
     testProtocol: 'Assay by HPLC & Dissolution Profile',
-    priority: 'STAT',
+    priority: 'URGENT',
     shift: 'Morning Shift (08:00 - 16:00)',
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
@@ -306,7 +306,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     assignedAnalystName: 'Bilal Raza',
     assignedAnalystId: 'EMP-007',
     testProtocol: 'pH & Optical Rotation Verification',
-    priority: 'STAT',
+    priority: 'URGENT',
     shift: 'Morning Shift (08:00 - 16:00)',
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
@@ -446,9 +446,9 @@ function TaskAssignmentPageInner() {
   const [newSampleName, setNewSampleName] = useState('');
   const [newLab, setNewLab] = useState<'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN'>(activeLabKey);
   const [newSection, setNewSection] = useState<'semi-base' | 'formulation'>('semi-base');
-  const [newAnalystId, setNewAnalystId] = useState(ANALYSTS[0].id);
+  const [newAnalystId, setNewAnalystId] = useState(ANALYSTS[0]?.id || '');
   const [newProtocol, setNewProtocol] = useState(TEST_PROTOCOLS[0]);
-  const [newPriority, setNewPriority] = useState<'STAT' | 'URGENT' | 'ROUTINE'>('URGENT');
+  const [newPriority, setNewPriority] = useState<'URGENT' | 'ROUTINE'>('URGENT');
   const [newShift, setNewShift] = useState('Morning Shift (08:00 - 16:00)');
   const [newDueDate, setNewDueDate] = useState('2026-10-30');
   const [newInstructions, setNewInstructions] = useState('');
@@ -473,8 +473,8 @@ function TaskAssignmentPageInner() {
   });
 
   const allPersonnelList = useMemo<AnalystUserOption[]>(() => {
-    if (!dbPersonnelData || !Array.isArray(dbPersonnelData)) return ANALYSTS;
-    const mapped: AnalystUserOption[] = dbPersonnelData
+    if (!dbPersonnelData || !Array.isArray(dbPersonnelData)) return [];
+    return dbPersonnelData
       .filter((u: any) => u.isActive !== false)
       .map((u: any) => ({
         id: u.employeeId || u.id,
@@ -485,17 +485,14 @@ function TaskAssignmentPageInner() {
         department: u.department || 'Analytical QC',
         lab: (u.assignedLab || 'ALL') as any,
       }));
-    const ids = new Set(mapped.map((m) => m.id));
-    const missing = ANALYSTS.filter((a) => !ids.has(a.id));
-    return [...mapped, ...missing];
   }, [dbPersonnelData]);
 
   // Row-level Sample Assignment Modal State
   const [isRowAssignModalOpen, setIsRowAssignModalOpen] = useState(false);
   const [targetSampleTask, setTargetSampleTask] = useState<TaskItem | null>(null);
-  const [selectedAnalystId, setSelectedAnalystId] = useState<string>(ANALYSTS[0].id);
+  const [selectedAnalystId, setSelectedAnalystId] = useState<string>(ANALYSTS[0]?.id || '');
   const [selectedProtocol, setSelectedProtocol] = useState<string>(TEST_PROTOCOLS[0]);
-  const [selectedPriorityVal, setSelectedPriorityVal] = useState<'STAT' | 'URGENT' | 'ROUTINE'>('URGENT');
+  const [selectedPriorityVal, setSelectedPriorityVal] = useState<'URGENT' | 'ROUTINE'>('URGENT');
   const [selectedShiftVal, setSelectedShiftVal] = useState<string>('Morning Shift (08:00 - 16:00)');
   const [selectedDueDateVal, setSelectedDueDateVal] = useState<string>('2026-10-30');
   const [selectedInstructionsVal, setSelectedInstructionsVal] = useState<string>('');
@@ -507,7 +504,7 @@ function TaskAssignmentPageInner() {
     );
     setSelectedAnalystId(existing ? existing.id : allPersonnelList[0]?.id || 'EMP-ANL-01');
     setSelectedProtocol(task.testProtocol || TEST_PROTOCOLS[0]);
-    setSelectedPriorityVal(task.priority || 'URGENT');
+    setSelectedPriorityVal(task.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT');
     setSelectedShiftVal(task.shift || 'Morning Shift (08:00 - 16:00)');
     setSelectedDueDateVal(task.dueDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
     setSelectedInstructionsVal(task.instructions || '');
@@ -660,7 +657,7 @@ function TaskAssignmentPageInner() {
               assignedAnalystName: defaultAnalyst.name,
               assignedAnalystId: defaultAnalyst.id,
               testProtocol: defaultProtocol,
-              priority: s.priority === 'STAT' ? 'STAT' : s.priority === 'URGENT' ? 'URGENT' : 'ROUTINE',
+              priority: s.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT',
               shift: 'Morning Shift (08:00 - 16:00)',
               dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
               assignedDate: s.samplingDate
@@ -732,7 +729,7 @@ function TaskAssignmentPageInner() {
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const selectedAnalyst = allPersonnelList.find((a) => a.id === newAnalystId) || allPersonnelList[0] || ANALYSTS[0];
+    const selectedAnalyst = allPersonnelList.find((a) => a.id === newAnalystId) || allPersonnelList[0] || { id: 'UNASSIGNED', name: 'Unassigned Analyst', username: 'unassigned', email: '', role: 'Analyst', department: 'QC', lab: 'ALL' };
     const generatedCode = `TSK-2026-${String(tasks.length + 1).padStart(3, '0')}`;
     const match = labSpecificSamples.find(
       (s: any) =>
@@ -838,9 +835,9 @@ function TaskAssignmentPageInner() {
   const semiBaseCount = semiBaseTasks.length;
   const formulationCount = formulationTasks.length;
 
-  const urgentTasksCount = useMemo(() => labTasks.filter((t) => t.priority === 'STAT' || t.priority === 'URGENT').length, [labTasks]);
-  const semiBaseUrgentCount = useMemo(() => semiBaseTasks.filter((t) => t.priority === 'STAT' || t.priority === 'URGENT').length, [semiBaseTasks]);
-  const formulationUrgentCount = useMemo(() => formulationTasks.filter((t) => t.priority === 'STAT' || t.priority === 'URGENT').length, [formulationTasks]);
+  const urgentTasksCount = useMemo(() => labTasks.filter((t) => t.priority === 'URGENT' || (t.priority as any) === 'STAT').length, [labTasks]);
+  const semiBaseUrgentCount = useMemo(() => semiBaseTasks.filter((t) => t.priority === 'URGENT' || (t.priority as any) === 'STAT').length, [semiBaseTasks]);
+  const formulationUrgentCount = useMemo(() => formulationTasks.filter((t) => t.priority === 'URGENT' || (t.priority as any) === 'STAT').length, [formulationTasks]);
 
   // Filtered task items strictly isolated by active laboratory AND selected section
   const filteredTasks = useMemo(() => {
@@ -876,11 +873,11 @@ function TaskAssignmentPageInner() {
   const stats = useMemo(() => {
     const scope = activeSection === 'semi-base' ? semiBaseTasks : activeSection === 'formulation' ? formulationTasks : labTasks;
     const total = scope.length;
-    const statCount = scope.filter((t) => t.priority === 'STAT').length;
+    const urgentCount = scope.filter((t) => t.priority === 'URGENT' || (t.priority as any) === 'STAT').length;
     const inProgress = scope.filter((t) => t.status === 'IN_PROGRESS').length;
     const assigned = scope.filter((t) => t.status === 'ASSIGNED').length;
     const completed = scope.filter((t) => t.status === 'COMPLETED').length;
-    return { total, statCount, inProgress, assigned, completed };
+    return { total, urgentCount, inProgress, assigned, completed };
   }, [activeSection, semiBaseTasks, formulationTasks, labTasks]);
 
   if (!isMounted) {
@@ -1164,16 +1161,16 @@ function TaskAssignmentPageInner() {
           <p className="text-[11px] text-slate-400 mt-0.5">Active analysis in cleanrooms</p>
         </div>
 
-        {/* Card 4: STAT Emergency */}
-        <div className="p-4 rounded-xl border border-rose-100 bg-white shadow-2xs">
+        {/* Card 4: Urgent Priority */}
+        <div className="p-4 rounded-xl border border-amber-100 bg-white shadow-2xs">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
-            <span>STAT (24h SLA)</span>
-            <span className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+            <span>Urgent (48h SLA)</span>
+            <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
               <AlertTriangle className="h-4 w-4" />
             </span>
           </div>
-          <div className="text-2xl font-black text-rose-600">{stats.statCount}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Immediate priority release</p>
+          <div className="text-2xl font-black text-amber-700">{stats.urgentCount}</div>
+          <p className="text-[11px] text-slate-400 mt-0.5">Expedited 48-hour testing</p>
         </div>
       </div>
 
@@ -1208,7 +1205,6 @@ function TaskAssignmentPageInner() {
             className="text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-medium focus:outline-none focus:border-indigo-500"
           >
             <option value="ALL">All Priorities</option>
-            <option value="STAT">STAT (24h)</option>
             <option value="URGENT">Urgent (48h)</option>
             <option value="ROUTINE">Routine (5d)</option>
           </select>
@@ -1291,8 +1287,7 @@ function TaskAssignmentPageInner() {
                 </tr>
               ) : (
                 filteredTasks.map((t) => {
-                  const isStat = t.priority === 'STAT';
-                  const isUrgent = t.priority === 'URGENT';
+                  const isUrgent = t.priority === 'URGENT' || (t.priority as any) === 'STAT';
                   const taskSec = getTaskSection(t);
 
                   const matchedSample = availableSamples.find((s: any) => {
@@ -1362,7 +1357,7 @@ function TaskAssignmentPageInner() {
                       <td className="py-3 px-3.5 font-mono font-bold text-teal-800 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span>{sampleIdCode}</span>
-                          {(isStat || isUrgent) && (
+                          {isUrgent && (
                             <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
                               Urgent
                             </span>
@@ -1429,18 +1424,11 @@ function TaskAssignmentPageInner() {
 
                       {/* 15. Priority */}
                       <td className="py-3 px-3.5 whitespace-nowrap">
-                        {isStat && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-ping" />
-                            STAT
-                          </span>
-                        )}
-                        {isUrgent && (
+                        {isUrgent ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
                             URGENT
                           </span>
-                        )}
-                        {!isStat && !isUrgent && (
+                        ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                             ROUTINE
                           </span>
@@ -1543,11 +1531,7 @@ function TaskAssignmentPageInner() {
                       setNewSection(getSampleSection(match));
                       if (match.priority) {
                         setNewPriority(
-                          match.priority === 'STAT'
-                            ? 'STAT'
-                            : match.priority === 'URGENT'
-                            ? 'URGENT'
-                            : 'ROUTINE'
+                          match.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT'
                         );
                       }
                     }
@@ -1694,7 +1678,6 @@ function TaskAssignmentPageInner() {
                 onChange={(e) => setNewPriority(e.target.value as any)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
               >
-                <option value="STAT">STAT (24h Immediate SLA)</option>
                 <option value="URGENT">URGENT (48h Standard)</option>
                 <option value="ROUTINE">ROUTINE (5-Day Turnaround)</option>
               </select>
@@ -1792,7 +1775,9 @@ function TaskAssignmentPageInner() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 shadow-2xs">
-                    {targetSampleTask.laboratory}
+                    {typeof targetSampleTask.laboratory === 'string'
+                      ? targetSampleTask.laboratory
+                      : (targetSampleTask.laboratory as any)?.name || 'General'}
                   </span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-emerald-700 border border-emerald-200 shadow-2xs">
                     {targetSampleTask.section === 'semi-base' ? 'Semi Basics' : 'Formulation'}
@@ -1851,42 +1836,30 @@ function TaskAssignmentPageInner() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Workflow Priority *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setSelectedPriorityVal('ROUTINE')}
                     className={cn(
-                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
+                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center',
                       selectedPriorityVal === 'ROUTINE'
                         ? 'bg-slate-100 border-slate-400 text-slate-800 shadow-2xs'
                         : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                     )}
                   >
-                    Routine
+                    Routine (5-Day Turnaround)
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedPriorityVal('URGENT')}
                     className={cn(
-                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
+                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center',
                       selectedPriorityVal === 'URGENT'
                         ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-2xs'
                         : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                     )}
                   >
-                    Urgent (48h)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPriorityVal('STAT')}
-                    className={cn(
-                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer',
-                      selectedPriorityVal === 'STAT'
-                        ? 'bg-rose-50 border-rose-500 text-rose-700 shadow-2xs'
-                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                    )}
-                  >
-                    STAT (24h)
+                    Urgent (48h Priority)
                   </button>
                 </div>
               </div>
@@ -1975,7 +1948,9 @@ function TaskAssignmentPageInner() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
-                    {activeTaskDetails.laboratory} LAB
+                    {typeof activeTaskDetails.laboratory === 'string'
+                      ? activeTaskDetails.laboratory
+                      : (activeTaskDetails.laboratory as any)?.name || 'General'} LAB
                   </span>
                   <span
                     className={cn(

@@ -689,7 +689,7 @@ export class SamplingService {
       },
       include: {
         batch: true,
-        laboratory: true,
+        laboratory: { select: { id: true, name: true, code: true } },
         accessionedBy: { select: { id: true, fullName: true, employeeId: true, department: true } },
         assignedTo: { select: { id: true, fullName: true, employeeId: true, department: true } },
         tests: {

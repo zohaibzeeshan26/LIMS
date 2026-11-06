@@ -318,7 +318,13 @@ export function SubmitSampleModal({
                   {sample.sampleCode}
                 </span>
                 <Badge variant="info" size="sm">
-                  {sample.laboratory ? `${sample.laboratory} Lab Intake` : 'General'}
+                  {typeof sample.laboratory === 'string'
+                    ? `${sample.laboratory} Lab Intake`
+                    : (sample.laboratory as any)?.name
+                    ? `${(sample.laboratory as any).name} Intake`
+                    : sample.laboratoryType
+                    ? `${sample.laboratoryType} Lab Intake`
+                    : 'General'}
                 </Badge>
               </div>
               <h3 className="text-sm font-bold text-navy-950 mt-1">

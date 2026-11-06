@@ -62,7 +62,7 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
     accentBg: 'bg-blue-50/70',
     iconBg: 'bg-blue-600',
     badgeBg: 'bg-blue-100 text-blue-700 border-blue-200',
-    description: 'Raw Materials & Finished Oral Formulations QC Facility',
+    description: '',
     authorizedAnalysts: [
       'analyst1',
       'analyst2',
@@ -88,7 +88,7 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
     accentBg: 'bg-amber-50/70',
     iconBg: 'bg-amber-600',
     badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
-    description: 'Semi-Base & Dedicated Penicillin Isolation QC Facility',
+    description: '',
     authorizedAnalysts: ['analyst5'],
   },
   cephalosporin: {
@@ -105,7 +105,7 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
     accentBg: 'bg-purple-50/70',
     iconBg: 'bg-purple-600',
     badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
-    description: 'Sterile Area Facility (SAF / SEF Cephalosporins)',
+    description: '',
     authorizedAnalysts: ['analyst6'],
   },
 };
@@ -289,9 +289,11 @@ export function LabSecurityModal({
                 Restricted Access
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 truncate mt-0.5">
-              {targetLab.desc || labConfig.description}
-            </p>
+            {(targetLab.desc || labConfig.description) ? (
+              <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                {targetLab.desc || labConfig.description}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -371,12 +373,6 @@ export function LabSecurityModal({
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-        </div>
-
-        {/* Compliance Footer Indicator */}
-        <div className="text-[11px] text-slate-400 flex items-center justify-between px-1 pt-1">
-          <span>Protected analytical facility</span>
-          <span className="font-mono text-[10px] text-slate-400 font-semibold">21 CFR PART 11</span>
         </div>
 
         {/* Action Buttons */}

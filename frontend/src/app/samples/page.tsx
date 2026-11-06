@@ -197,10 +197,14 @@ function SamplesPageInner() {
   // 3. Search by batch/lot number
   // 4. Filter by date range (startDate, endDate)
   // 5. Filter by stage/type
-  // 6. Pagination & Sorting
+  // 6. Pagination & Sorting & Granular Search Filters
+  const [globalSearch, setGlobalSearch] = useState('');
   const [sampleIdSearch, setSampleIdSearch] = useState('');
   const [nomenclatureSearch, setNomenclatureSearch] = useState('');
   const [batchSearch, setBatchSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [mfgDateFilter, setMfgDateFilter] = useState('');
+  const [expDateFilter, setExpDateFilter] = useState('');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
@@ -213,9 +217,13 @@ function SamplesPageInner() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Debounced search terms for smooth server queries
+  const debouncedGlobal = useDebounce(globalSearch, 300);
   const debouncedSampleId = useDebounce(sampleIdSearch, 300);
   const debouncedNomenclature = useDebounce(nomenclatureSearch, 300);
   const debouncedBatch = useDebounce(batchSearch, 300);
+  const debouncedCategory = useDebounce(categorySearch, 300);
+  const debouncedMfg = useDebounce(mfgDateFilter, 300);
+  const debouncedExp = useDebounce(expDateFilter, 300);
 
   // Modals state
   const [isAccessionModalOpen, setIsAccessionModalOpen] = useState(false);
@@ -274,9 +282,13 @@ function SamplesPageInner() {
 
   // Reset all filters
   const handleResetFilters = () => {
+    setGlobalSearch('');
     setSampleIdSearch('');
     setNomenclatureSearch('');
     setBatchSearch('');
+    setCategorySearch('');
+    setMfgDateFilter('');
+    setExpDateFilter('');
     setStartDateFilter('');
     setEndDateFilter('');
     setStageFilter('');
@@ -285,9 +297,13 @@ function SamplesPageInner() {
   };
 
   const hasActiveFilters = Boolean(
+    globalSearch ||
     sampleIdSearch ||
     nomenclatureSearch ||
     batchSearch ||
+    categorySearch ||
+    mfgDateFilter ||
+    expDateFilter ||
     startDateFilter ||
     endDateFilter ||
     stageFilter ||
@@ -339,9 +355,13 @@ function SamplesPageInner() {
     () => ({
       laboratory: isAllLabs ? undefined : activeLab.key,
       section: isAllLabs || activeSection === 'all' ? undefined : (activeSection as any),
+      search: debouncedGlobal || undefined,
       sampleId: debouncedSampleId || undefined,
       nomenclature: debouncedNomenclature || undefined,
       batchNumber: debouncedBatch || undefined,
+      category: debouncedCategory || undefined,
+      mfgDate: debouncedMfg || undefined,
+      expDate: debouncedExp || undefined,
       startDate: startDateFilter || undefined,
       endDate: endDateFilter || undefined,
       sampleType: stageFilter || undefined,
@@ -355,9 +375,13 @@ function SamplesPageInner() {
       isAllLabs,
       activeLab.key,
       activeSection,
+      debouncedGlobal,
       debouncedSampleId,
       debouncedNomenclature,
       debouncedBatch,
+      debouncedCategory,
+      debouncedMfg,
+      debouncedExp,
       startDateFilter,
       endDateFilter,
       stageFilter,
@@ -418,7 +442,7 @@ function SamplesPageInner() {
     return allUrgentSamples;
   }, [activeSection, semiBaseUrgentSamples, formulationUrgentSamples, allUrgentSamples]);
 
-  // Extract samples array and strictly filter by active laboratory and section (guarantees zero cross-lab leakage)
+  // Extract samples array and strictly filter by active laboratory, section, and live search fields
   const samplesList: Sample[] = useMemo(() => {
     let raw: Sample[] = [];
     if (responseData) {
@@ -432,11 +456,105 @@ function SamplesPageInner() {
       }
       // 2. Section filter: if 'semi-base' or 'formulation', filter accordingly; if 'all', show all samples of this lab
       if (activeSection === 'semi-base' || activeSection === 'formulation') {
-        return getSampleSection(s) === activeSection;
+        if (getSampleSection(s) !== activeSection) return false;
       }
+
+      // 3. Live Batch Number Search
+      if (batchSearch) {
+        const q = batchSearch.trim().toLowerCase();
+        const lot = (s.lotNumber || s.batchLotNumber || '').toLowerCase();
+        if (!lot.includes(q)) return false;
+      }
+
+      // 4. Live Sample ID / Accession No Search
+      if (sampleIdSearch) {
+        const q = sampleIdSearch.trim().toLowerCase();
+        const sid = (s.sampleCode || s.sampleId || s.accessionNo || s.recordNumber || '').toLowerCase();
+        if (!sid.includes(q)) return false;
+      }
+
+      // 5. Live Nomenclature Search
+      if (nomenclatureSearch) {
+        const q = nomenclatureSearch.trim().toLowerCase();
+        const nom = (s.nomenclature || s.materialName || '').toLowerCase();
+        if (!nom.includes(q)) return false;
+      }
+
+      // 6. Live Category Search
+      if (categorySearch) {
+        const q = categorySearch.trim().toLowerCase();
+        const cat = (s.stageType || s.sampleType || '').toLowerCase();
+        if (!cat.includes(q)) return false;
+      }
+
+      // 7. Category Dropdown Filter
+      if (stageFilter) {
+        const q = stageFilter.trim().toLowerCase();
+        const cat = (s.stageType || s.sampleType || '').toLowerCase();
+        if (!cat.includes(q)) return false;
+      }
+
+      // 8. Live MFG Date Search / Filter
+      if (mfgDateFilter) {
+        const q = mfgDateFilter.trim().toLowerCase();
+        const mfg = (s.mfgDate || s.manufacturingDate || '').toString().toLowerCase();
+        if (!mfg.includes(q)) return false;
+      }
+
+      // 9. Live EXP Date Search / Filter
+      if (expDateFilter) {
+        const q = expDateFilter.trim().toLowerCase();
+        const exp = (s.expDate || s.expiryDate || '').toString().toLowerCase();
+        if (!exp.includes(q)) return false;
+      }
+
+      // 10. Live Status Filter
+      if (statusFilter) {
+        if (s.status?.toUpperCase() !== statusFilter.toUpperCase()) return false;
+      }
+
+      // 11. Universal Quick Search across all columns
+      if (globalSearch) {
+        const q = globalSearch.trim().toLowerCase();
+        const combo = [
+          s.sampleCode,
+          s.sampleId,
+          s.accessionNo,
+          s.recordNumber,
+          s.nomenclature,
+          s.materialName,
+          s.lotNumber,
+          s.batchLotNumber,
+          s.stageType,
+          s.sampleType,
+          s.status,
+          s.mfgDate,
+          s.expDate,
+          s.manufacturingDate,
+          s.expiryDate,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!combo.includes(q)) return false;
+      }
+
       return true;
     });
-  }, [responseData, activeLab.key, activeSection]);
+  }, [
+    responseData,
+    activeLab.key,
+    activeSection,
+    batchSearch,
+    sampleIdSearch,
+    nomenclatureSearch,
+    categorySearch,
+    stageFilter,
+    mfgDateFilter,
+    expDateFilter,
+    statusFilter,
+    globalSearch,
+  ]);
 
   const meta = useMemo(() => {
     if (responseData && 'meta' in (responseData as any)) {
@@ -745,9 +863,12 @@ function SamplesPageInner() {
       <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs space-y-3.5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-navy-900" />
-            <span className="text-xs font-bold text-navy-950 uppercase tracking-wider">
+            <Filter className="h-4 w-4 text-blue-600" />
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Search & Filter Sampling Records
+            </span>
+            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+              {samplesList.length} matching
             </span>
           </div>
 
@@ -755,25 +876,56 @@ function SamplesPageInner() {
             <button
               type="button"
               onClick={handleResetFilters}
-              className="text-xs text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1 px-2 py-1 rounded bg-rose-50 hover:bg-rose-100/70 border border-rose-200 transition-colors cursor-pointer"
+              className="text-xs text-rose-600 hover:text-rose-700 font-medium flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100/70 border border-rose-200 transition-colors cursor-pointer"
             >
               <RotateCcw className="h-3 w-3" />
-              <span>Reset Filters</span>
+              <span>Reset All Filters</span>
             </button>
           )}
         </div>
 
-        {/* Row 1: Dedicated Search Inputs (Sample ID, Nomenclature, Batch/Lot) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Search by Sample ID */}
+        {/* Global Live Universal Search Bar */}
+        <div className="relative">
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <Search className="h-3 w-3 text-blue-600" />
+            <span>Universal Instant Search (Batch #, MFG Date, Expiry Date, Category, Sample ID, Nomenclature)</span>
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={globalSearch}
+              onChange={(e) => {
+                setGlobalSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Type anything here (e.g. batch 1212, 2026-10-27, Vendor Sample, Lenori)..."
+              className="w-full pl-8 pr-7 py-2 text-xs rounded-xl border border-blue-200 bg-blue-50/20 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 outline-none font-medium transition-all"
+            />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-blue-500" />
+            {globalSearch && (
+              <button
+                type="button"
+                onClick={() => setGlobalSearch('')}
+                className="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Row 1: Dedicated Search Inputs (Sample ID, Nomenclature, Batch/Lot, Category) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1 border-t border-slate-100">
+          {/* Search by Sample ID / A. No. */}
           <div className="relative">
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Hash className="h-3 w-3 text-slate-400" />
-              <span>Search Sample ID</span>
+              <span>Search Sample ID / A. No.</span>
             </label>
             <div className="relative">
               <input
                 type="text"
+                placeholder="e.g. GL/SB-2 or ACC-..."
                 value={sampleIdSearch}
                 onChange={(e) => {
                   setSampleIdSearch(e.target.value);
@@ -786,7 +938,7 @@ function SamplesPageInner() {
                 <button
                   type="button"
                   onClick={() => setSampleIdSearch('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -803,6 +955,7 @@ function SamplesPageInner() {
             <div className="relative">
               <input
                 type="text"
+                placeholder="e.g. Lenori, Brufen..."
                 value={nomenclatureSearch}
                 onChange={(e) => {
                   setNomenclatureSearch(e.target.value);
@@ -815,7 +968,7 @@ function SamplesPageInner() {
                 <button
                   type="button"
                   onClick={() => setNomenclatureSearch('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -832,6 +985,7 @@ function SamplesPageInner() {
             <div className="relative">
               <input
                 type="text"
+                placeholder="e.g. 1212, BATCH-01..."
                 value={batchSearch}
                 onChange={(e) => {
                   setBatchSearch(e.target.value);
@@ -844,7 +998,37 @@ function SamplesPageInner() {
                 <button
                   type="button"
                   onClick={() => setBatchSearch('')}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Search Category / Stage */}
+          <div className="relative">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Layers className="h-3 w-3 text-slate-400" />
+              <span>Search Category / Stage</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="e.g. Vendor Sample, Raw Material..."
+                value={categorySearch}
+                onChange={(e) => {
+                  setCategorySearch(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-800 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none"
+              />
+              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+              {categorySearch && (
+                <button
+                  type="button"
+                  onClick={() => setCategorySearch('')}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -853,9 +1037,67 @@ function SamplesPageInner() {
           </div>
         </div>
 
-        {/* Row 2: Granular Filters (Date Range, Stage/Type, Status) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1 border-t border-slate-100">
-          {/* Start Date */}
+        {/* Row 2: Date Filters (MFG Date, EXP Date, From/To Sampling Date) & Select Dropdowns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-1 border-t border-slate-100">
+          {/* MFG Date */}
+          <div className="relative">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Calendar className="h-3 w-3 text-slate-400" />
+              <span>Search MFG Date</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="YYYY-MM-DD or date"
+                value={mfgDateFilter}
+                onChange={(e) => {
+                  setMfgDateFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-800 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-mono"
+              />
+              {mfgDateFilter && (
+                <button
+                  type="button"
+                  onClick={() => setMfgDateFilter('')}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* EXP Date */}
+          <div className="relative">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Calendar className="h-3 w-3 text-slate-400" />
+              <span>Search EXP Date</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="YYYY-MM-DD or date"
+                value={expDateFilter}
+                onChange={(e) => {
+                  setExpDateFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-800 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-mono"
+              />
+              {expDateFilter && (
+                <button
+                  type="button"
+                  onClick={() => setExpDateFilter('')}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sampling Start Date */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Calendar className="h-3 w-3 text-slate-400" />
@@ -872,7 +1114,7 @@ function SamplesPageInner() {
             />
           </div>
 
-          {/* End Date */}
+          {/* Sampling End Date */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Calendar className="h-3 w-3 text-slate-400" />
@@ -889,14 +1131,14 @@ function SamplesPageInner() {
             />
           </div>
 
-          {/* Filter by Stage / Type */}
+          {/* Filter by Stage / Type Dropdown */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               {activeSection === 'semi-base'
-                ? 'Semi Basics Category'
+                ? 'Category Preset'
                 : activeSection === 'formulation'
-                ? 'Formulation Category'
-                : 'Stage / Category'}
+                ? 'Category Preset'
+                : 'Category Preset'}
             </label>
             <select
               value={stageFilter}
@@ -907,13 +1149,7 @@ function SamplesPageInner() {
               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 outline-none bg-white font-medium"
             >
               <option value="">
-                All Categories (
-                {activeSection === 'semi-base'
-                  ? 'Semi Basics'
-                  : activeSection === 'formulation'
-                  ? 'Formulation'
-                  : 'All Lab Categories'}
-                )
+                All Preset Categories
               </option>
               {(activeSection === 'semi-base'
                 ? SEMI_BASE_STAGES
@@ -1465,27 +1701,6 @@ function SamplesPageInner() {
                     <Printer className="h-3.5 w-3.5 mr-1" />
                     <span>Print Dossier</span>
                   </Button>
-
-
-
-                  {canEdit ? (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => {
-                        setEditingSample(activeDossier);
-                      }}
-                      className="bg-navy-900 text-white text-xs font-semibold cursor-pointer"
-                    >
-                      <Edit3 className="h-3.5 w-3.5 text-teal-400 mr-1" />
-                      <span>Edit Record</span>
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
-                      <Lock className="h-3.5 w-3.5 text-amber-600" />
-                      <span>Edit Restricted (Admin Only)</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1559,39 +1774,7 @@ function SamplesPageInner() {
                 </div>
               </div>
 
-              {/* Status Transition Action */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-4">
-                <div className="text-xs">
-                  <span className="font-bold text-navy-950 block">Update Workflow Status</span>
-                </div>
 
-                <select
-                  value={activeDossier.status}
-                  onChange={(e) => {
-                    const newStatus = e.target.value;
-                    const reason = prompt(
-                      'Reason for status change:',
-                      'Progressing analytical testing'
-                    );
-                    if (reason) {
-                      updateStatusMutation.mutate({
-                        id: activeDossier.id,
-                        status: newStatus,
-                        reason,
-                      });
-                    }
-                  }}
-                  className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-medium text-slate-800 focus:ring-1 focus:ring-navy-900"
-                >
-                  <option value="RECEIVED">Received</option>
-                  <option value="LOGGED">Logged</option>
-                  <option value="ASSIGNED">Assigned</option>
-                  <option value="TESTING_IN_PROGRESS">Testing In Progress</option>
-                  <option value="REVIEW_PENDING">Review Pending</option>
-                  <option value="APPROVED">Approved / Released</option>
-                  <option value="REJECTED">Rejected</option>
-                </select>
-              </div>
 
 
 

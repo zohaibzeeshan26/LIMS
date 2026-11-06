@@ -53,7 +53,7 @@ export default function WelcomePortalPage() {
       name: 'General Lab',
       code: 'GENERAL',
       badge: 'GL',
-      desc: 'Raw Materials & Finished Oral Formulations',
+      desc: '',
       href: '/samples?lab=general',
       icon: FlaskConical,
       cardBg: 'bg-blue-50/50 hover:bg-blue-50 border-blue-200/80 hover:border-blue-400',
@@ -65,7 +65,7 @@ export default function WelcomePortalPage() {
       name: 'Penicillin Lab',
       code: 'PENICILLIN',
       badge: 'PEN',
-      desc: 'Semi-Base & Dedicated Penicillin Isolation',
+      desc: '',
       href: '/samples?lab=penicillin',
       icon: Microscope,
       cardBg: 'bg-amber-50/50 hover:bg-amber-50 border-amber-200/80 hover:border-amber-400',
@@ -77,7 +77,7 @@ export default function WelcomePortalPage() {
       name: 'Cephalosporin Lab',
       code: 'CEPHALOSPORIN',
       badge: 'CEPH',
-      desc: 'Sterile Area Facility (SAF / SEF Cephalosporins)',
+      desc: '',
       href: '/samples?lab=cephalosporin',
       icon: ShieldAlert,
       cardBg: 'bg-purple-50/50 hover:bg-purple-50 border-purple-200/80 hover:border-purple-400',
@@ -178,18 +178,6 @@ export default function WelcomePortalPage() {
       cardBg: 'bg-[#f5f3ff] border-[#e4e1fc] hover:border-[#c7d2fe] hover:shadow-md',
       iconBg: 'bg-[#ede9fe] text-[#7c3aed]',
       arrowColor: 'text-slate-400 group-hover:text-[#7c3aed]',
-    },
-    {
-      id: 'batches',
-      title: 'Inventory & Batches',
-      description: 'Manage production batches, consumables, reagents and stock levels.',
-      href: '/batches',
-      icon: Package,
-      badgeText: 'Traceability',
-      // Pastel amber/orange theme matching mockup Card 4
-      cardBg: 'bg-[#fffbf0] border-[#fdecd0] hover:border-[#fcdbaa] hover:shadow-md',
-      iconBg: 'bg-[#fef3c7] text-[#d97706]',
-      arrowColor: 'text-slate-400 group-hover:text-[#d97706]',
     },
     {
       id: 'analytics',
@@ -416,7 +404,7 @@ export default function WelcomePortalPage() {
                     setSelectedLabForAuth({
                       ...lab,
                       href: labModalTarget === 'tasks' ? `/tasks?lab=${lab.id}` : `/samples?lab=${lab.id}`,
-                      desc: labModalTarget === 'tasks' ? `Task Allocation & Workload Delegation for ${lab.name}` : lab.desc,
+                      desc: labModalTarget === 'tasks' ? `Task Allocation & Workload Delegation for ${lab.name}` : '',
                     });
                     setIsAuthModalOpen(true);
                   }
@@ -450,9 +438,6 @@ export default function WelcomePortalPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-1 font-normal">
-                      {lab.desc}
-                    </p>
                   </div>
                 </div>
 

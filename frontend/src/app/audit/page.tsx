@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -17,13 +18,12 @@ import {
   User,
   Clock,
   Terminal,
+  ArrowLeft,
+  FileText,
+  Lock,
 } from 'lucide-react';
 
 export default function AuditPage() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace('/samples');
-  }, [router]);
   const [entityFilter, setEntityFilter] = useState('');
   const [actionSearch, setActionSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -52,37 +52,34 @@ export default function AuditPage() {
 
   return (
     <div className="space-y-6">
-      {/* Title */}
+      {/* Title & Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-navy-950 tracking-tight flex items-center gap-2">
-            <History className="h-6 w-6 text-teal-700" />
-            <span>Electronic Audit Trail</span>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+              title="Return to QC Executive Dashboard"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+              <span>Dashboard</span>
+            </Link>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+              21 CFR Part 11 Certified
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <History className="h-6 w-6 text-blue-600" />
+            <span>21 CFR Part 11 Electronic Audit Vault</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Tamper-evident, cryptographically sequenced record of all sample intakes, analytical modifications, QA sign-offs, and logins
+            Tamper-evident, cryptographically sequenced record of all sample intakes, analytical modifications, QA sign-offs, and logins.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200/80 text-xs font-semibold">
+        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-3.5 py-2 rounded-xl border border-emerald-200 text-xs font-bold shadow-2xs shrink-0 self-start sm:self-auto">
           <ShieldCheck className="h-4 w-4 text-emerald-600" />
           <span>Audit Log Immutability: Active</span>
-        </div>
-      </div>
-
-      {/* Phase 2 Roadmap Notice Banner */}
-      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 flex items-start gap-3">
-        <div className="p-1.5 rounded-lg bg-white border border-slate-200 text-teal-800 shadow-xs shrink-0 mt-0.5">
-          <ShieldCheck className="h-4 w-4 text-teal-700" />
-        </div>
-        <div className="text-xs text-slate-600 leading-relaxed">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="font-bold text-navy-950">Future Module: Audit Analytics & Inspection Export (Phase 2 Roadmap)</span>
-            <span className="text-[10px] font-bold text-navy-700 bg-white px-2 py-0.5 rounded border border-slate-200/80 uppercase">
-              Phase 2 Scope
-            </span>
-          </div>
-          The Sampling module is currently the fully active certified module for City Pharma LIMS v1.0. All sampling intake events are actively captured in the audit trail database below.
         </div>
       </div>
 

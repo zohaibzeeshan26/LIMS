@@ -315,7 +315,7 @@ export class SamplesService {
           barcode,
         },
         include: {
-          laboratory: true,
+          laboratory: { select: { id: true, name: true, code: true } },
           submittedByUser: { select: { id: true, fullName: true, employeeId: true } },
           receivedByUser: { select: { id: true, fullName: true, employeeId: true } },
           batch: true,
@@ -615,7 +615,7 @@ export class SamplesService {
         take: limit,
         orderBy: { [sortBy]: sortOrder },
         include: {
-          laboratory: true,
+          laboratory: { select: { id: true, name: true, code: true } },
           submittedByUser: { select: { id: true, fullName: true, employeeId: true } },
           receivedByUser: { select: { id: true, fullName: true, employeeId: true } },
           assignedTo: { select: { id: true, fullName: true, employeeId: true, username: true } },
@@ -753,7 +753,7 @@ export class SamplesService {
         where: { id: existing.id },
         data: parsedUpdateData,
         include: {
-          laboratory: true,
+          laboratory: { select: { id: true, name: true, code: true } },
           submittedByUser: { select: { id: true, fullName: true, employeeId: true } },
           receivedByUser: { select: { id: true, fullName: true, employeeId: true } },
           batch: true,
@@ -902,7 +902,7 @@ export class SamplesService {
           remarks: dto.remarks || null,
         },
         include: {
-          laboratory: true,
+          laboratory: { select: { id: true, name: true, code: true } },
           submittedByUser: { select: { id: true, fullName: true, employeeId: true } },
         },
       });

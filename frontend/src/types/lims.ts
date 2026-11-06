@@ -297,6 +297,7 @@ export interface User {
 export interface Sample {
   id: string;
   accessionNo?: string | null;
+  recordNumber?: string | null;
   sampleId?: string | null;
   sampleCode: string;
   barcode: string;
@@ -310,6 +311,8 @@ export interface Sample {
   lotNumber?: string | null;
   mfgDate?: string | null;
   expDate?: string | null;
+  manufacturingDate?: string | null;
+  expiryDate?: string | null;
   submittedBy?: string | null;
   sourceSupplier?: string | null;
   samplingLocation?: string | null;

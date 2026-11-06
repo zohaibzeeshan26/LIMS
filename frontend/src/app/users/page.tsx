@@ -1402,7 +1402,7 @@ export default function UserManagementPage() {
             onSubmit={(e) => {
               e.preventDefault();
               setAddFormError(null);
-              if (!addForm.fullName.trim() || !addForm.email.trim() || !addForm.employeeId.trim() || !addForm.password) {
+              if (!addForm.fullName.trim() || !addForm.employeeId.trim() || !addForm.password) {
                 setAddFormError('Please fill in all required fields marked with *.');
                 return;
               }
@@ -1410,7 +1410,13 @@ export default function UserManagementPage() {
                 setAddFormError('Password must be at least 6 characters long.');
                 return;
               }
-              addMutation.mutate(addForm);
+              const cleanEmpId = addForm.employeeId.trim().toUpperCase();
+              const autoEmail = addForm.email?.trim() || `${(addForm.username || cleanEmpId).toLowerCase().replace(/[^a-z0-9]/g, '')}@citypharma.local`;
+              addMutation.mutate({
+                ...addForm,
+                employeeId: cleanEmpId,
+                email: autoEmail,
+              });
             }}
             className="space-y-4"
           >
@@ -1452,21 +1458,6 @@ export default function UserManagementPage() {
                 />
               </div>
 
-              {/* Email Address */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Email Address <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={addForm.email}
-                  onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                  placeholder="e.g. ayesha.khan@citypharma.com"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
               {/* Username */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
@@ -1497,7 +1488,7 @@ export default function UserManagementPage() {
               </div>
 
               {/* Assigned Lab */}
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Assigned Laboratory</label>
                 <select
                   value={addForm.assignedLab || ''}
@@ -1606,8 +1597,8 @@ export default function UserManagementPage() {
             onSubmit={(e) => {
               e.preventDefault();
               setEditFormError(null);
-              if (!editForm.fullName?.trim() || !editForm.email?.trim() || !editForm.employeeId?.trim()) {
-                setEditFormError('Full Name, Email, and Employee ID are required.');
+              if (!editForm.fullName?.trim() || !editForm.employeeId?.trim()) {
+                setEditFormError('Full Name and Employee ID are required.');
                 return;
               }
               if (editForm.password && editForm.password.trim().length > 0 && editForm.password.trim().length < 6) {
@@ -1617,7 +1608,7 @@ export default function UserManagementPage() {
 
               const payload: UpdateUserData = {
                 fullName: editForm.fullName,
-                email: editForm.email,
+                email: editForm.email || undefined,
                 username: editForm.username || undefined,
                 employeeId: editForm.employeeId,
                 department: editForm.department,
@@ -1664,18 +1655,6 @@ export default function UserManagementPage() {
                 />
               </div>
 
-              {/* Email Address */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={editForm.email || ''}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-hidden focus:border-blue-500"
-                />
-              </div>
-
               {/* Username */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Username</label>
@@ -1700,7 +1679,7 @@ export default function UserManagementPage() {
               </div>
 
               {/* Assigned Lab */}
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Assigned Laboratory</label>
                 <select
                   value={editForm.assignedLab || ''}

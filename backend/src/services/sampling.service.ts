@@ -316,6 +316,7 @@ export class SamplingService {
     const where: any = {};
     const userAssignedLab = this.getUserAssignedLab(user);
 
+    // 1. Status Filter
     if (query.status) {
       if (typeof query.status === 'string' && query.status.includes(',')) {
         where.status = { in: query.status.split(',').map((s: string) => s.trim()).filter(Boolean) };
@@ -324,13 +325,29 @@ export class SamplingService {
       }
     }
 
-    if (query.sampleType || query.stage || query.stageType) {
-      const s = (query.stageType || query.stage || query.sampleType)?.trim();
-      if (s) {
-        where.stageType = { contains: s, mode: 'insensitive' };
+    // 2. Category / Stage Type / Sample Type Filter
+    const cat = (query.category || query.stageType || query.stage || query.sampleType)?.toString().trim();
+    if (cat) {
+      const catCond: any[] = [
+        { stageType: { contains: cat, mode: 'insensitive' } },
+        { nomenclature: { contains: cat, mode: 'insensitive' } },
+        { materialName: { contains: cat, mode: 'insensitive' } },
+      ];
+      const upper = cat.toUpperCase().replace(/\s+/g, '_');
+      if (['RAW_MATERIAL', 'IN_PROCESS', 'FINISHED_PRODUCT', 'STABILITY', 'PACKAGING_MATERIAL', 'CONTROL_SAMPLE', 'RETENTION_SAMPLE'].includes(upper)) {
+        catCond.push({ sampleType: upper as any });
+      }
+      if (where.AND) {
+        where.AND.push({ OR: catCond });
+      } else if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: catCond }];
+        delete where.OR;
+      } else {
+        where.AND = [{ OR: catCond }];
       }
     }
 
+    // 3. Priority Filter
     if (query.priority) {
       if (typeof query.priority === 'string' && query.priority.includes(',')) {
         where.priority = { in: query.priority.split(',').map((p: string) => p.trim()).filter(Boolean) };
@@ -339,8 +356,26 @@ export class SamplingService {
       }
     }
 
-    if (query.batchId) where.batchId = query.batchId;
+    // 4. Batch / Lot Number Filter (supports batchNumber, batchNo, lotNumber, batchId)
+    if (query.batchNumber || query.batchNo || query.lotNumber || query.batchId) {
+      const b = (query.batchNumber || query.batchNo || query.lotNumber || query.batchId).toString().trim();
+      if (b) {
+        const batchConditions = [
+          { lotNumber: { contains: b, mode: 'insensitive' } },
+          { batchLotNumber: { contains: b, mode: 'insensitive' } },
+        ];
+        if (where.AND) {
+          where.AND.push({ OR: batchConditions });
+        } else if (where.OR) {
+          where.AND = [{ OR: where.OR }, { OR: batchConditions }];
+          delete where.OR;
+        } else {
+          where.AND = [{ OR: batchConditions }];
+        }
+      }
+    }
 
+    // 5. Laboratory Access & Target Filter
     if (userAssignedLab !== 'ALL') {
       if (userAssignedLab === 'CEPHALOSPORIN') {
         where.laboratoryType = { in: ['CEPHALOSPORIN', 'SAF'] };
@@ -361,28 +396,152 @@ export class SamplingService {
       }
     }
 
+    // 6. Sample ID / Accession No Filter
     if (query.sampleId) {
-      where.sampleCode = { contains: query.sampleId.trim(), mode: 'insensitive' };
-    }
-
-    if (query.nomenclature) {
-      where.OR = [
-        { nomenclature: { contains: query.nomenclature.trim(), mode: 'insensitive' } },
-        { materialName: { contains: query.nomenclature.trim(), mode: 'insensitive' } },
+      const sId = query.sampleId.toString().trim();
+      const sampleIdConditions = [
+        { sampleCode: { contains: sId, mode: 'insensitive' } },
+        { sampleId: { contains: sId, mode: 'insensitive' } },
+        { accessionNo: { contains: sId, mode: 'insensitive' } },
+        { recordNumber: { contains: sId, mode: 'insensitive' } },
       ];
+      if (where.AND) {
+        where.AND.push({ OR: sampleIdConditions });
+      } else if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: sampleIdConditions }];
+        delete where.OR;
+      } else {
+        where.AND = [{ OR: sampleIdConditions }];
+      }
     }
 
+    // 7. Nomenclature / Material Name Filter
+    if (query.nomenclature) {
+      const n = query.nomenclature.toString().trim();
+      const nomConditions = [
+        { nomenclature: { contains: n, mode: 'insensitive' } },
+        { materialName: { contains: n, mode: 'insensitive' } },
+      ];
+      if (where.AND) {
+        where.AND.push({ OR: nomConditions });
+      } else if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: nomConditions }];
+        delete where.OR;
+      } else {
+        where.AND = [{ OR: nomConditions }];
+      }
+    }
+
+    // 8. MFG Date Filter
+    if (query.mfgDate) {
+      const rawMfg = query.mfgDate.toString().trim();
+      const d = new Date(rawMfg);
+      if (!isNaN(d.getTime())) {
+        const start = new Date(d);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(d);
+        end.setHours(23, 59, 59, 999);
+        const mfgCond = [
+          { mfgDate: { gte: start, lte: end } },
+          { manufacturingDate: { gte: start, lte: end } },
+        ];
+        if (where.AND) {
+          where.AND.push({ OR: mfgCond });
+        } else if (where.OR) {
+          where.AND = [{ OR: where.OR }, { OR: mfgCond }];
+          delete where.OR;
+        } else {
+          where.AND = [{ OR: mfgCond }];
+        }
+      }
+    }
+
+    // 9. EXP Date Filter
+    if (query.expDate) {
+      const rawExp = query.expDate.toString().trim();
+      const d = new Date(rawExp);
+      if (!isNaN(d.getTime())) {
+        const start = new Date(d);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(d);
+        end.setHours(23, 59, 59, 999);
+        const expCond = [
+          { expDate: { gte: start, lte: end } },
+          { expiryDate: { gte: start, lte: end } },
+        ];
+        if (where.AND) {
+          where.AND.push({ OR: expCond });
+        } else if (where.OR) {
+          where.AND = [{ OR: where.OR }, { OR: expCond }];
+          delete where.OR;
+        } else {
+          where.AND = [{ OR: expCond }];
+        }
+      }
+    }
+
+    // 10. Date Range Filter (From Date / To Date for sampling intake)
+    if (query.startDate || query.endDate) {
+      const dateRangeCond: any = {};
+      if (query.startDate) {
+        const sDate = new Date(query.startDate.toString().trim());
+        if (!isNaN(sDate.getTime())) {
+          sDate.setHours(0, 0, 0, 0);
+          dateRangeCond.gte = sDate;
+        }
+      }
+      if (query.endDate) {
+        const eDate = new Date(query.endDate.toString().trim());
+        if (!isNaN(eDate.getTime())) {
+          eDate.setHours(23, 59, 59, 999);
+          dateRangeCond.lte = eDate;
+        }
+      }
+      if (dateRangeCond.gte || dateRangeCond.lte) {
+        const samplingCond = [
+          { samplingDate: dateRangeCond },
+          { sampledAt: dateRangeCond },
+        ];
+        if (where.AND) {
+          where.AND.push({ OR: samplingCond });
+        } else if (where.OR) {
+          where.AND = [{ OR: where.OR }, { OR: samplingCond }];
+          delete where.OR;
+        } else {
+          where.AND = [{ OR: samplingCond }];
+        }
+      }
+    }
+
+    // 11. Universal Keyword / Text Search across ALL fields
     if (query.search) {
       const s = query.search.trim();
-      const searchConditions = [
+      const searchConditions: any[] = [
         { sampleCode: { contains: s, mode: 'insensitive' } },
+        { sampleId: { contains: s, mode: 'insensitive' } },
         { accessionNo: { contains: s, mode: 'insensitive' } },
+        { recordNumber: { contains: s, mode: 'insensitive' } },
         { nomenclature: { contains: s, mode: 'insensitive' } },
         { materialName: { contains: s, mode: 'insensitive' } },
         { lotNumber: { contains: s, mode: 'insensitive' } },
+        { batchLotNumber: { contains: s, mode: 'insensitive' } },
+        { stageType: { contains: s, mode: 'insensitive' } },
         { submittedBy: { contains: s, mode: 'insensitive' } },
         { barcode: { contains: s, mode: 'insensitive' } },
       ];
+      const d = new Date(s);
+      if (!isNaN(d.getTime()) && s.length >= 8) {
+        const start = new Date(d);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(d);
+        end.setHours(23, 59, 59, 999);
+        searchConditions.push(
+          { mfgDate: { gte: start, lte: end } },
+          { manufacturingDate: { gte: start, lte: end } },
+          { expDate: { gte: start, lte: end } },
+          { expiryDate: { gte: start, lte: end } }
+        );
+      }
 
       if (where.AND) {
         where.AND.push({ OR: searchConditions });
@@ -390,7 +549,7 @@ export class SamplingService {
         where.AND = [{ OR: where.OR }, { OR: searchConditions }];
         delete where.OR;
       } else {
-        where.OR = searchConditions;
+        where.AND = [{ OR: searchConditions }];
       }
     }
 
@@ -505,7 +664,7 @@ export class SamplingService {
       },
       include: {
         batch: true,
-        laboratory: true,
+        laboratory: { select: { id: true, name: true, code: true } },
         accessionedBy: { select: { id: true, fullName: true, employeeId: true, department: true } },
         assignedTo: { select: { id: true, fullName: true, employeeId: true, department: true } },
         tests: {

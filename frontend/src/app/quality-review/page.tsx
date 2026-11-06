@@ -906,7 +906,7 @@ export default function QualityReviewAndCoaPage() {
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Authorized QA Signatory</span>
                   <span className="font-bold text-slate-900 text-sm">
-                    {viewingCoa.authorizedBy?.fullName || 'Dr. Tariq Mahmood / Fatima Noor'}
+                    {viewingCoa.authorizedBy?.fullName || 'Dr. Muhammad Jamil / Fatima Noor'}
                   </span>
                   <span className="text-[11px] text-slate-600 block">
                     {viewingCoa.authorizedBy?.role || 'QA_MANAGER'} &bull; Quality Assurance Directorate

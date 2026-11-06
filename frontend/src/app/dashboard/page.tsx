@@ -123,7 +123,7 @@ export default function DashboardPage() {
   const handleCreateDashboardUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddUserError(null);
-    if (!addUserForm.fullName.trim() || !addUserForm.email.trim() || !addUserForm.employeeId.trim() || !addUserForm.password) {
+    if (!addUserForm.fullName.trim() || !addUserForm.employeeId.trim() || !addUserForm.password) {
       setAddUserError('Please fill in all required fields marked with *.');
       return;
     }
@@ -133,9 +133,9 @@ export default function DashboardPage() {
     }
     setIsAddingUser(true);
     try {
-      const cleanEmail = addUserForm.email.trim().toLowerCase();
       const cleanEmpId = addUserForm.employeeId.trim().toUpperCase();
       const cleanUsername = (addUserForm.username || cleanEmpId).trim().toLowerCase().replace(/\s+/g, '');
+      const cleanEmail = addUserForm.email?.trim() || `${(addUserForm.username || cleanEmpId).toLowerCase().replace(/[^a-z0-9]/g, '')}@citypharma.local`;
 
       const payload = {
         ...addUserForm,
@@ -715,11 +715,45 @@ export default function DashboardPage() {
 
 
   // Real-time live audit logs from database (refreshes every 3 seconds for instant synchronization)
-  const { data: rawAuditLogs, isLoading: isAuditLoading, refetch: refetchAuditLogs } = useQuery({
+  const {
+    data: rawAuditLogs,
+    isLoading: isAuditLoading,
+    isFetching: isAuditFetching,
+    refetch: refetchAuditLogs,
+  } = useQuery({
     queryKey: ['dashboard-audit-logs'],
     queryFn: () => auditService.getAll({ limit: 100 }),
     refetchInterval: 3000,
   });
+
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [justRefreshed, setJustRefreshed] = useState(false);
+
+  const handleRefreshAuditLogs = async () => {
+    if (isManualRefreshing) return;
+    setIsManualRefreshing(true);
+    setJustRefreshed(false);
+    try {
+      await Promise.allSettled([
+        refetchAuditLogs(),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-audit-logs'] }),
+        queryClient.invalidateQueries({ queryKey: ['audit-trail'] }),
+        queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-recent-samples'] }),
+        queryClient.invalidateQueries({ queryKey: ['active-expedited-urgent-samples'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-batches-list'] }),
+        queryClient.invalidateQueries({ queryKey: ['users-list'] }),
+      ]);
+      setJustRefreshed(true);
+      setTimeout(() => setJustRefreshed(false), 2500);
+    } catch (err) {
+      console.error('Failed to refresh dashboard audit logs:', err);
+    } finally {
+      setTimeout(() => {
+        setIsManualRefreshing(false);
+      }, 600);
+    }
+  };
 
   const [auditPage, setAuditPage] = useState(1);
   const auditPageSize = 10;
@@ -2137,12 +2171,27 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 self-start md:self-center shrink-0">
             <button
               type="button"
-              onClick={() => refetchAuditLogs()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+              disabled={isManualRefreshing || isAuditFetching}
+              onClick={handleRefreshAuditLogs}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-all cursor-pointer active:scale-95',
+                (isManualRefreshing || isAuditFetching) && 'opacity-85 bg-slate-50 cursor-wait'
+              )}
               title="Force Refresh Audit Log Feed"
             >
-              <RefreshCw className={cn('h-3.5 w-3.5 text-slate-500', isAuditLoading && 'animate-spin text-blue-600')} />
-              <span>Refresh</span>
+              <RefreshCw
+                className={cn(
+                  'h-3.5 w-3.5 text-slate-500 transition-all duration-300',
+                  (isManualRefreshing || isAuditFetching) && 'animate-spin text-blue-600'
+                )}
+              />
+              <span>
+                {isManualRefreshing || isAuditFetching
+                  ? 'Refreshing...'
+                  : justRefreshed
+                  ? 'Refreshed!'
+                  : 'Refresh'}
+              </span>
             </button>
             <Link
               href="/audit-trail"
@@ -2529,20 +2578,6 @@ export default function DashboardPage() {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Email Address <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={addUserForm.email}
-                  onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
-                  placeholder="e.g. ayesha.khan@citypharma.com"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-hidden focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Username <span className="text-slate-400 font-normal">(Login identifier)</span>
                 </label>
                 <input
@@ -2568,7 +2603,7 @@ export default function DashboardPage() {
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">Assigned Laboratory</label>
                 <select
                   value={addUserForm.assignedLab}

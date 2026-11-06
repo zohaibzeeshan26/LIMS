@@ -132,7 +132,9 @@ export function PrintSampleModal({ isOpen, onClose, sample }: PrintSampleModalPr
                 Laboratory Suite
               </span>
               <span className="text-xs font-bold text-teal-800 uppercase bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                {sample.laboratory || 'GENERAL'} LAB
+                {typeof sample.laboratory === 'string'
+                  ? sample.laboratory
+                  : (sample.laboratory as any)?.name || (sample.laboratory as any)?.code || sample.laboratoryType || 'GENERAL'} LAB
               </span>
             </div>
           </div>

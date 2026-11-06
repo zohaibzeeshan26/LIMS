@@ -533,7 +533,7 @@ model AskprolQcReport {
   overallVerdict        QcVerdict         @default(APPROVED)
   analystName           String            @default("Muhammad Zubair")
   reviewerName          String            @default("Syed Kamran Ali (AMQC)")
-  approverName          String            @default("Dr. Tariq Mahmood (Head of QC)")
+  approverName          String            @default("Dr. Muhammad Jamil (Head of QC)")
   releaseDate           DateTime          @default(now())
   remarks               String?
 

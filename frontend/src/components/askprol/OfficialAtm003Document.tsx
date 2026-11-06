@@ -1220,7 +1220,7 @@ export function OfficialAtm003Document() {
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-[10.5px]">
                       {[
-                        { sr: '01', name: 'Dr. Tariq Mahmood', desig: 'Head of Quality Control', sig: 'Controlled Copy (QC Master)' },
+                        { sr: '01', name: 'Dr. Muhammad Jamil', desig: 'Head of Quality Control', sig: 'Controlled Copy (QC Master)' },
                         { sr: '02', name: 'Syed Kamran Ali', desig: 'Manager Quality Assurance', sig: 'Controlled Copy (QA Master)' },
                         { sr: '03', name: 'Muhammad Zubair', desig: 'Sr. Analyst QC (Chemical)', sig: 'Sign: ____________ Date: ________' },
                         { sr: '04', name: 'Bilal Ahmed', desig: 'QC Analyst (HPLC Section)', sig: 'Sign: ____________ Date: ________' },

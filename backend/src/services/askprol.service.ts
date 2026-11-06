@@ -555,7 +555,7 @@ export class AskprolService {
         overallVerdict: calcResult.overallVerdict,
         analystName: input.analystName || user?.fullName || 'Muhammad Zubair',
         reviewerName: input.reviewerName || 'Syed Kamran Ali (AMQC)',
-        approverName: input.approverName || 'Dr. Tariq Mahmood (Head of QC)',
+        approverName: input.approverName || 'Dr. Muhammad Jamil (Head of QC)',
         releaseDate: new Date(),
         remarks:
           input.remarks ||

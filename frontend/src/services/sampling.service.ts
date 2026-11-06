@@ -5,6 +5,7 @@ export interface SamplingFilters {
   status?: string;
   sampleType?: string;
   stage?: string;
+  category?: string;
   priority?: string;
   search?: string;
   laboratory?: string;
@@ -12,6 +13,8 @@ export interface SamplingFilters {
   sampleId?: string;
   nomenclature?: string;
   batchNumber?: string;
+  mfgDate?: string;
+  expDate?: string;
   startDate?: string;
   endDate?: string;
   section?: string;
@@ -27,6 +30,7 @@ export const samplingService = {
     if (query?.status) params.append('status', query.status);
     if (query?.sampleType) params.append('sampleType', query.sampleType);
     if (query?.stage) params.append('stage', query.stage);
+    if (query?.category) params.append('category', query.category);
     if (query?.priority) params.append('priority', query.priority);
     if (query?.search) params.append('search', query.search);
     if (query?.laboratory) params.append('laboratory', query.laboratory);
@@ -34,6 +38,8 @@ export const samplingService = {
     if (query?.sampleId) params.append('sampleId', query.sampleId);
     if (query?.nomenclature) params.append('nomenclature', query.nomenclature);
     if (query?.batchNumber) params.append('batchNumber', query.batchNumber);
+    if (query?.mfgDate) params.append('mfgDate', query.mfgDate);
+    if (query?.expDate) params.append('expDate', query.expDate);
     if (query?.startDate) params.append('startDate', query.startDate);
     if (query?.endDate) params.append('endDate', query.endDate);
     if (query?.section) params.append('section', query.section);

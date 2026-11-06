@@ -165,9 +165,26 @@ export function NewSampleModal({
 
   const userAccess = getUserLabAccess(user);
   const isRestrictedToLab = userAccess !== 'ALL';
-  const effectiveLab = isRestrictedToLab
-    ? userAccess
-    : (defaultLaboratory || 'GENERAL').toUpperCase();
+
+  // Helper to reliably detect the active opened laboratory from props, URL (?lab=...), or user restriction
+  const detectOpenedLab = React.useCallback(() => {
+    if (isRestrictedToLab) return userAccess;
+    if (defaultLaboratory && defaultLaboratory !== 'ALL') {
+      const defUpper = defaultLaboratory.toUpperCase();
+      if (defUpper === 'GENERAL' || defUpper === 'PENICILLIN' || defUpper === 'CEPHALOSPORIN') {
+        return defUpper;
+      }
+    }
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('lab')?.toLowerCase();
+      if (p === 'penicillin' || p === 'pen' || p === 'pl') return 'PENICILLIN';
+      if (p === 'cephalosporin' || p === 'ceph' || p === 'cp' || p === 'saf' || p === 'sef') return 'CEPHALOSPORIN';
+      if (p === 'general' || p === 'gen' || p === 'gl') return 'GENERAL';
+    }
+    return (defaultLaboratory || 'GENERAL').toUpperCase();
+  }, [defaultLaboratory, isRestrictedToLab, userAccess]);
+
+  const effectiveLab = detectOpenedLab();
 
   // Selected laboratory state (explicitly controls target laboratory)
   const [selectedLab, setSelectedLab] = useState<string>(effectiveLab);
@@ -284,7 +301,7 @@ export function NewSampleModal({
       setLiveDate(now);
       const targetSec = defaultSection === 'formulation' ? 'formulation' : 'semi-base';
       setSelectedSection(targetSec);
-      const targetLab = isRestrictedToLab ? userAccess : (defaultLaboratory || 'GENERAL').toUpperCase();
+      const targetLab = detectOpenedLab();
       setSelectedLab(targetLab);
       setValue('laboratory', targetLab, { shouldValidate: true, shouldDirty: true });
       setValue('sampleType', targetSec === 'semi-base' ? SEMI_BASE_STAGES[0] : FORMULATION_STAGES[0], { shouldValidate: true });
@@ -557,7 +574,10 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
         sampleCode: newSample.sampleCode,
         accessionNo: newSample.accessionNo,
         nomenclature: newSample.nomenclature || newSample.materialName,
-        laboratory: newSample.laboratory || newSample.laboratoryType || selectedLab,
+        laboratory:
+          typeof newSample.laboratory === 'string'
+            ? newSample.laboratory
+            : (newSample.laboratory as any)?.name || (newSample.laboratory as any)?.code || newSample.laboratoryType || selectedLab,
       });
 
       if (onSampleCreated) {
@@ -773,7 +793,7 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
                 <p className="text-xs text-emerald-800 mt-0.5">
                   Accession No. <strong>{successInfo.accessionNo || 'Generated'}</strong> • Sample ID{' '}
                   <strong className="font-mono">{successInfo.sampleCode}</strong> has been saved to
-                  PostgreSQL in {successInfo.laboratory} Lab.
+                  PostgreSQL in {typeof successInfo.laboratory === 'string' ? successInfo.laboratory : (successInfo.laboratory as any)?.name || 'General'} Lab.
                 </p>
                 <div className="mt-2.5 flex items-center gap-2">
                   <Button
@@ -819,52 +839,31 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
             </div>
           )}
 
-          {/* Section 1: Laboratory Suite (General, Penicillin, Cephalosporin) */}
+          {/* Section 1: Target Laboratory (Strictly isolated to opened lab only) */}
           <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-blue-600 shrink-0" />
               <span className="text-xs font-bold text-slate-800">Target Laboratory:</span>
             </div>
 
-            {!isRestrictedToLab ? (
-              <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto">
-                {[
-                  { key: 'GENERAL', label: 'General Lab' },
-                  { key: 'PENICILLIN', label: 'Penicillin Lab' },
-                  { key: 'CEPHALOSPORIN', label: 'Cephalosporin Lab' },
-                ].map((l) => (
-                  <button
-                    key={l.key}
-                    type="button"
-                    onClick={() => {
-                      setSelectedLab(l.key);
-                      setValue('laboratory', l.key, { shouldValidate: true, shouldDirty: true });
-                    }}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center',
-                      (selectedLab === l.key || watchedLab === l.key)
-                        ? 'bg-[#0066FF] text-white shadow-xs'
-                        : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                    )}
-                  >
-                    {l.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-blue-900 bg-blue-100/70 px-2.5 py-0.5 rounded-md border border-blue-200">
-                  {selectedLab === 'PENICILLIN'
-                    ? 'Penicillin Lab'
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'px-4 py-1.5 rounded-lg text-xs font-bold shadow-xs inline-flex items-center gap-1.5 text-center',
+                  selectedLab === 'PENICILLIN'
+                    ? 'bg-amber-600 text-white'
                     : selectedLab === 'CEPHALOSPORIN'
-                    ? 'Cephalosporin Lab'
-                    : 'General Lab'}
-                </span>
-                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Assigned Facility
-                </span>
-              </div>
-            )}
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-[#0066FF] text-white'
+                )}
+              >
+                {selectedLab === 'PENICILLIN'
+                  ? 'Penicillin Lab'
+                  : selectedLab === 'CEPHALOSPORIN'
+                  ? 'Cephalosporin Lab'
+                  : 'General Lab'}
+              </span>
+            </div>
           </div>
 
           {/* Section 2: Core Identifiers & Timing */}
@@ -1347,7 +1346,6 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
             >
               <option value="ROUTINE">Routine (5 - 15 Days)</option>
               <option value="URGENT">Urgent (1 Hr - 2 Days)</option>
-              <option value="STABILITY">Stability Protocol (Scheduled Interval)</option>
             </select>
           </div>
 

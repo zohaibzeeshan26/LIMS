@@ -52,7 +52,7 @@ export const DEMO_USERS = [
     email: 'admin@citypharma.com',
     password: 'lims123',
     employeeId: 'EMP-001',
-    name: 'Dr. Tariq Mahmood',
+    name: 'Dr. Muhammad Jamil',
     title: 'Super Admin / QC Director',
     desc: 'Full administrative access across all modules, samples, and users',
     labBadge: 'Super Admin',

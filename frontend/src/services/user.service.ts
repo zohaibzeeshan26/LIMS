@@ -3,7 +3,7 @@ import { User, Role } from '@/types/lims';
 
 export interface CreateUserData {
   fullName: string;
-  email: string;
+  email?: string;
   username?: string;
   employeeId: string;
   department: string;

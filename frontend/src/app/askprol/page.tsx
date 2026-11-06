@@ -128,7 +128,7 @@ const createBlankForm = (stage: 'FINAL_BULK' | 'FINISHED_GOOD' = 'FINISHED_GOOD'
 
   analystName: userFullName || 'Testing Analyst',
   reviewerName: 'Syed Kamran Ali (AMQC)',
-  approverName: 'Dr. Tariq Mahmood (Head of QC)',
+  approverName: 'Dr. Muhammad Jamil (Head of QC)',
   remarks: '',
 });
 
@@ -203,7 +203,7 @@ const BULK_PRESET: AskprolCalculationPayload = {
 
   analystName: 'Muhammad Zubair',
   reviewerName: 'Syed Kamran Ali (AMQC)',
-  approverName: 'Dr. Tariq Mahmood (Head of QC)',
+  approverName: 'Dr. Muhammad Jamil (Head of QC)',
   remarks: 'Final Bulk batch meets all release specifications as per analytical testing method QC/CLG/ATM-003.',
 };
 
@@ -295,7 +295,7 @@ const FINISHED_GOOD_PRESET: AskprolCalculationPayload = {
 
   analystName: 'Muhammad Zubair',
   reviewerName: 'Syed Kamran Ali (AMQC)',
-  approverName: 'Dr. Tariq Mahmood (Head of QC)',
+  approverName: 'Dr. Muhammad Jamil (Head of QC)',
   remarks: 'Finished Good batch complies with all release specifications per analytical testing method QC/CLG/ATM-003.',
 };
 
