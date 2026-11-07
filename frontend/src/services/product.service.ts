@@ -20,6 +20,9 @@ export const productService = {
   deleteDocument: (documentId: string) =>
     api.delete<{ success: boolean; message: string }>(`/product-documents/${documentId}`),
 
+  deleteProduct: (productId: string) =>
+    api.delete<{ success: boolean; message: string }>(`/products/${productId}`),
+
   getDocumentDownloadUrl: (documentId: string, download: boolean = true) => {
     const token = getStoredToken();
     const query = new URLSearchParams();

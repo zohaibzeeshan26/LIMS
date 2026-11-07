@@ -45,5 +45,12 @@ router.post(
   productsController.uploadDocument
 );
 
+// 8. Delete a product
+router.delete(
+  '/:id',
+  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.QA_MANAGER, Role.MANAGER),
+  productsController.deleteProduct
+);
+
 export default router;
 

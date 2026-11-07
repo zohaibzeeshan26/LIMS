@@ -249,7 +249,7 @@ class ApiClient {
     const url = endpoint.startsWith('http')
       ? endpoint
       : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    const token = getStoredToken();
+    let token = getStoredToken();
     const headers: Record<string, string> = {
       Accept: 'application/json',
     };
@@ -257,11 +257,59 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: 'POST',
       headers,
       body: formData,
     });
+
+    // Check for 401 Unauthorized (Access token expired during upload)
+    if (response.status === 401) {
+      const refreshToken = getStoredRefreshToken();
+      if (refreshToken) {
+        try {
+          const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({ refreshToken }),
+          });
+
+          if (refreshResponse.ok) {
+            const data = await refreshResponse.json();
+            const rememberMe = !!localStorage.getItem(TOKEN_KEY);
+            setStoredSession(data.accessToken, data.refreshToken, data.user, rememberMe);
+
+            // Retry upload with fresh access token
+            const retryHeaders: Record<string, string> = {
+              Accept: 'application/json',
+              Authorization: `Bearer ${data.accessToken}`,
+            };
+            response = await fetch(url, {
+              method: 'POST',
+              headers: retryHeaders,
+              body: formData,
+            });
+          } else {
+            clearStoredSession();
+            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+              window.location.href = '/login?error=session_expired';
+            }
+            throw new Error('Session expired. Please log in again.');
+          }
+        } catch (err: any) {
+          throw new Error(err?.message || 'Session expired. Please log in again.');
+        }
+      } else {
+        clearStoredSession();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login?error=session_expired';
+        }
+        throw new Error('Session expired. Please log in again.');
+      }
+    }
 
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status}`;

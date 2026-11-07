@@ -23,16 +23,20 @@ export class ProductsService {
 
     const products = await prisma.product.findMany({
       where,
-      orderBy: { brandName: 'asc' },
+      orderBy: [
+        { brandName: 'asc' },
+        { createdAt: 'desc' },
+      ],
       include: {
         documents: {
-          orderBy: { version: 'desc' },
+          orderBy: { createdAt: 'desc' },
           select: {
             id: true,
             title: true,
             fileName: true,
             fileSize: true,
             mimeType: true,
+            category: true,
             version: true,
             versionNotes: true,
             uploadedById: true,
@@ -46,9 +50,10 @@ export class ProductsService {
     });
 
     return products.map((prod) => {
-      const currentDoc = prod.documents.find((d) => d.isCurrent) || prod.documents[0] || null;
+      const currentDoc = prod.documents[0] || null;
       return {
         ...prod,
+        documents: prod.documents,
         currentDocument: currentDoc,
         totalDocuments: prod.documents.length,
       };
@@ -188,6 +193,8 @@ export class ProductsService {
     versionNotes?: string;
     laboratory?: string;
     labName?: string;
+    docType?: string;
+    category?: string;
     file: Express.Multer.File;
     user: any;
   }) {
@@ -210,73 +217,94 @@ export class ProductsService {
         ? 'Semi-Automated Formulation Lab'
         : `${targetLab.charAt(0) + targetLab.slice(1).toLowerCase()} Lab`);
 
-    let product = await prisma.product.findUnique({
-      where: { id: data.productId },
-      include: {
-        documents: true,
-      },
-    });
-
-    if (!product) {
-      product = await prisma.product.findFirst({
-        where: { brandName: { equals: data.productId.trim(), mode: 'insensitive' } },
+    // 1. Resolve product brand name if an existing ID was passed
+    let existingById: any = null;
+    if (data.productId) {
+      existingById = await prisma.product.findUnique({
+        where: { id: data.productId },
         include: { documents: true },
       });
     }
 
+    const targetBrandName = (existingById ? existingById.brandName : data.productId).trim();
+
+    // 2. Find product specifically in the TARGET laboratory
+    let product: any = null;
+    if (existingById && existingById.laboratory === targetLab) {
+      product = existingById;
+    } else {
+      product = await prisma.product.findFirst({
+        where: {
+          brandName: { equals: targetBrandName, mode: 'insensitive' },
+          laboratory: targetLab,
+        },
+        include: { documents: true },
+      });
+    }
+
+    // 3. If product does NOT exist in targetLab, create an independent record for this lab!
+    // (Never modify or move a product from another laboratory)
     if (!product) {
-      // Auto-create product for manual entry
-      const cleanName = data.productId.trim();
-      const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'doc-prod';
-      const newId = `${baseSlug}-${Date.now().toString(36)}`;
+      const baseSlug = targetBrandName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'product';
+      const newId = `${baseSlug}-${targetLab.toLowerCase()}-${Date.now().toString(36)}`;
+      const labCode = targetLab === 'PENICILLIN' ? 'PEN' : targetLab === 'CEPHALOSPORIN' ? 'CEP' : 'CLG';
+      const atmCode = `QC/${labCode}/ATM-${Math.floor(100 + Math.random() * 900)}`;
+
       product = await prisma.product.create({
         data: {
           id: newId,
-          brandName: cleanName,
-          genericName: cleanName,
-          dosageForm: 'Pharmaceutical Document / Spec',
-          strength: 'Standard',
-          packSize: 'Commercial',
+          brandName: targetBrandName,
+          genericName: existingById ? existingById.genericName : targetBrandName,
+          dosageForm: existingById ? existingById.dosageForm : 'Pharmaceutical Document / Spec',
+          strength: existingById ? existingById.strength : 'Standard',
+          packSize: existingById ? existingById.packSize : 'Commercial',
           laboratory: targetLab,
           labName: targetLabName,
-          atmCode: `QC/DOC/ATM-${Math.floor(100 + Math.random() * 900)}`,
-          version: 'Version: 01',
+          atmCode,
+          version: existingById ? existingById.version : 'Version: 01',
           status: 'COMPENDIAL_READY',
           specs: 'Approved Specification Document',
-          description: `Document record entry for ${cleanName}.`,
-          parameters: ['Document Review', 'Monograph Verification'],
-        },
-        include: { documents: true },
-      });
-    } else if (data.laboratory && product.laboratory !== targetLab) {
-      // Update existing product's lab if user selected a different lab
-      product = await prisma.product.update({
-        where: { id: product.id },
-        data: {
-          laboratory: targetLab,
-          labName: targetLabName,
+          description: `Document record entry for ${targetBrandName} in ${targetLabName}.`,
+          parameters: existingById && existingById.parameters?.length > 0
+            ? existingById.parameters
+            : ['Document Review', 'Monograph Verification'],
         },
         include: { documents: true },
       });
     }
 
-    // Determine document version
-    const maxVersion = product.documents.length > 0
-      ? Math.max(...product.documents.map((d) => d.version))
+    // Document category (e.g. STP_METHOD, FINISHED_SPEC, CORE_SPEC, CALCULATION_GUIDELINE, RAW_MATERIAL_SPEC, etc.)
+    const docCategory = (data.docType || data.category || 'GENERAL_DOC').trim().toUpperCase();
+
+    // Determine document version for this specific file
+    const matchingDocs = product.documents.filter(
+      (d) => d.fileName.toLowerCase() === data.file.originalname.toLowerCase()
+    );
+    const maxVersion = matchingDocs.length > 0
+      ? Math.max(...matchingDocs.map((d) => d.version))
       : 0;
     const nextVersion = maxVersion + 1;
 
-    // Mark previous documents for this product as isCurrent = false
-    await prisma.productDocument.updateMany({
-      where: { productId: product.id, isCurrent: true },
-      data: { isCurrent: false },
-    });
+    // Only supersede previous revision if the exact same file name was uploaded again
+    if (matchingDocs.length > 0) {
+      await prisma.productDocument.updateMany({
+        where: {
+          productId: product.id,
+          fileName: { equals: data.file.originalname, mode: 'insensitive' },
+          isCurrent: true,
+        },
+        data: { isCurrent: false },
+      });
+    }
 
     const mimeType = data.file.mimetype || 'application/octet-stream';
 
-    const defaultTitle = `${product.brandName} - Document Specification (v${nextVersion})`;
+    const defaultTitle = data.title?.trim() || `${data.file.originalname.replace(/\.[^/.]+$/, '')}`;
     const defaultNotes = nextVersion === 1
-      ? 'Initial product description PDF document upload'
+      ? `Uploaded ${data.file.originalname}`
       : (data.versionNotes?.trim() || `Superseded previous revision with version ${nextVersion}`);
 
     // Create new current document record
@@ -285,7 +313,7 @@ export class ProductsService {
         productId: product.id,
         productName: product.brandName,
         productCode: product.atmCode,
-        category: product.laboratory,
+        category: docCategory,
         title: data.title?.trim() || defaultTitle,
         fileName: data.file.originalname,
         fileSize: data.file.size,
@@ -475,6 +503,50 @@ export class ProductsService {
     } catch (auditErr) {}
 
     return { success: true, message: 'Document removed successfully' };
+  }
+
+  async deleteProduct(id: string, user: any) {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: { documents: true },
+    });
+
+    if (!product) {
+      throw new AppError('Product not found', 404);
+    }
+
+    for (const doc of product.documents) {
+      if (fs.existsSync(doc.filePath)) {
+        try {
+          fs.unlinkSync(doc.filePath);
+        } catch (e) {}
+      }
+    }
+
+    await prisma.productDocument.deleteMany({
+      where: { productId: id },
+    });
+
+    await prisma.product.delete({
+      where: { id },
+    });
+
+    try {
+      await prisma.auditTrail.create({
+        data: {
+          entityName: 'Product',
+          entityId: id,
+          action: 'PRODUCT_DELETED',
+          performedById: user?.id || null,
+          performedByName: user?.fullName || 'User',
+          role: String(user?.role || 'ADMIN'),
+          reasonForChange: `Deleted product ${product.brandName} (${product.atmCode})`,
+          diffPayload: JSON.stringify({ deletedProductId: id, brandName: product.brandName }),
+        },
+      });
+    } catch (e) {}
+
+    return { success: true, message: `Product ${product.brandName} removed successfully` };
   }
 }
 

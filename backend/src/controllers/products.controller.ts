@@ -81,7 +81,7 @@ export class ProductsController {
     try {
       const rawProductId = req.body.productId || req.params.id;
       const productId = rawProductId ? String(rawProductId) : '';
-      const { title, versionNotes, laboratory, labName } = req.body;
+      const { title, versionNotes, laboratory, labName, category, docType } = req.body;
       const file = req.file;
 
       if (!productId) {
@@ -97,6 +97,7 @@ export class ProductsController {
         versionNotes,
         laboratory,
         labName,
+        docType: docType || category,
         file,
         user: req.user,
       });
@@ -169,6 +170,16 @@ export class ProductsController {
     try {
       const id = String(req.params.id);
       const result = await productsService.deleteDocument(id, req.user);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteProduct(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const result = await productsService.deleteProduct(id, req.user);
       res.json(result);
     } catch (err) {
       next(err);

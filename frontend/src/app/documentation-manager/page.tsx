@@ -8,6 +8,10 @@ import { Product } from '@/types/lims';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import {
+  ProductFolderViewerModal,
+  DOCUMENT_SLOTS,
+} from '@/components/documentation/ProductFolderViewerModal';
+import {
   FileText,
   UploadCloud,
   FileCheck2,
@@ -29,6 +33,8 @@ import {
   Tag,
   ArrowRight,
   Trash2,
+  Folder,
+  Eye,
 } from 'lucide-react';
 
 export default function DocumentationManagerDashboard() {
@@ -40,11 +46,16 @@ export default function DocumentationManagerDashboard() {
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [productInput, setProductInput] = useState<string>('');
   const [selectedLab, setSelectedLab] = useState<string>('GENERAL');
+  const [selectedCategory, setSelectedCategory] = useState<string>('STP_METHOD');
   const [docTitle, setDocTitle] = useState<string>('');
   const [versionNotes, setVersionNotes] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Folder Modal states
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [selectedFolderProduct, setSelectedFolderProduct] = useState<Product | null>(null);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,29 +99,44 @@ export default function DocumentationManagerDashboard() {
     return (
       products.find(
         (p) =>
-          p.id === selectedProductId ||
-          p.brandName.toLowerCase() === productInput.trim().toLowerCase()
+          (p.id === selectedProductId ||
+            p.brandName.toLowerCase() === productInput.trim().toLowerCase()) &&
+          (p.laboratory || 'GENERAL').toUpperCase() === selectedLab.toUpperCase()
       ) || null
     );
-  }, [products, selectedProductId, productInput]);
+  }, [products, selectedProductId, productInput, selectedLab]);
+
+  // When target laboratory is changed
+  const handleLabChange = (newLab: string) => {
+    setSelectedLab(newLab);
+    if (productInput.trim()) {
+      const clean = productInput.trim().toLowerCase();
+      const matched = products.find(
+        (p) =>
+          p.brandName.toLowerCase() === clean &&
+          (p.laboratory || 'GENERAL').toUpperCase() === newLab.toUpperCase()
+      );
+      if (matched) {
+        setSelectedProductId(matched.id);
+      } else {
+        setSelectedProductId(productInput.trim());
+      }
+    }
+  };
 
   // When selected product changes or is manually typed
   const handleProductInputChange = (val: string) => {
     setProductInput(val);
     setStatusMessage(null);
     setFileError(null);
+    const clean = val.trim().toLowerCase();
     const matched = products.find(
-      (p) => p.id === val || p.brandName.toLowerCase() === val.trim().toLowerCase()
+      (p) =>
+        (p.id === val || p.brandName.toLowerCase() === clean) &&
+        (p.laboratory || 'GENERAL').toUpperCase() === selectedLab.toUpperCase()
     );
     if (matched) {
       setSelectedProductId(matched.id);
-      setSelectedLab(
-        matched.laboratory === 'PENICILLIN'
-          ? 'PENICILLIN'
-          : matched.laboratory === 'CEPHALOSPORIN'
-          ? 'CEPHALOSPORIN'
-          : 'GENERAL'
-      );
       if (!docTitle) {
         setDocTitle(`${matched.brandName} (${matched.strength}) — Finished Product Specification & Method Description`);
       }
@@ -129,7 +155,6 @@ export default function DocumentationManagerDashboard() {
   const handleProductSelect = (prodId: string) => {
     const prod = products.find((p) => p.id === prodId);
     if (prod) {
-      handleProductInputChange(prod.brandName);
       setSelectedLab(
         prod.laboratory === 'PENICILLIN'
           ? 'PENICILLIN'
@@ -137,9 +162,21 @@ export default function DocumentationManagerDashboard() {
           ? 'CEPHALOSPORIN'
           : 'GENERAL'
       );
+      setProductInput(prod.brandName);
+      setSelectedProductId(prod.id);
+      if (!docTitle) {
+        setDocTitle(`${prod.brandName} (${prod.strength}) — Finished Product Specification & Method Description`);
+      }
     } else {
       handleProductInputChange(prodId);
     }
+  };
+
+  const handleSelectSlotForUpload = (prod: Product, slotKey: string) => {
+    handleProductSelect(prod.id);
+    setSelectedCategory(slotKey);
+    const slot = DOCUMENT_SLOTS.find((s) => s.key === slotKey);
+    setDocTitle(`${prod.brandName} (${prod.strength}) — ${slot?.name || 'Document'}`);
   };
 
   // File selection handler supporting all document types
@@ -169,26 +206,27 @@ export default function DocumentationManagerDashboard() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      const targetId = (selectedProductId || productInput).trim();
-      if (!targetId) {
+      const cleanName = productInput.trim();
+      if (!cleanName) {
         throw new Error('Please enter a product name, drug substance, or select from database.');
       }
       if (!selectedFile) {
         throw new Error('Please choose a document file to upload.');
       }
 
-      const isUpdate = Boolean(
-        activeProduct?.currentDocument ||
-        products.find(
-          (p) =>
-            p.id === selectedProductId ||
-            p.brandName.toLowerCase() === productInput.trim().toLowerCase()
-        )?.currentDocument
+      // Check if product exists specifically in the target lab
+      const matchedInLab = products.find(
+        (p) =>
+          (p.id === selectedProductId || p.brandName.toLowerCase() === cleanName.toLowerCase()) &&
+          (p.laboratory || 'GENERAL').toUpperCase() === selectedLab.toUpperCase()
       );
+
+      const targetId = matchedInLab ? matchedInLab.id : cleanName;
 
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('title', docTitle.trim() || `${activeProduct?.brandName || targetId} Document`);
+      formData.append('productId', targetId);
+      formData.append('title', docTitle.trim() || `${cleanName} Document`);
       formData.append('laboratory', selectedLab);
       formData.append(
         'labName',
@@ -198,21 +236,32 @@ export default function DocumentationManagerDashboard() {
           ? 'Penicillin Lab'
           : 'Cephalosporin Lab'
       );
+      formData.append('category', selectedCategory);
+      formData.append('docType', selectedCategory);
       if (versionNotes.trim()) {
         formData.append('versionNotes', versionNotes.trim());
       }
 
       const res = await productService.uploadDocument(targetId, formData);
-      return { res, isUpdate };
+      return { res, isUpdate: Boolean(matchedInLab) };
     },
     onSuccess: ({ isUpdate }) => {
+      const targetLabLabel =
+        selectedLab === 'PENICILLIN'
+          ? 'Penicillin Lab'
+          : selectedLab === 'CEPHALOSPORIN'
+          ? 'Cephalosporin Lab'
+          : 'General Lab';
+
       setStatusMessage({
         type: 'success',
-        text: isUpdate ? 'Document updated successfully!' : 'Document submitted successfully!',
+        text: `Document uploaded and saved into ${targetLabLabel} successfully!`,
       });
+      // Switch active view to the lab where it was uploaded so it appears right there
+      setLabFilter(selectedLab);
       setProductInput('');
       setSelectedProductId('');
-      setSelectedLab('GENERAL');
+      setSelectedCategory('STP_METHOD');
       setDocTitle('');
       setVersionNotes('');
       setSelectedFile(null);
@@ -228,6 +277,42 @@ export default function DocumentationManagerDashboard() {
     },
   });
 
+  // Delete product mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: async (prodId: string) => {
+      return await productService.deleteProduct(prodId);
+    },
+    onSuccess: () => {
+      setStatusMessage({
+        type: 'success',
+        text: 'Product and associated files deleted successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err: any) => {
+      setStatusMessage({
+        type: 'error',
+        text: err?.message || 'Failed to delete product.',
+      });
+    },
+  });
+
+  const handleDeleteProduct = (p: Product) => {
+    if (window.confirm(`Are you sure you want to delete "${p.brandName}" and its documents?`)) {
+      deleteProductMutation.mutate(p.id);
+    }
+  };
+
+  // Lab Counts for 3 Labs + All
+  const labCounts = useMemo(() => {
+    return {
+      ALL: products.length,
+      GENERAL: products.filter((p) => (p.laboratory || 'GENERAL').toUpperCase() === 'GENERAL').length,
+      PENICILLIN: products.filter((p) => (p.laboratory || '').toUpperCase() === 'PENICILLIN').length,
+      CEPHALOSPORIN: products.filter((p) => (p.laboratory || '').toUpperCase() === 'CEPHALOSPORIN').length,
+    };
+  }, [products]);
+
   // Filtered products
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -237,7 +322,7 @@ export default function DocumentationManagerDashboard() {
         p.atmCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.currentDocument?.fileName && p.currentDocument.fileName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      const matchesLab = labFilter === 'ALL' || p.laboratory === labFilter;
+      const matchesLab = labFilter === 'ALL' || (p.laboratory || 'GENERAL').toUpperCase() === labFilter;
       return matchesSearch && matchesLab;
     });
   }, [products, searchQuery, labFilter]);
@@ -364,26 +449,83 @@ export default function DocumentationManagerDashboard() {
               />
             </div>
 
-            {/* Step 2: Target Laboratory Option */}
+            {/* Step 2: Target Laboratory Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                <span>
+                  2. Select Target Laboratory <span className="text-rose-500">*</span>
+                </span>
+                <span className="text-[10px] font-medium text-teal-700">
+                  Product will be saved in this lab
+                </span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  {
+                    key: 'GENERAL',
+                    name: 'General Lab',
+                    icon: '🧪',
+                    activeStyle: 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 font-bold',
+                  },
+                  {
+                    key: 'PENICILLIN',
+                    name: 'Penicillin Lab',
+                    icon: '💊',
+                    activeStyle: 'bg-amber-50 border-amber-500 text-amber-900 ring-2 ring-amber-500/20 font-bold',
+                  },
+                  {
+                    key: 'CEPHALOSPORIN',
+                    name: 'Cephalosporin Lab',
+                    icon: '🧬',
+                    activeStyle: 'bg-purple-50 border-purple-500 text-purple-900 ring-2 ring-purple-500/20 font-bold',
+                  },
+                ].map((l) => (
+                  <button
+                    key={l.key}
+                    type="button"
+                    onClick={() => handleLabChange(l.key)}
+                    className={cn(
+                      'p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1',
+                      selectedLab === l.key
+                        ? l.activeStyle + ' shadow-2xs'
+                        : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                    )}
+                  >
+                    <span className="text-base">{l.icon}</span>
+                    <span className="text-[11px] leading-tight font-medium">{l.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3: Document Category / Type */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                2. Laboratory / Department Section <span className="text-rose-500">*</span>
+                3. Document Category / Type <span className="text-rose-500">*</span>
               </label>
               <select
-                value={selectedLab}
-                onChange={(e) => setSelectedLab(e.target.value)}
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  const cat = DOCUMENT_SLOTS.find((s) => s.key === e.target.value);
+                  if (productInput.trim()) {
+                    setDocTitle(`${productInput.trim()} — ${cat?.shortLabel || 'Document'}`);
+                  }
+                }}
                 className="w-full text-xs rounded-lg border border-slate-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white text-slate-900 font-medium cursor-pointer"
               >
-                <option value="GENERAL">General Lab</option>
-                <option value="PENICILLIN">Penicillin Lab</option>
-                <option value="CEPHALOSPORIN">Cephalosporin Lab</option>
+                {DOCUMENT_SLOTS.map((slot) => (
+                  <option key={slot.key} value={slot.key}>
+                    {slot.name}
+                  </option>
+                ))}
               </select>
             </div>
 
             {/* Document Title */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                3. Document Title / Description Specification
+                4. Document Title / Description Specification
               </label>
               <input
                 type="text"
@@ -396,7 +538,7 @@ export default function DocumentationManagerDashboard() {
             {/* Drag & Drop Document File Input */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                4. Select Document File <span className="text-rose-500">*</span>
+                5. Select Document File <span className="text-rose-500">*</span>
               </label>
 
               <div
@@ -483,9 +625,6 @@ export default function DocumentationManagerDashboard() {
               <h2 className="font-semibold text-slate-900 text-sm">
                 Commercial Products & Attached PDF Documents
               </h2>
-              <p className="text-[11px] text-slate-500">
-                PDF files instantly propagate to Analyst Testing Workstation & Product Catalog
-              </p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -500,19 +639,72 @@ export default function DocumentationManagerDashboard() {
                   className="text-xs rounded-lg border border-slate-200 pl-8 pr-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 w-36 sm:w-44"
                 />
               </div>
-
-              {/* Lab Filter */}
-              <select
-                value={labFilter}
-                onChange={(e) => setLabFilter(e.target.value)}
-                className="text-xs rounded-lg border border-slate-200 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
-              >
-                <option value="ALL">All Labs</option>
-                <option value="GENERAL">General Lab</option>
-                <option value="PENICILLIN">Penicillin Lab</option>
-                <option value="CEPHALOSPORIN">Cephalosporin Lab</option>
-              </select>
             </div>
+          </div>
+
+          {/* 3 Laboratory Switcher Tabs (General Lab, Penicillin Lab, Cephalosporin Lab, All Labs) */}
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              {
+                key: 'ALL',
+                name: 'All Labs',
+                count: labCounts.ALL,
+                icon: '🌐',
+                activeClass: 'bg-slate-900 text-white border-slate-900 shadow-sm',
+              },
+              {
+                key: 'GENERAL',
+                name: 'General Lab',
+                count: labCounts.GENERAL,
+                icon: '🧪',
+                activeClass: 'bg-blue-700 text-white border-blue-700 shadow-sm',
+              },
+              {
+                key: 'PENICILLIN',
+                name: 'Penicillin Lab',
+                count: labCounts.PENICILLIN,
+                icon: '💊',
+                activeClass: 'bg-amber-600 text-white border-amber-600 shadow-sm',
+              },
+              {
+                key: 'CEPHALOSPORIN',
+                name: 'Cephalosporin Lab',
+                count: labCounts.CEPHALOSPORIN,
+                icon: '🧬',
+                activeClass: 'bg-purple-700 text-white border-purple-700 shadow-sm',
+              },
+            ].map((tab) => {
+              const isActive = labFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setLabFilter(tab.key);
+                    if (tab.key !== 'ALL') {
+                      setSelectedLab(tab.key);
+                    }
+                  }}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer',
+                    isActive
+                      ? tab.activeClass
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                  )}
+                >
+                  <span>{tab.icon}</span>
+                  <span>{tab.name}</span>
+                  <span
+                    className={cn(
+                      'text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold',
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Table */}
@@ -531,19 +723,21 @@ export default function DocumentationManagerDashboard() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold uppercase text-[10px] tracking-wider">
-                    <th className="py-2.5 px-3">Product / ATM Code</th>
+                    <th className="py-2.5 px-3">Product Name</th>
                     <th className="py-2.5 px-3">Laboratory</th>
-                    <th className="py-2.5 px-3">Current PDF Document</th>
-                    <th className="py-2.5 px-3">Version</th>
+                    <th className="py-2.5 px-3">Attached Documents</th>
                     <th className="py-2.5 px-3">Upload Date & Time</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredProducts.map((p) => {
-                    const doc = p.currentDocument;
-                    const uploadDate = doc?.createdAt || p.createdAt;
+                    const activeDocs = p.documents || [];
+                    const count = activeDocs.length;
+                    const primaryDoc = activeDocs[0] || p.currentDocument;
+                    const uploadDate = primaryDoc?.createdAt || p.createdAt;
                     const formatted = formatDateTime(uploadDate);
+
                     return (
                       <tr
                         key={p.id}
@@ -554,13 +748,7 @@ export default function DocumentationManagerDashboard() {
                       >
                         {/* Product Name */}
                         <td className="py-3 px-3">
-                          <div className="font-semibold text-slate-900">{p.brandName}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {p.genericName} • {p.strength}
-                          </div>
-                          <span className="font-mono text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 inline-block mt-0.5">
-                            {p.atmCode}
-                          </span>
+                          <div className="font-semibold text-slate-900 text-xs">{p.brandName}</div>
                         </td>
 
                         {/* Laboratory */}
@@ -574,8 +762,6 @@ export default function DocumentationManagerDashboard() {
                                 ? 'bg-amber-50 text-amber-700 border-amber-200'
                                 : p.laboratory === 'CEPHALOSPORIN'
                                 ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                : p.laboratory === 'MICROBIOLOGY'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : 'bg-teal-50 text-teal-700 border-teal-200'
                             )}
                           >
@@ -583,37 +769,49 @@ export default function DocumentationManagerDashboard() {
                           </span>
                         </td>
 
-                        {/* Document */}
+                        {/* Attached Documents */}
                         <td className="py-3 px-3">
-                          {doc ? (
-                            <div className="space-y-0.5">
-                              <div className="inline-flex items-center gap-1.5 font-medium text-slate-800">
-                                <span className="p-1 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                                  <FileText className="w-3 h-3" />
-                                </span>
-                                <span className="max-w-[150px] sm:max-w-[180px] truncate" title={doc.fileName}>
-                                  {doc.fileName}
-                                </span>
+                          {activeDocs.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {/* Latest document */}
+                              <div className="space-y-0.5">
+                                <div className="inline-flex items-center gap-1.5 font-medium text-slate-800">
+                                  <span className="p-1 rounded bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                                    <FileText className="w-3 h-3" />
+                                  </span>
+                                  <span
+                                    className="max-w-[170px] sm:max-w-[210px] truncate font-medium text-slate-900"
+                                    title={activeDocs[0].fileName}
+                                  >
+                                    {activeDocs[0].fileName}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {(activeDocs[0].fileSize / 1024).toFixed(1)} KB • By {activeDocs[0].uploadedByName}
+                                </div>
                               </div>
-                              <div className="text-[10px] text-slate-400">
-                                {(doc.fileSize / 1024).toFixed(1)} KB • By {doc.uploadedByName}
-                              </div>
+
+                              {/* Multi-document indicator */}
+                              {activeDocs.length > 1 && (
+                                <div className="pt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedFolderProduct(p);
+                                      setFolderModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                                  >
+                                    <Folder className="w-2.5 h-2.5 text-teal-600" />
+                                    <span>+{activeDocs.length - 1} more file{activeDocs.length > 2 ? 's' : ''} in folder</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-[11px] text-slate-400 italic">
-                              No PDF uploaded
+                              No document uploaded
                             </span>
-                          )}
-                        </td>
-
-                        {/* Version */}
-                        <td className="py-3 px-3">
-                          {doc ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
-                              v{doc.version}.0
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 font-mono text-[11px]">—</span>
                           )}
                         </td>
 
@@ -637,32 +835,23 @@ export default function DocumentationManagerDashboard() {
 
                         {/* Actions */}
                         <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Download Document */}
-                            {doc && (
-                              <a
-                                href={productService.getDocumentDownloadUrl(doc.id)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="Download Document"
-                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-colors"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-
-                            {/* Quick Select for Update */}
+                          <div className="flex items-center justify-end">
+                            {/* Open Product Document Folder */}
                             <button
-                              onClick={() => handleProductSelect(p.id)}
-                              title="Update / Replace Document"
-                              className={cn(
-                                'px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors',
-                                selectedProductId === p.id
-                                  ? 'bg-teal-600 text-white border-teal-600'
-                                  : 'border-slate-200 text-slate-700 hover:bg-slate-100'
-                              )}
+                              onClick={() => {
+                                setSelectedFolderProduct(p);
+                                setFolderModalOpen(true);
+                              }}
+                              title="Open Product Documents Folder"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
                             >
-                              {doc ? 'Replace' : 'Upload'}
+                              <Folder className="w-3.5 h-3.5 text-teal-600" />
+                              <span>Folder</span>
+                              {count > 0 && (
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-teal-600 text-white font-mono">
+                                  {count}
+                                </span>
+                              )}
                             </button>
                           </div>
                         </td>
@@ -675,6 +864,22 @@ export default function DocumentationManagerDashboard() {
           )}
         </div>
       </div>
+
+      {/* Product Folder Dossier Modal */}
+      <ProductFolderViewerModal
+        isOpen={folderModalOpen}
+        onClose={() => {
+          setFolderModalOpen(false);
+          setSelectedFolderProduct(null);
+        }}
+        product={
+          selectedFolderProduct
+            ? products.find((p) => p.id === selectedFolderProduct.id) || selectedFolderProduct
+            : null
+        }
+        onSelectSlotForUpload={handleSelectSlotForUpload}
+        onDocumentDeleted={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+      />
     </div>
   );
 }

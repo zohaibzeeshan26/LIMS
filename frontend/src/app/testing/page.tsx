@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { samplingService, SamplingFilters } from '@/services/sampling.service';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Sample, SampleStatus, Priority, getSampleSection } from '@/types/lims';
+import { Sample, SampleStatus, Priority, getSampleSection, Product, ProductDocument } from '@/types/lims';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -42,8 +42,13 @@ import {
   Layers,
   Send,
   Check,
+  Folder,
 } from 'lucide-react';
 import { OfficialAtm003Document } from '@/components/askprol/OfficialAtm003Document';
+import {
+  ProductFolderViewerModal,
+  DOCUMENT_SLOTS,
+} from '@/components/documentation/ProductFolderViewerModal';
 
 const LAB_TABS = [
   {
@@ -278,14 +283,19 @@ function TestingPageContent() {
     return [];
   }, [instrumentsResponse]);
 
+  // Product folder modal state
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [selectedFolderProduct, setSelectedFolderProduct] = useState<Product | null>(null);
+
   // Load commercial products to link official description PDF documents
   const { data: productsList = [] } = useQuery({
     queryKey: ['products'],
     queryFn: productService.getAll,
   });
 
-  const getProductDocForTest = React.useCallback(
-    (testOrSample: any) => {
+  // Helper to match full product record for a test or sample
+  const getProductForTest = React.useCallback(
+    (testOrSample: any): Product | null => {
       if (!productsList || productsList.length === 0) return null;
       const mat = (testOrSample?.materialName || testOrSample?.nomenclature || '').toLowerCase();
       const sample = (testOrSample?.sampleCode || testOrSample?.sampleId || '').toLowerCase();
@@ -307,9 +317,17 @@ function TestingPageContent() {
         return false;
       });
 
-      return matchedProduct?.currentDocument || null;
+      return matchedProduct || null;
     },
     [productsList]
+  );
+
+  const getProductDocForTest = React.useCallback(
+    (testOrSample: any) => {
+      const prod = getProductForTest(testOrSample);
+      return prod?.currentDocument || null;
+    },
+    [getProductForTest]
   );
 
   // Helper to extract tests and tasks belonging to a specific sample
@@ -1372,42 +1390,87 @@ function TestingPageContent() {
               </div>
             </div>
 
-            {/* Official Product Description PDF Document Link */}
+            {/* Official Product Documentation Dossier Folder (5 Categorized Files) */}
             {(() => {
+              const matchedProd = getProductForTest(activeTest);
               const activeDoc = getProductDocForTest(activeTest);
-              if (!activeDoc) return null;
+              if (!matchedProd && !activeDoc) return null;
+
+              const activeDocs = (matchedProd?.documents || []).filter((d) => d.isCurrent !== false);
+              const totalDocs = activeDocs.length || (activeDoc ? 1 : 0);
+
               return (
-                <div className="p-3.5 rounded-xl bg-rose-50/80 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <div className="p-2 rounded-lg bg-rose-100 text-rose-800 shrink-0">
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div className="overflow-hidden">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-rose-950 text-xs truncate max-w-[240px]" title={activeDoc.fileName}>
-                          {activeDoc.fileName}
-                        </span>
-                        <span className="font-mono text-[10px] font-bold bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded shrink-0">
-                          v{activeDoc.version}.0 (PDF)
-                        </span>
+                <div className="p-3.5 rounded-xl bg-teal-50/80 border border-teal-200 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div className="p-2 rounded-lg bg-teal-100 text-teal-800 shrink-0">
+                        <Folder className="w-4 h-4" />
                       </div>
-                      <p className="text-[11px] text-rose-700 mt-0.5">
-                        Official product description PDF document uploaded by {activeDoc.uploadedByName}
-                      </p>
+                      <div className="overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-xs">
+                            {matchedProd?.brandName || 'Product'} Folder
+                          </span>
+                          <span className="font-mono text-[10px] font-bold bg-teal-200 text-teal-900 px-1.5 py-0.5 rounded shrink-0">
+                            {totalDocs} {totalDocs === 1 ? 'File' : 'Files'} Available
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-teal-800 mt-0.5">
+                          Method, specifications, calculations &amp; laboratory reference documents
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {matchedProd && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFolderProduct(matchedProd);
+                            setFolderModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white shadow-2xs shrink-0 cursor-pointer"
+                          title="Open product documents folder"
+                        >
+                          <Folder className="w-3.5 h-3.5" />
+                          <span>Folder</span>
+                        </button>
+                      )}
+                      {activeDoc && (
+                        <a
+                          href={productService.getDocumentViewUrl(activeDoc.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 border border-teal-300 text-teal-900 shadow-2xs shrink-0"
+                          title="Quick view primary document PDF"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-teal-700" />
+                          <span>Quick View</span>
+                        </a>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={productService.getDocumentViewUrl(activeDoc.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white shadow-2xs shrink-0"
-                      title="Open and read PDF document directly in browser"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>View PDF</span>
-                    </a>
-                  </div>
+
+                  {/* Documents Quick Link Chips */}
+                  {matchedProd && activeDocs.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-teal-200/60">
+                      {activeDocs.map((docItem) => (
+                        <button
+                          key={docItem.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedFolderProduct(matchedProd);
+                            setFolderModalOpen(true);
+                          }}
+                          title={`Click to view ${docItem.fileName}`}
+                          className="text-[10px] px-2 py-0.5 rounded border border-teal-300 bg-white text-teal-900 font-semibold hover:bg-teal-100/70 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                        >
+                          <span>📄</span>
+                          <span className="truncate max-w-[140px]">{docItem.fileName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -1534,6 +1597,16 @@ function TestingPageContent() {
           </form>
         </Modal>
       )}
+
+      {/* Product Folder Dossier Modal for Analysts */}
+      <ProductFolderViewerModal
+        isOpen={folderModalOpen}
+        onClose={() => {
+          setFolderModalOpen(false);
+          setSelectedFolderProduct(null);
+        }}
+        product={selectedFolderProduct}
+      />
     </div>
   );
 }
