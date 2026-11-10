@@ -50,3 +50,4 @@ uploads/
 */uploads/
 
 frontend/portalbe/
+*.err

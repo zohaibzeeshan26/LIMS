@@ -60,7 +60,7 @@ import {
   Gauge,
   LayoutDashboard,
 } from 'lucide-react';
-import { STATIC_ANALYSTS, isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
+import { isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
 import { LabOperationsView } from '@/components/dashboard/LabOperationsView';
 
 function DashboardInner() {
@@ -559,7 +559,7 @@ function DashboardInner() {
       }
 
       if (!assignedAnalystUsername && assignedAnalystId) {
-        const found = allAnalysts.find((a) => a.id === assignedAnalystId || a.name === assignedAnalystName) || STATIC_ANALYSTS.find((a) => a.id === assignedAnalystId || a.name === assignedAnalystName);
+        const found = allAnalysts.find((a) => a.id === assignedAnalystId || a.name === assignedAnalystName);
         if (found) {
           assignedAnalystUsername = found.username;
           if (!assignedAnalystName) assignedAnalystName = found.name;
@@ -627,7 +627,7 @@ function DashboardInner() {
           labBadgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
         }
 
-        const foundAnalyst = allAnalysts.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName) || STATIC_ANALYSTS.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName);
+        const foundAnalyst = allAnalysts.find((a) => a.id === t.assignedAnalystId || a.name === t.assignedAnalystName);
 
         additionalTasks.push({
           uuid: t.id,
@@ -681,7 +681,7 @@ function DashboardInner() {
     // 2. If Super Admin or Manager: Filter by selected analyst dropdown if chosen
     if (selectedAnalystFilter !== 'ALL') {
       return combined.filter((s) => {
-        const found = allAnalysts.find((a) => a.id === selectedAnalystFilter) || STATIC_ANALYSTS.find((a) => a.id === selectedAnalystFilter);
+        const found = allAnalysts.find((a) => a.id === selectedAnalystFilter);
         const matchId = s.assignedAnalystId === selectedAnalystFilter;
         const matchUsername = found && s.assignedAnalystUsername?.toLowerCase() === found.username.toLowerCase();
         const matchName = found && s.assignedAnalystName?.toLowerCase().includes(found.name.toLowerCase());

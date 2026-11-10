@@ -38,18 +38,6 @@ export class AuthService {
         user = await prisma.user.findFirst({ where: { username: 'admin' } });
       } else if (lower === '0012' || lower.includes('nasir')) {
         user = await prisma.user.findFirst({ where: { username: '0012' } });
-      } else if (lower === 'analyst1' || lower.includes('zubair')) {
-        user = await prisma.user.findFirst({ where: { username: 'analyst1' } });
-      } else if (lower === 'analyst' || lower.includes('analyst') || lower.includes('ali')) {
-        user = await prisma.user.findFirst({ where: { username: 'analyst' } });
-      } else if (lower.includes('gen') || lower.includes('general')) {
-        user = await prisma.user.findFirst({ where: { username: 'general' } });
-      } else if (lower.includes('pen') || lower.includes('penicillin')) {
-        user = await prisma.user.findFirst({ where: { username: 'penicillin' } });
-      } else if (lower.includes('ceph') || lower.includes('cephalosporin')) {
-        user = await prisma.user.findFirst({ where: { username: 'cephalosporin' } });
-      } else if (lower.includes('doc') || lower.includes('sana')) {
-        user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
       }
     }
 

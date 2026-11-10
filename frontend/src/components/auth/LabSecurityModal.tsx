@@ -63,16 +63,7 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
     iconBg: 'bg-blue-600',
     badgeBg: 'bg-blue-100 text-blue-700 border-blue-200',
     description: '',
-    authorizedAnalysts: [
-      'analyst1',
-      'analyst2',
-      'analyst3',
-      'analyst4',
-      'analyst7',
-      'analyst8',
-      'analyst9',
-      'analyst10',
-    ],
+    authorizedAnalysts: [],
   },
   penicillin: {
     labId: 'penicillin',
@@ -89,7 +80,7 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
     iconBg: 'bg-amber-600',
     badgeBg: 'bg-amber-100 text-amber-800 border-amber-200',
     description: '',
-    authorizedAnalysts: ['analyst5'],
+    authorizedAnalysts: [],
   },
   cephalosporin: {
     labId: 'cephalosporin',
@@ -106,7 +97,7 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
     iconBg: 'bg-purple-600',
     badgeBg: 'bg-purple-100 text-purple-800 border-purple-200',
     description: '',
-    authorizedAnalysts: ['analyst6'],
+    authorizedAnalysts: [],
   },
 };
 
