@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { getSampleSection } from '@/types/lims';
 import { formatDateTime } from '@/lib/date';
-import { STATIC_ANALYSTS as ANALYSTS, AnalystUserOption } from '@/lib/analysts';
+import { AnalystUserOption } from '@/lib/analysts';
 import { auditService } from '@/services/audit.service';
 import {
   UserCheck,
@@ -446,7 +446,7 @@ function TaskAssignmentPageInner() {
   const [newSampleName, setNewSampleName] = useState('');
   const [newLab, setNewLab] = useState<'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN'>(activeLabKey);
   const [newSection, setNewSection] = useState<'semi-base' | 'formulation'>('semi-base');
-  const [newAnalystId, setNewAnalystId] = useState(ANALYSTS[0]?.id || '');
+  const [newAnalystId, setNewAnalystId] = useState('');
   const [newProtocol, setNewProtocol] = useState(TEST_PROTOCOLS[0]);
   const [newPriority, setNewPriority] = useState<'URGENT' | 'ROUTINE'>('URGENT');
   const [newShift, setNewShift] = useState('Morning Shift (08:00 - 16:00)');
@@ -490,7 +490,7 @@ function TaskAssignmentPageInner() {
   // Row-level Sample Assignment Modal State
   const [isRowAssignModalOpen, setIsRowAssignModalOpen] = useState(false);
   const [targetSampleTask, setTargetSampleTask] = useState<TaskItem | null>(null);
-  const [selectedAnalystId, setSelectedAnalystId] = useState<string>(ANALYSTS[0]?.id || '');
+  const [selectedAnalystId, setSelectedAnalystId] = useState<string>('');
   const [selectedProtocol, setSelectedProtocol] = useState<string>(TEST_PROTOCOLS[0]);
   const [selectedPriorityVal, setSelectedPriorityVal] = useState<'URGENT' | 'ROUTINE'>('URGENT');
   const [selectedShiftVal, setSelectedShiftVal] = useState<string>('Morning Shift (08:00 - 16:00)');
@@ -502,7 +502,7 @@ function TaskAssignmentPageInner() {
     const existing = allPersonnelList.find(
       (a) => a.id === task.assignedAnalystId || a.name === task.assignedAnalystName
     );
-    setSelectedAnalystId(existing ? existing.id : allPersonnelList[0]?.id || 'EMP-ANL-01');
+    setSelectedAnalystId(existing ? existing.id : allPersonnelList[0]?.id || '');
     setSelectedProtocol(task.testProtocol || TEST_PROTOCOLS[0]);
     setSelectedPriorityVal(task.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT');
     setSelectedShiftVal(task.shift || 'Morning Shift (08:00 - 16:00)');

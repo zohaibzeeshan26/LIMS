@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { useAuth, DEMO_USERS } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { CityPharmaLogo } from '@/components/ui/CityPharmaLogo';
 import {
   Bell,
@@ -65,7 +65,7 @@ const DEFAULT_STAFF_NOTIFICATIONS: NotificationItem[] = [
 ];
 
 function NavbarInner({ onToggleSidebar }: NavbarProps) {
-  const { user, loginAs, logout } = useAuth();
+  const { user, logout } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -245,16 +245,8 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
     }
   };
 
-  // Get display name & role title matching login demo card exactly
-  const demoMatch = DEMO_USERS.find(
-    (d) =>
-      (user?.email && d.email.toLowerCase() === user.email.toLowerCase()) ||
-      (user?.username && d.username?.toLowerCase() === user.username.toLowerCase()) ||
-      (user?.employeeId && d.employeeId?.toUpperCase() === user.employeeId.toUpperCase())
-  );
-
-  const displayName = demoMatch?.name || user?.fullName || 'Lab Staff';
-  const displayRole = demoMatch?.labBadge || (user?.role === 'ADMIN' ? 'Master Administrator' : (user?.role ? user.role.replace(/_/g, ' ') : 'Lab Staff'));
+  const displayName = user?.fullName || 'Lab Staff';
+  const displayRole = user?.role === 'ADMIN' ? 'Master Administrator' : (user?.role ? user.role.replace(/_/g, ' ') : 'Lab Staff');
 
   return (
     <header className="sticky top-0 z-40 w-full lg:pl-64 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
@@ -430,45 +422,8 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
               <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white shadow-xl border border-slate-200 p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-3 py-2 border-b border-slate-100">
                   <p className="text-sm font-bold text-slate-900">{displayName}</p>
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">{user?.email || demoMatch?.email || 'admin@citypharma.com'}</p>
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">{user?.email || 'admin@citypharma.com'}</p>
                 </div>
-
-
-                {/* Switch Persona for Live Testing - Only visible for Admin */}
-                {user?.role === 'ADMIN' && (
-                  <div className="p-2 border-b border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1">
-                      Profiles
-                    </p>
-                    <div className="space-y-1">
-                      {DEMO_USERS.map((demo) => {
-                        const isCurrent = user?.email === demo.email;
-                        return (
-                          <button
-                            key={demo.role}
-                            onClick={() => {
-                              loginAs(demo.role);
-                              setIsUserMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition-colors cursor-pointer ${
-                              isCurrent
-                                ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
-                                : 'hover:bg-slate-50 text-slate-700'
-                            }`}
-                          >
-                            <div>
-                              <div className="font-medium text-slate-900">{demo.name}</div>
-                              <div className="text-[10px] text-slate-500">{demo.title}</div>
-                            </div>
-                            {isCurrent && (
-                              <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
                 {/* Sign Out Button */}
                 <div className="pt-1.5">

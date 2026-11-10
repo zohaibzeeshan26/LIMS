@@ -879,6 +879,7 @@ export default function DocumentationManagerDashboard() {
         }
         onSelectSlotForUpload={handleSelectSlotForUpload}
         onDocumentDeleted={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+        onDocumentUploaded={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { productsService } from '../services/products.service';
+import { renderDocumentToHtml } from '../services/document-viewer.service';
 import { AppError } from '../middlewares/error.middleware';
 
 // Ensure uploads directory exists
@@ -152,15 +153,54 @@ export class ProductsController {
       const fileInfo = await productsService.getDocumentFileDetails(id);
 
       const isInline = req.query.inline === 'true' || req.query.view === 'true';
-      res.setHeader('Content-Type', fileInfo.mimeType || 'application/pdf');
-      res.setHeader(
-        'Content-Disposition',
-        `${isInline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(fileInfo.fileName)}"`
-      );
-      res.setHeader('Content-Length', fileInfo.fileSize);
+      const isDownload = req.query.download === 'true' || !isInline;
+      const ext = path.extname(fileInfo.fileName).toLowerCase();
 
-      const stream = fs.createReadStream(fileInfo.filePath);
-      stream.pipe(res);
+      // 1. Direct download request: stream original raw file
+      if (isDownload) {
+        res.setHeader('Content-Type', fileInfo.mimeType || 'application/octet-stream');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${encodeURIComponent(fileInfo.fileName)}"`
+        );
+        res.setHeader('Content-Length', fileInfo.fileSize);
+
+        const stream = fs.createReadStream(fileInfo.filePath);
+        stream.pipe(res);
+        return;
+      }
+
+      // 2. In-app View request
+      // If PDF, stream inline natively
+      if (ext === '.pdf' || fileInfo.mimeType === 'application/pdf') {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `inline; filename="${encodeURIComponent(fileInfo.fileName)}"`
+        );
+        res.setHeader('Content-Length', fileInfo.fileSize);
+
+        const stream = fs.createReadStream(fileInfo.filePath);
+        stream.pipe(res);
+        return;
+      }
+
+      // If Word (.docx), Excel (.xlsx), or Text: render complete interactive document viewer
+      const token = req.query.token ? String(req.query.token) : '';
+      const downloadUrl = `/api/v1/product-documents/${id}/file?download=true${token ? '&token=' + token : ''}`;
+
+      const renderedHtml = await renderDocumentToHtml({
+        filePath: fileInfo.filePath,
+        fileName: fileInfo.fileName,
+        mimeType: fileInfo.mimeType,
+        downloadUrl,
+        title: (fileInfo.doc as any)?.title,
+        version: (fileInfo.doc as any)?.version,
+        productName: (fileInfo.doc as any)?.productName,
+      });
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(renderedHtml);
     } catch (err) {
       next(err);
     }

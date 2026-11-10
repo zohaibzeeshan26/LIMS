@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/utils';
-import { STATIC_ANALYSTS, isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
+import { isAssignedToUser, useAllAnalysts } from '@/lib/analysts';
 import { auditService } from '@/services/audit.service';
 import { productService } from '@/services/product.service';
 import {
@@ -29,8 +29,6 @@ import {
   ShieldCheck,
   Beaker,
   Play,
-  ArrowLeft,
-  BookOpen,
   FileText,
   Download,
   Eye,
@@ -43,11 +41,14 @@ import {
   Send,
   Check,
   Folder,
+  ExternalLink,
+  X,
+  AlertCircle,
 } from 'lucide-react';
-import { OfficialAtm003Document } from '@/components/askprol/OfficialAtm003Document';
 import {
   ProductFolderViewerModal,
   DOCUMENT_SLOTS,
+  DOCUMENT_CATEGORIES,
 } from '@/components/documentation/ProductFolderViewerModal';
 
 const LAB_TABS = [
@@ -162,7 +163,6 @@ function TestingPageContent() {
   const [statusFilter, setStatusFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [selectedAnalystFilter, setSelectedAnalystFilter] = useState<string>('ALL');
-  const [testingTab, setTestingTab] = useState<'QUEUE' | 'OFFICIAL_SOP'>('QUEUE');
 
   // Expanded rows to inspect nested test worksheets directly
   const [expandedSampleIds, setExpandedSampleIds] = useState<Set<string>>(new Set());
@@ -208,6 +208,7 @@ function TestingPageContent() {
 
   // Selected sample for full execution drawer/modal
   const [selectedSampleForExecution, setSelectedSampleForExecution] = useState<Sample | null>(null);
+  const [executionViewingDoc, setExecutionViewingDoc] = useState<ProductDocument | null>(null);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -296,22 +297,52 @@ function TestingPageContent() {
   // Helper to match full product record for a test or sample
   const getProductForTest = React.useCallback(
     (testOrSample: any): Product | null => {
-      if (!productsList || productsList.length === 0) return null;
-      const mat = (testOrSample?.materialName || testOrSample?.nomenclature || '').toLowerCase();
-      const sample = (testOrSample?.sampleCode || testOrSample?.sampleId || '').toLowerCase();
-      const specName = (testOrSample?.testSpecification?.name || testOrSample?.testSpecification?.testCode || '').toLowerCase();
-      const pId = (testOrSample?.productId || '').toLowerCase();
+      if (!productsList || productsList.length === 0 || !testOrSample) return null;
+      const mat = (testOrSample?.materialName || testOrSample?.nomenclature || '').toLowerCase().trim();
+      const sample = (testOrSample?.sampleCode || testOrSample?.sampleId || '').toLowerCase().trim();
+      const specName = (testOrSample?.testSpecification?.name || testOrSample?.testSpecification?.testCode || '').toLowerCase().trim();
+      const pId = (testOrSample?.productId || '').toLowerCase().trim();
+      const sampleLab = (testOrSample?.laboratoryType || testOrSample?.laboratory || '').toUpperCase().trim();
 
+      // 1. Direct ID / ATM Code Match
+      if (pId) {
+        const byId = productsList.find((p) => p.id.toLowerCase() === pId || p.atmCode.toLowerCase() === pId);
+        if (byId) return byId;
+      }
+
+      // 2. Exact Brand / Generic match within the same laboratory
+      if (mat && sampleLab) {
+        const sameLabMatch = productsList.find(
+          (p) =>
+            (p.laboratory || 'GENERAL').toUpperCase() === sampleLab &&
+            (p.brandName.toLowerCase() === mat ||
+              p.genericName.toLowerCase() === mat ||
+              mat.includes(p.brandName.toLowerCase()) ||
+              p.brandName.toLowerCase().includes(mat))
+        );
+        if (sameLabMatch) return sameLabMatch;
+      }
+
+      // 3. Exact Brand / Generic match across any lab
+      if (mat) {
+        const exactBrand = productsList.find(
+          (p) =>
+            p.brandName.toLowerCase() === mat ||
+            p.genericName.toLowerCase() === mat ||
+            mat.includes(p.brandName.toLowerCase())
+        );
+        if (exactBrand) return exactBrand;
+      }
+
+      // 4. Token-based match (e.g. "Panadol 500mg" matches "Panadol")
       const matchedProduct = productsList.find((p) => {
-        const id = p.id.toLowerCase();
         const brand = p.brandName.toLowerCase();
         const generic = p.genericName.toLowerCase();
         const atm = p.atmCode.toLowerCase();
         const brandTokens = brand.split(/[\s-]+/).filter((t: string) => t.length > 2);
         const genericTokens = generic.split(/[\s-]+/).filter((t: string) => t.length > 2);
 
-        if (pId && (id === pId || atm === pId)) return true;
-        if (mat && (mat.includes(brand) || mat.includes(generic) || mat.includes(atm))) return true;
+        if (atm && (mat.includes(atm) || sample.includes(atm))) return true;
         if (brandTokens.some((tok: string) => mat.includes(tok) || specName.includes(tok) || sample.includes(tok))) return true;
         if (genericTokens.some((tok: string) => mat.includes(tok) || specName.includes(tok))) return true;
         return false;
@@ -603,17 +634,6 @@ function TestingPageContent() {
       {/* Title & Navigation Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
-              <span>Back to Dashboard</span>
-            </Link>
-            <span className="text-xs font-semibold text-slate-400">/</span>
-            <span className="text-xs font-bold text-slate-700">Analyst Execution Workstation</span>
-          </div>
           <h1 className="text-xl sm:text-2xl font-bold text-navy-950 tracking-tight flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-teal-700" />
             <span>Analyst Execution &amp; Testing Worksheets</span>
@@ -623,91 +643,9 @@ function TestingPageContent() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <Link
-            href="/samples"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-colors"
-          >
-            <FlaskConical className="h-4 w-4 text-teal-600" />
-            <span>Sample Registration</span>
-          </Link>
-          <Link
-            href="/askprol"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#0B1A30] text-white hover:bg-slate-800 transition-colors shadow-2xs"
-          >
-            <Beaker className="w-4 h-4 text-purple-300" />
-            <span>Launch Askprol ATM-003 &rarr;</span>
-          </Link>
-        </div>
       </div>
 
-      {/* Askprol ATM-003 Highlight Banner */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white border border-purple-200/90 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start gap-3.5">
-          <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-xs shrink-0 mt-0.5">
-            <Beaker className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="font-bold text-slate-900 text-sm">
-                Askprol Suspension 120mg/5ml Analytical Protocol (QC/CLG/ATM-003)
-              </span>
-              <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200">
-                Bulk &amp; Finished Pack
-              </span>
-              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-                Live Calculation Engine
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
-              Official analytical testing protocol matching QC/CLG/ATM-003 Version 06. Automatically synchronized with sample registration records, HPLC chromatogram references, and release CoAs.
-            </p>
-          </div>
-        </div>
-
-        <Link
-          href="/askprol"
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[#0B1A30] text-white hover:bg-slate-800 transition-all shadow-xs shrink-0"
-        >
-          <Beaker className="w-4 h-4 text-purple-300" />
-          <span>Launch Askprol Testing Worksheet &rarr;</span>
-        </Link>
-      </div>
-
-      {/* Main Workstation Top Tabs: Queue vs SOP Monograph */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setTestingTab('QUEUE')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              testingTab === 'QUEUE'
-                ? 'bg-[#0B1A30] text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-teal-400" />
-            <span>Analyst Execution Queue ({samplesList.length} Registered Samples)</span>
-          </button>
-
-          <button
-            onClick={() => setTestingTab('OFFICIAL_SOP')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              testingTab === 'OFFICIAL_SOP'
-                ? 'bg-[#0B1A30] text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            <BookOpen className="w-4 h-4 text-purple-500" />
-            <span>Official SOP Monograph (QC/CLG/ATM-003 Ver: 06 - 10 Pages)</span>
-          </button>
-        </div>
-      </div>
-
-      {testingTab === 'OFFICIAL_SOP' ? (
-        <OfficialAtm003Document />
-      ) : (
-        <>
-          {/* Laboratory Tabs (General Lab, Penicillin Lab, Cephalosporin Lab, All Labs) */}
+      {/* Laboratory Tabs (General Lab, Penicillin Lab, Cephalosporin Lab, All Labs) */}
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
             {LAB_TABS.map((tab) => {
               const Icon = tab.icon;
@@ -1085,25 +1023,45 @@ function TestingPageContent() {
                             {/* 12. Analyst Execution Actions */}
                             <td className="py-3 px-3.5 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                {isAskprolItem ? (
+                                {(() => {
+                                  const rowProd = getProductForTest(sample);
+                                  const rowDocs = rowProd?.documents || [];
+                                  if (rowDocs.length === 0) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedFolderProduct(rowProd);
+                                        setFolderModalOpen(true);
+                                      }}
+                                      className="h-7 px-2 rounded-lg text-xs font-bold border border-teal-300 bg-teal-50 hover:bg-teal-100 text-teal-800 inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                                      title={`View ${rowDocs.length} documentation files for ${rowProd?.brandName || 'Product'}`}
+                                    >
+                                      <Folder className="h-3 w-3 text-teal-600" />
+                                      <span>Docs ({rowDocs.length})</span>
+                                    </button>
+                                  );
+                                })()}
+
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => setSelectedSampleForExecution(sample)}
+                                  className="h-7 text-xs bg-navy-900 hover:bg-navy-800 text-white font-semibold inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                                >
+                                  <Play className="h-3 w-3 text-teal-400" />
+                                  <span>Execute Analysis</span>
+                                </Button>
+
+                                {isAskprolItem && (
                                   <Link
                                     href={`/askprol?batchNumber=${batchLotText}&sampleCode=${sample.sampleCode}&stage=${sample.stageType || sample.sampleType}`}
-                                    className="h-7 px-2.5 rounded-lg text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 inline-flex items-center gap-1.5 transition-colors shadow-2xs"
+                                    className="h-7 px-2 rounded-lg text-xs font-bold bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 inline-flex items-center gap-1 transition-colors shadow-2xs"
                                     title="Open official ATM-003 testing worksheet"
                                   >
-                                    <Beaker className="h-3.5 w-3.5 text-purple-600" />
-                                    <span>ATM-003 Sheet</span>
+                                    <Beaker className="h-3 w-3 text-purple-600" />
+                                    <span>ATM-003</span>
                                   </Link>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="primary"
-                                    onClick={() => setSelectedSampleForExecution(sample)}
-                                    className="h-7 text-xs bg-navy-900 hover:bg-navy-800 text-white font-semibold inline-flex items-center gap-1"
-                                  >
-                                    <Play className="h-3 w-3 text-teal-400" />
-                                    <span>Execute Analysis</span>
-                                  </Button>
                                 )}
 
                                 <button
@@ -1254,99 +1212,334 @@ function TestingPageContent() {
               )}
             </div>
           </div>
-        </>
-      )}
 
-      {/* SAMPLE ANALYSIS EXECUTION MODAL */}
+      {/* SAMPLE ANALYSIS EXECUTION MODAL (Full Workstation with Product Documentation & Live In-App SOP Reader) */}
       {selectedSampleForExecution && (
         <Modal
           isOpen={!!selectedSampleForExecution}
-          onClose={() => setSelectedSampleForExecution(null)}
+          onClose={() => {
+            setSelectedSampleForExecution(null);
+            setExecutionViewingDoc(null);
+          }}
           title={`Analyst Execution: ${selectedSampleForExecution.sampleCode}`}
           subtitle={`Accession No: ${selectedSampleForExecution.accessionNo} • ${selectedSampleForExecution.nomenclature || selectedSampleForExecution.materialName}`}
-          maxWidth="2xl"
+          maxWidth="4xl"
         >
-          <div className="space-y-4">
-            {/* Sample Information Card */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample ID</span>
-                <span className="font-mono font-bold text-teal-800">{selectedSampleForExecution.sampleCode}</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Stage / Type</span>
-                <span className="font-semibold text-slate-800">{selectedSampleForExecution.stageType || selectedSampleForExecution.sampleType}</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Batch / Lot</span>
-                <span className="font-mono font-semibold text-slate-800">{selectedSampleForExecution.lotNumber || selectedSampleForExecution.batch?.batchNumber || '—'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample Quantity</span>
-                <span className="font-mono text-slate-800">{selectedSampleForExecution.sampleQty} {selectedSampleForExecution.unit}</span>
-              </div>
-            </div>
+          {(() => {
+            const matchedProd = getProductForTest(selectedSampleForExecution);
+            const productDocs: ProductDocument[] = [...(matchedProd?.documents || [])].sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
 
-            {/* If Askprol, provide direct launch banner */}
-            {((selectedSampleForExecution.sampleCode || '').toUpperCase().includes('ASK') ||
-              (selectedSampleForExecution.nomenclature || '').toLowerCase().includes('askprol')) && (
-              <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between gap-3">
-                <div className="text-xs">
-                  <span className="font-bold text-purple-900 block">Dedicated Monograph QC/CLG/ATM-003</span>
-                  <span className="text-purple-700">Launch 3-module analytical calculation sheet with real-time HPLC assay calculation.</span>
+            return (
+              <div className="space-y-4">
+                {/* 1. Sample Summary Information */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample ID</span>
+                    <span className="font-mono font-bold text-teal-800">{selectedSampleForExecution.sampleCode}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Product / Material</span>
+                    <span className="font-bold text-slate-900 truncate block" title={selectedSampleForExecution.nomenclature || selectedSampleForExecution.materialName}>
+                      {selectedSampleForExecution.nomenclature || selectedSampleForExecution.materialName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Stage / Type</span>
+                    <span className="font-semibold text-slate-700">{selectedSampleForExecution.stageType || selectedSampleForExecution.sampleType}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Batch / Lot No</span>
+                    <span className="font-mono font-semibold text-slate-800">{selectedSampleForExecution.lotNumber || selectedSampleForExecution.batch?.batchNumber || '—'}</span>
+                  </div>
                 </div>
-                <Link
-                  href={`/askprol?batchNumber=${selectedSampleForExecution.lotNumber}&sampleCode=${selectedSampleForExecution.sampleCode}&stage=${selectedSampleForExecution.stageType || selectedSampleForExecution.sampleType}`}
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-[#0B1A30] text-white hover:bg-slate-800 shrink-0"
-                >
-                  Launch Worksheet &rarr;
-                </Link>
-              </div>
-            )}
 
-            {/* Test Protocols List */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-700 block">Analytical Test Protocols:</span>
-              <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
-                {getTestsForSample(selectedSampleForExecution).map((t: any) => (
-                  <div key={t.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
-                    <div>
-                      <div className="font-semibold text-slate-900 text-xs">{t.testSpecification?.name || 'Assay Protocol'}</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                        Limits: {t.minLimit !== null ? `${t.minLimit} - ${t.maxLimit} ${t.unit}` : 'Qualitative'} &bull; Method: {t.testSpecification?.pharmacopeiaMethod || 'USP/BP'}
+                {/* 2. In-Modal Document Viewer (Live interactive reader for Word, Excel, and PDF files) */}
+                {executionViewingDoc && (
+                  <div className="space-y-2 rounded-2xl border-2 border-teal-500/40 bg-teal-50/40 p-3 sm:p-4 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-teal-200 shadow-2xs">
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="p-2 rounded-lg bg-teal-600 text-white shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900 truncate" title={executionViewingDoc.fileName}>
+                              {executionViewingDoc.fileName}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded">
+                              v{executionViewingDoc.version}.0
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {executionViewingDoc.title} • {(executionViewingDoc.fileSize / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={productService.getDocumentViewUrl(executionViewingDoc.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-colors"
+                          title="Open document in a separate browser tab to keep open while entering results"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-teal-600" />
+                          <span>New Tab</span>
+                        </a>
+                        <a
+                          href={productService.getDocumentDownloadUrl(executionViewingDoc.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Download</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setExecutionViewingDoc(null)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Close Viewer</span>
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {t.numericResult !== null || t.textResult ? (
-                        <div className="text-right mr-2">
-                          <span className="font-mono font-bold text-xs text-slate-900">{t.numericResult !== null ? `${t.numericResult} ${t.unit}` : t.textResult}</span>
-                          <div><StatusBadge status={t.resultStatus || 'PASSED'} /></div>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 text-xs italic mr-2">Pending</span>
-                      )}
-
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => openRecordModal(t)}
-                        className="h-7 text-xs"
-                      >
-                        {t.numericResult !== null || t.textResult ? 'Edit Result' : 'Input Result'}
-                      </Button>
+                    {/* In-App Word / Excel / PDF Document Viewer Iframe */}
+                    <div className="w-full h-96 sm:h-[480px] rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shadow-inner">
+                      <iframe
+                        src={productService.getDocumentViewUrl(executionViewingDoc.id)}
+                        className="w-full h-full border-0 bg-white"
+                        title={executionViewingDoc.title || executionViewingDoc.fileName}
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                )}
 
-            <div className="flex justify-end pt-3 border-t border-slate-100">
-              <Button type="button" variant="outline" onClick={() => setSelectedSampleForExecution(null)}>
-                Close
-              </Button>
-            </div>
-          </div>
+                {/* 3. Official Product Documentation & Testing Monograph Dossier */}
+                <div className="rounded-2xl border border-teal-200 bg-teal-50/30 p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-teal-100">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-teal-600 text-white shrink-0 shadow-2xs">
+                        <Folder className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                            Official Product Documentation &amp; Testing Monograph
+                          </h4>
+                          {matchedProd && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-300">
+                              {matchedProd.brandName} • {matchedProd.laboratory} LAB
+                            </span>
+                          )}
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-lg bg-white text-teal-900 border border-teal-200 font-mono shadow-2xs">
+                            {productDocs.length} {productDocs.length === 1 ? 'Document' : 'Documents'} Available
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Read approved STP testing methods, calculation sheets, and specifications before recording results
+                        </p>
+                      </div>
+                    </div>
+
+                    {matchedProd && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFolderProduct(matchedProd);
+                          setFolderModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 border border-teal-300 text-teal-800 shadow-2xs shrink-0 transition-colors cursor-pointer"
+                        title="Open complete product documentation repository"
+                      >
+                        <Folder className="w-3.5 h-3.5 text-teal-600" />
+                        <span>All Folder Files</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {productDocs.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-white border border-dashed border-slate-200 text-center">
+                      <p className="text-xs text-slate-500">
+                        No product documents uploaded for <strong className="text-slate-800">{selectedSampleForExecution.nomenclature || selectedSampleForExecution.materialName}</strong> yet.
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        You can upload STP methods, Word documents, and Excel calculation sheets in <Link href="/documentation-manager" className="text-teal-700 underline font-medium" target="_blank">Documentation Manager</Link>.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
+                      {productDocs.map((docItem, idx) => {
+                        const matchedCat = DOCUMENT_CATEGORIES.find(
+                          (c) => c.key === docItem.category || c.name === docItem.category
+                        );
+                        const isWord = docItem.fileName.toLowerCase().endsWith('.docx') || docItem.fileName.toLowerCase().endsWith('.doc');
+                        const isExcel = docItem.fileName.toLowerCase().endsWith('.xlsx') || docItem.fileName.toLowerCase().endsWith('.xls') || docItem.fileName.toLowerCase().endsWith('.csv');
+                        const isPdf = docItem.fileName.toLowerCase().endsWith('.pdf');
+                        const fileIcon = isWord ? '📝' : isExcel ? '📊' : isPdf ? '📕' : '📄';
+                        const fileTypeLabel = isWord ? 'Word' : isExcel ? 'Excel' : isPdf ? 'PDF' : 'File';
+                        const isCurrentlyViewing = executionViewingDoc?.id === docItem.id;
+
+                        return (
+                          <div
+                            key={docItem.id || idx}
+                            className={cn(
+                              'p-3 rounded-xl border bg-white shadow-2xs hover:border-teal-300 transition-all flex flex-col justify-between gap-2',
+                              isCurrentlyViewing ? 'border-teal-500 ring-2 ring-teal-100 bg-teal-50/20' : 'border-slate-200'
+                            )}
+                          >
+                            <div className="space-y-1 overflow-hidden">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={cn(
+                                  'text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase',
+                                  isWord
+                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                    : isExcel
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : isPdf
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200'
+                                )}>
+                                  {fileIcon} {fileTypeLabel}
+                                </span>
+                                {matchedCat && (
+                                  <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase', matchedCat.badgeBg, matchedCat.badgeColor, matchedCat.badgeBorder)}>
+                                    {matchedCat.shortLabel}
+                                  </span>
+                                )}
+                                <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-1 py-0.5 rounded">
+                                  v{docItem.version}.0
+                                </span>
+                              </div>
+
+                              <p className="text-xs font-bold text-slate-900 truncate" title={docItem.fileName}>
+                                {docItem.fileName}
+                              </p>
+                              {docItem.title && docItem.title !== docItem.fileName && (
+                                <p className="text-[11px] text-slate-500 truncate" title={docItem.title}>
+                                  {docItem.title}
+                                </p>
+                              )}
+                              <p className="text-[10px] text-slate-400">
+                                {(docItem.fileSize / 1024).toFixed(1)} KB • Uploaded by {docItem.uploadedByName || 'Doc Manager'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setExecutionViewingDoc(isCurrentlyViewing ? null : docItem)}
+                                className={cn(
+                                  'flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                                  isCurrentlyViewing
+                                    ? 'bg-teal-700 text-white shadow-xs'
+                                    : 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200'
+                                )}
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>{isCurrentlyViewing ? 'Viewing' : 'Read SOP / File'}</span>
+                              </button>
+
+                              <a
+                                href={productService.getDocumentViewUrl(docItem.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-teal-700 hover:bg-slate-50 transition-colors"
+                                title="Open in New Tab"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-teal-600" />
+                              </a>
+
+                              <a
+                                href={productService.getDocumentDownloadUrl(docItem.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-teal-700 hover:bg-slate-50 transition-colors"
+                                title="Download File"
+                              >
+                                <Download className="w-3.5 h-3.5 text-teal-600" />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Analytical Test Protocols List & Result Entry */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                      Analytical Test Protocols ({getTestsForSample(selectedSampleForExecution).length})
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Enter measured values and check pharmacopeial compliance
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                    {getTestsForSample(selectedSampleForExecution).map((t: any) => (
+                      <div key={t.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                        <div>
+                          <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                            <span>{t.testSpecification?.name || 'Assay Protocol'}</span>
+                            {t.testSpecification?.testCode && (
+                              <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
+                                {t.testSpecification.testCode}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                            Limits: <strong className="text-slate-800">{t.minLimit !== null && t.minLimit !== undefined ? `${t.minLimit} - ${t.maxLimit} ${t.unit}` : 'Qualitative'}</strong> &bull; Method: {t.testSpecification?.pharmacopeiaMethod || 'USP / BP Compendial'}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {t.numericResult !== null && t.numericResult !== undefined ? (
+                            <div className="text-right mr-2">
+                              <span className="font-mono font-bold text-xs text-slate-900">{t.numericResult} {t.unit}</span>
+                              <div><StatusBadge status={t.resultStatus || 'PASSED'} /></div>
+                            </div>
+                          ) : t.textResult ? (
+                            <div className="text-right mr-2">
+                              <span className="font-mono font-semibold text-xs text-slate-800">{t.textResult}</span>
+                              <div><StatusBadge status={t.resultStatus || 'PASSED'} /></div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic mr-2">Pending Execution</span>
+                          )}
+
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => openRecordModal(t)}
+                            className="h-8 text-xs font-bold bg-[#0B1A30] hover:bg-slate-800 text-white cursor-pointer"
+                          >
+                            {t.numericResult !== null || t.textResult ? 'Edit Result' : 'Input Result'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-slate-100">
+                  <Button type="button" variant="outline" onClick={() => {
+                    setSelectedSampleForExecution(null);
+                    setExecutionViewingDoc(null);
+                  }}>
+                    Close Workstation
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </Modal>
       )}
 
@@ -1451,24 +1644,30 @@ function TestingPageContent() {
                     </div>
                   </div>
 
-                  {/* Documents Quick Link Chips */}
+                  {/* Documents Direct View Link Chips */}
                   {matchedProd && activeDocs.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-teal-200/60">
-                      {activeDocs.map((docItem) => (
-                        <button
-                          key={docItem.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedFolderProduct(matchedProd);
-                            setFolderModalOpen(true);
-                          }}
-                          title={`Click to view ${docItem.fileName}`}
-                          className="text-[10px] px-2 py-0.5 rounded border border-teal-300 bg-white text-teal-900 font-semibold hover:bg-teal-100/70 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>📄</span>
-                          <span className="truncate max-w-[140px]">{docItem.fileName}</span>
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-teal-200/60">
+                      {activeDocs.map((docItem) => {
+                        const isWord = docItem.fileName.toLowerCase().endsWith('.docx') || docItem.fileName.toLowerCase().endsWith('.doc');
+                        const isExcel = docItem.fileName.toLowerCase().endsWith('.xlsx') || docItem.fileName.toLowerCase().endsWith('.xls') || docItem.fileName.toLowerCase().endsWith('.csv');
+                        const isPdf = docItem.fileName.toLowerCase().endsWith('.pdf');
+                        const fileIcon = isWord ? '📝' : isExcel ? '📊' : isPdf ? '📕' : '📄';
+
+                        return (
+                          <a
+                            key={docItem.id}
+                            href={productService.getDocumentViewUrl(docItem.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Click to read ${docItem.fileName} in new tab`}
+                            className="text-[11px] px-2.5 py-1 rounded-lg border border-teal-300 bg-white hover:bg-teal-50 text-teal-900 font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <span>{fileIcon}</span>
+                            <span className="truncate max-w-[150px]">{docItem.fileName}</span>
+                            <ExternalLink className="w-3 h-3 text-teal-600" />
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

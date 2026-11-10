@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Product, ProductDocument } from '@/types/lims';
 import { productService } from '@/services/product.service';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,10 @@ import {
   Minimize2,
   Trash2,
   Plus,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 
 export interface DocumentCategoryConfig {
@@ -104,6 +108,7 @@ interface ProductFolderViewerModalProps {
   product: Product | null;
   onSelectSlotForUpload?: (product: Product, slotKey: string) => void;
   onDocumentDeleted?: () => void;
+  onDocumentUploaded?: () => void;
 }
 
 export function ProductFolderViewerModal({
@@ -112,15 +117,114 @@ export function ProductFolderViewerModal({
   product,
   onSelectSlotForUpload,
   onDocumentDeleted,
+  onDocumentUploaded,
 }: ProductFolderViewerModalProps) {
   const [activeViewingDoc, setActiveViewingDoc] = useState<ProductDocument | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // In-modal direct upload state
+  const [isUploadingInModal, setIsUploadingInModal] = useState<boolean>(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadCategory, setUploadCategory] = useState<string>('STP_METHOD');
+  const [uploadTitle, setUploadTitle] = useState<string>('');
+  const [uploadNotes, setUploadNotes] = useState<string>('');
+  const [isSubmittingUpload, setIsSubmittingUpload] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const modalFileInputRef = useRef<HTMLInputElement>(null);
+
   if (!isOpen || !product) return null;
 
-  // All documents for this product (unlimited!)
-  const productDocs: ProductDocument[] = product.documents || [];
+  // All documents for this product sorted by newest first
+  const productDocs: ProductDocument[] = [...(product.documents || [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  const resetUploadForm = () => {
+    setIsUploadingInModal(false);
+    setUploadFile(null);
+    setUploadCategory('STP_METHOD');
+    setUploadTitle('');
+    setUploadNotes('');
+    setUploadError(null);
+    setUploadSuccess(null);
+    if (modalFileInputRef.current) {
+      modalFileInputRef.current.value = '';
+    }
+  };
+
+  const handleModalClose = () => {
+    setActiveViewingDoc(null);
+    resetUploadForm();
+    onClose();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 100 * 1024 * 1024) {
+      setUploadError('File size exceeds the 100MB limit.');
+      return;
+    }
+
+    setUploadFile(file);
+    setUploadError(null);
+    if (!uploadTitle.trim()) {
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+      setUploadTitle(nameWithoutExt);
+    }
+  };
+
+  const handleModalUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile) {
+      setUploadError('Please choose a document file to upload.');
+      return;
+    }
+
+    setIsSubmittingUpload(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('productId', product.id);
+      formData.append('title', uploadTitle.trim() || uploadFile.name);
+      formData.append('laboratory', product.laboratory || 'GENERAL');
+      formData.append(
+        'labName',
+        product.laboratory === 'GENERAL'
+          ? 'General Lab'
+          : product.laboratory === 'PENICILLIN'
+          ? 'Penicillin Lab'
+          : 'Cephalosporin Lab'
+      );
+      formData.append('category', uploadCategory);
+      formData.append('docType', uploadCategory);
+      if (uploadNotes.trim()) {
+        formData.append('versionNotes', uploadNotes.trim());
+      }
+
+      await productService.uploadDocument(product.id, formData);
+
+      setUploadSuccess(`File "${uploadFile.name}" added to folder successfully!`);
+      if (onDocumentUploaded) {
+        onDocumentUploaded();
+      }
+
+      // Close upload drawer after brief moment
+      setTimeout(() => {
+        resetUploadForm();
+      }, 1200);
+    } catch (err: any) {
+      setUploadError(err?.message || 'Failed to upload document. Please try again.');
+    } finally {
+      setIsSubmittingUpload(false);
+    }
+  };
 
   const handleDeleteDoc = async (docId: string, fileName: string) => {
     if (!window.confirm(`Are you sure you want to remove "${fileName}" from this folder?`)) {
@@ -182,33 +286,43 @@ export function ProductFolderViewerModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {onSelectSlotForUpload && (
-              <button
-                onClick={() => {
-                  onSelectSlotForUpload(product, 'GENERAL_DOC');
-                  onClose();
-                }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Upload File</span>
-              </button>
-            )}
+            {/* Direct In-Modal Upload Button */}
+            <button
+              onClick={() => {
+                setActiveViewingDoc(null);
+                setIsUploadingInModal((prev) => !prev);
+              }}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer',
+                isUploadingInModal
+                  ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                  : 'bg-teal-600 hover:bg-teal-700 text-white'
+              )}
+            >
+              {isUploadingInModal ? (
+                <>
+                  <X className="w-3.5 h-3.5" />
+                  <span>Cancel Upload</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Upload File</span>
+                </>
+              )}
+            </button>
 
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
               title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Viewer'}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer"
             >
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
             <button
-              onClick={() => {
-                setActiveViewingDoc(null);
-                onClose();
-              }}
+              onClick={handleModalClose}
               title="Close Folder"
-              className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -217,7 +331,161 @@ export function ProductFolderViewerModal({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Active PDF Viewer (if viewing) */}
+          {/* In-Modal Direct File Upload Drawer */}
+          {isUploadingInModal && (
+            <div className="bg-slate-50/90 border-2 border-teal-500/30 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-200">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-teal-600 text-white shrink-0">
+                    <UploadCloud className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                      Upload New File to {product.brandName}
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      File will be linked directly to this product folder in {product.laboratory} Lab
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetUploadForm}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {uploadError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              {uploadSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{uploadSuccess}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleModalUploadSubmit} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Document Category / Type <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={uploadCategory}
+                      onChange={(e) => setUploadCategory(e.target.value)}
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 text-slate-800 font-medium"
+                    >
+                      {DOCUMENT_CATEGORIES.map((cat) => (
+                        <option key={cat.key} value={cat.key}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Document Title / Specification Description
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      placeholder="e.g. Finished Product Testing Procedure"
+                      className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 text-slate-800 font-medium placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Select Document File <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    ref={modalFileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.txt"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  <div
+                    onClick={() => modalFileInputRef.current?.click()}
+                    className={cn(
+                      'border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all',
+                      uploadFile
+                        ? 'border-teal-500 bg-teal-50/50 hover:bg-teal-50/70'
+                        : 'border-slate-300 hover:border-teal-400 bg-white hover:bg-slate-50'
+                    )}
+                  >
+                    {uploadFile ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="p-2 rounded-lg bg-teal-600 text-white shrink-0">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <div className="text-left overflow-hidden">
+                          <p className="text-xs font-bold text-slate-900 truncate">
+                            {uploadFile.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            {(uploadFile.size / 1024).toFixed(1)} KB • Click to choose a different file
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-2">
+                        <UploadCloud className="w-6 h-6 text-teal-600 mb-1" />
+                        <p className="text-xs font-semibold text-slate-700">
+                          Click to browse or drop any document file here
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Word (.docx, .doc), Excel (.xlsx, .xls, .csv), PDF, Images • Up to 100MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={resetUploadForm}
+                    disabled={isSubmittingUpload}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={!uploadFile || isSubmittingUpload}
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmittingUpload ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Uploading & Linking...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        <span>Upload to this Folder</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Active Document Reader/Viewer (if viewing) */}
           {activeViewingDoc ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between bg-teal-50/70 p-3 rounded-xl border border-teal-200">
@@ -245,6 +513,16 @@ export function ProductFolderViewerModal({
 
                 <div className="flex items-center gap-2 shrink-0">
                   <a
+                    href={productService.getDocumentViewUrl(activeViewingDoc.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs transition-colors"
+                    title="Open in Full Window / New Tab"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-teal-600" />
+                    <span>New Tab</span>
+                  </a>
+                  <a
                     href={productService.getDocumentDownloadUrl(activeViewingDoc.id)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -255,7 +533,7 @@ export function ProductFolderViewerModal({
                   </a>
                   <button
                     onClick={() => setActiveViewingDoc(null)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                     <span>Close Reader</span>
@@ -263,11 +541,16 @@ export function ProductFolderViewerModal({
                 </div>
               </div>
 
-              {/* In-App PDF Iframe */}
-              <div className="w-full h-[65vh] rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shadow-inner">
+              {/* In-App Document Viewer Iframe */}
+              <div
+                className={cn(
+                  'w-full rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shadow-inner transition-all',
+                  isFullscreen ? 'h-[78vh]' : 'h-[68vh]'
+                )}
+              >
                 <iframe
                   src={productService.getDocumentViewUrl(activeViewingDoc.id)}
-                  className="w-full h-full border-0"
+                  className="w-full h-full border-0 bg-white"
                   title={activeViewingDoc.title}
                 />
               </div>
@@ -283,18 +566,17 @@ export function ProductFolderViewerModal({
                     All document files for this product available for laboratory analysts
                   </p>
                 </div>
-                {onSelectSlotForUpload && (
-                  <button
-                    onClick={() => {
-                      onSelectSlotForUpload(product, 'GENERAL_DOC');
-                      onClose();
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Another File</span>
-                  </button>
-                )}
+                {/* Add Another File Button directly opens upload drawer */}
+                <button
+                  onClick={() => {
+                    setActiveViewingDoc(null);
+                    setIsUploadingInModal(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Another File</span>
+                </button>
               </div>
 
               {/* Unlimited Documents List */}
@@ -309,18 +591,16 @@ export function ProductFolderViewerModal({
                   <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                     You can upload as many files as needed (STP methods, specs, calculations, validation reports, etc.). There is no limit.
                   </p>
-                  {onSelectSlotForUpload && (
-                    <button
-                      onClick={() => {
-                        onSelectSlotForUpload(product, 'GENERAL_DOC');
-                        onClose();
-                      }}
-                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      <UploadCloud className="w-4 h-4" />
-                      <span>Upload First Document</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      setActiveViewingDoc(null);
+                      setIsUploadingInModal(true);
+                    }}
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Upload First Document</span>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -328,6 +608,16 @@ export function ProductFolderViewerModal({
                     const matchedCat = DOCUMENT_CATEGORIES.find(
                       (c) => c.key === doc.category || c.name === doc.category
                     );
+                    const isWord =
+                      doc.fileName.toLowerCase().endsWith('.docx') ||
+                      doc.fileName.toLowerCase().endsWith('.doc');
+                    const isExcel =
+                      doc.fileName.toLowerCase().endsWith('.xlsx') ||
+                      doc.fileName.toLowerCase().endsWith('.xls') ||
+                      doc.fileName.toLowerCase().endsWith('.csv');
+                    const isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
+                    const fileIcon = isWord ? '📝' : isExcel ? '📊' : isPdf ? '📕' : '📄';
+                    const fileTypeLabel = isWord ? 'Word' : isExcel ? 'Excel' : isPdf ? 'PDF' : 'File';
 
                     return (
                       <div
@@ -339,6 +629,20 @@ export function ProductFolderViewerModal({
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-bold text-slate-400">
                               #{idx + 1}
+                            </span>
+                            <span
+                              className={cn(
+                                'text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider',
+                                isWord
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                  : isExcel
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : isPdf
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200'
+                              )}
+                            >
+                              {fileIcon} {fileTypeLabel}
                             </span>
                             {matchedCat && (
                               <span
@@ -353,7 +657,7 @@ export function ProductFolderViewerModal({
                               </span>
                             )}
                             <h5 className="text-xs font-bold text-slate-900 truncate" title={doc.fileName}>
-                              📄 {doc.fileName}
+                              {doc.fileName}
                             </h5>
                             <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                               v{doc.version}.0
@@ -436,10 +740,7 @@ export function ProductFolderViewerModal({
             Product: <strong>{product.brandName}</strong> • Total Documents: <strong>{productDocs.length}</strong>
           </span>
           <button
-            onClick={() => {
-              setActiveViewingDoc(null);
-              onClose();
-            }}
+            onClick={handleModalClose}
             className="px-4 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-100 transition-colors cursor-pointer"
           >
             Close Folder

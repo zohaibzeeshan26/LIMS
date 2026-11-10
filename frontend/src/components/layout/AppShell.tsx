@@ -15,7 +15,6 @@ import {
   LogOut,
   ArrowRight,
   PanelLeft,
-  LayoutDashboard,
 } from 'lucide-react';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -125,25 +124,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 </>
               ) : (
-                <>
-                  <Link
-                    href="/"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-                    title="Return to Main Portal"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Portal Hub</span>
-                  </Link>
-
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                    title="Go to QC Dashboard (with Left Slider)"
-                  >
-                    <LayoutDashboard className="h-3.5 w-3.5" />
-                    <span>QC Dashboard</span>
-                  </Link>
-                </>
+                <Link
+                  href="/"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                  title="Return to Main Portal"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Portal Hub</span>
+                </Link>
               )}
             </div>
 

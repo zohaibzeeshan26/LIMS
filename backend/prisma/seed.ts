@@ -71,21 +71,6 @@ async function main() {
   });
   console.log('✓ Created Admin User:', admin.username, `(${admin.email})`);
 
-  // 3b. Analyst User
-  const analyst = await prisma.user.create({
-    data: {
-      email: 'analyst@citypharma.com',
-      username: 'analyst',
-      passwordHash,
-      fullName: 'Muhammad Ali (QC Analyst)',
-      employeeId: 'EMP-ANL-01',
-      department: 'Quality Control Laboratory',
-      role: Role.ANALYST,
-      isActive: true,
-    },
-  });
-  console.log('✓ Created Analyst User:', analyst.username, `(${analyst.email})`);
-
   console.log('----------------------------------------------------');
   console.log('DATABASE RESET & SEED COMPLETE');
   console.log('Active Users in DB:');
