@@ -44,7 +44,8 @@ export function useAllAnalysts(): { analysts: AnalystUserOption[]; isLoading: bo
           : 'GENERAL';
 
       return {
-        id: u.employeeId || u.id,
+        id: u.id || u.employeeId,
+        dbId: u.id,
         name: u.fullName || u.username || 'Personnel',
         username: u.username || u.employeeId?.toLowerCase() || '',
         email: u.email || '',

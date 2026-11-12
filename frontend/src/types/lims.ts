@@ -1,4 +1,5 @@
 export type Role =
+  | 'SUPER_ADMIN'
   | 'ADMIN'
   | 'QA_MANAGER'
   | 'QC_ANALYST'

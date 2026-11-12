@@ -30,6 +30,6 @@ router.post('/:id/submit', requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANA
 router.get('/:id/submissions', (req, res, next) => samplingController.getSampleSubmissions(req, res, next));
 router.get('/by-code', (req, res, next) => samplingController.findByCode(req, res, next));
 router.get('/:id', (req, res, next) => samplingController.findOne(req, res, next));
-router.patch('/:id', requireRoles(Role.ADMIN), (req, res, next) => samplingController.update(req, res, next));
+router.patch('/:id', requireRoles(Role.ADMIN, Role.MANAGER, Role.DEPUTY_MANAGER, Role.SHIFT_INCHARGE, Role.QA_MANAGER, Role.QC_ANALYST), (req, res, next) => samplingController.update(req, res, next));
 
 export default router;

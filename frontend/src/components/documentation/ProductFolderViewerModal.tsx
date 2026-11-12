@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Product, ProductDocument } from '@/types/lims';
 import { productService } from '@/services/product.service';
 import { cn } from '@/lib/utils';
@@ -134,10 +135,20 @@ export function ProductFolderViewerModal({
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const modalFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Dynamic real-time query for product and its documents
+  const { data: dynamicProduct, refetch } = useQuery({
+    queryKey: ['product-folder-modal-docs', product?.id],
+    queryFn: () => (product?.id ? productService.getById(product.id) : null),
+    enabled: isOpen && !!product?.id,
+    refetchInterval: 3000,
+  });
+
   if (!isOpen || !product) return null;
 
+  const effectiveProduct = dynamicProduct || product;
+
   // All documents for this product sorted by newest first
-  const productDocs: ProductDocument[] = [...(product.documents || [])].sort(
+  const productDocs: ProductDocument[] = [...(effectiveProduct.documents || [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 

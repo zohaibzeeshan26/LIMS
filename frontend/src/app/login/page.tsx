@@ -95,8 +95,8 @@ export default function LoginPage() {
   };
 
   const handleDirectLogin = async (identifier: string, pass: string) => {
-    setValue('identifier', identifier);
-    setValue('password', pass);
+    setValue('identifier', identifier, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    setValue('password', pass, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
     setErrorMessage(null);
     setIsSubmitting(true);
 
@@ -369,6 +369,100 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Quick Login Shortcut Options */}
+          <div className="mt-5 pt-4 border-t border-slate-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Role-Based One-Click Logins
+              </span>
+              <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
+                8 Roles Active
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('superadmin', 'admin123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/80 text-rose-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-rose-900">1. Super Admin</div>
+                <div className="text-[10px] text-rose-600 font-mono">superadmin</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('admin.office', 'admin123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-blue-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-blue-900">2. Admin</div>
+                <div className="text-[10px] text-blue-600 font-mono">admin.office</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('doc.manager', 'doc123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/80 text-teal-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-teal-900">3. Doc Manager</div>
+                <div className="text-[10px] text-teal-600 font-mono">doc.manager</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('qc.manager', 'manager123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 text-indigo-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-indigo-900">4. QC Manager</div>
+                <div className="text-[10px] text-indigo-600 font-mono">qc.manager</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('deputy.manager', 'deputy123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100/80 text-purple-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-purple-900">5. Deputy Mgr</div>
+                <div className="text-[10px] text-purple-600 font-mono">deputy.manager</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('shift.incharge', 'incharge123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-cyan-200 bg-cyan-50/70 hover:bg-cyan-100/80 text-cyan-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-cyan-900">6. Shift Incharge</div>
+                <div className="text-[10px] text-cyan-600 font-mono">shift.incharge</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('reg.analyst', 'analyst123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 text-amber-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-amber-900">7. Registration</div>
+                <div className="text-[10px] text-amber-600 font-mono">reg.analyst</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('qc.analyst', 'analyst123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-emerald-900">8. Testing Analyst</div>
+                <div className="text-[10px] text-emerald-600 font-mono">qc.analyst</div>
+              </button>
+            </div>
+          </div>
 
           {/* 5. Bottom Secure & Encrypted Badge */}
           <div className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">

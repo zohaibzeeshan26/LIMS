@@ -66,7 +66,7 @@ const DEFAULT_STAFF_NOTIFICATIONS: NotificationItem[] = [
 
 function NavbarInner({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -246,7 +246,14 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
   };
 
   const displayName = user?.fullName || 'Lab Staff';
-  const displayRole = user?.role === 'ADMIN' ? 'Master Administrator' : (user?.role ? user.role.replace(/_/g, ' ') : 'Lab Staff');
+  const displayRole =
+    user?.role === 'SUPER_ADMIN'
+      ? 'Chief Super Admin'
+      : user?.role === 'ADMIN'
+      ? 'Master Administrator'
+      : user?.role
+      ? user.role.replace(/_/g, ' ')
+      : 'Lab Staff';
 
   return (
     <header className="sticky top-0 z-40 w-full lg:pl-64 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">

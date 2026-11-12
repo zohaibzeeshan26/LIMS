@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import { formatDateTime, formatDateOnly } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import {
@@ -169,7 +170,11 @@ export default function QualityReviewAndCoaPage() {
   };
 
   return (
-    <div className="space-y-6 pb-16 animate-in fade-in duration-300">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER']}
+      moduleName="Quality Review & Certificate of Analysis (CoA)"
+    >
+      <div className="space-y-6 pb-16 animate-in fade-in duration-300">
       {/* Top Header & Breadcrumbs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200">
         <div>
@@ -933,6 +938,7 @@ export default function QualityReviewAndCoaPage() {
         </Modal>
       )}
     </div>
+    </RoleRouteGuard>
   );
 }
 

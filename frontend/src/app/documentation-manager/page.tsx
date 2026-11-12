@@ -11,6 +11,7 @@ import {
   ProductFolderViewerModal,
   DOCUMENT_SLOTS,
 } from '@/components/documentation/ProductFolderViewerModal';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
   FileText,
   UploadCloud,
@@ -341,7 +342,11 @@ export default function DocumentationManagerDashboard() {
     user?.role === 'MANAGER';
 
   return (
-    <div className="space-y-6 pb-16">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DOCUMENTATION_MANAGER', 'MANAGER', 'QA_MANAGER', 'DEPUTY_MANAGER']}
+      moduleName="Product Documentation Repository"
+    >
+      <div className="space-y-6 pb-16">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
@@ -882,6 +887,7 @@ export default function DocumentationManagerDashboard() {
         onDocumentUploaded={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
       />
     </div>
+    </RoleRouteGuard>
   );
 }
 

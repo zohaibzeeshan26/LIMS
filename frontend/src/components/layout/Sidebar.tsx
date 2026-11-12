@@ -154,6 +154,26 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
   }, [expeditedSamplesData, userAccess]);
 
   // Sidebar navigation items tailored to RBAC
+  const userRole = (user?.role || 'QC_ANALYST').toUpperCase();
+  const isSuperAdmin = userRole === 'SUPER_ADMIN';
+
+  const dashboardLabel =
+    userRole === 'SUPER_ADMIN'
+      ? 'Super Admin Hub'
+      : userRole === 'ADMIN'
+      ? 'Admin Dashboard'
+      : userRole === 'DOCUMENTATION_MANAGER'
+      ? 'Doc Manager Hub'
+      : userRole === 'MANAGER' || userRole === 'QA_MANAGER'
+      ? 'Manager Dashboard'
+      : userRole === 'DEPUTY_MANAGER'
+      ? 'Deputy Manager Hub'
+      : userRole === 'SHIFT_INCHARGE'
+      ? 'Incharge Dashboard'
+      : userRole === 'LAB_TECHNICIAN'
+      ? 'Intake Terminal'
+      : 'Testing Workstation';
+
   const menuItems: Array<{
     name: string;
     href: string;
@@ -169,7 +189,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         icon: Home,
       },
       {
-        name: 'QC Dashboard',
+        name: dashboardLabel,
         href: '/dashboard',
         icon: LayoutDashboard,
       },
@@ -177,12 +197,14 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Lab Operations',
         href: '/dashboard?tab=lab-operations',
         icon: Activity,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER'],
         badge: '3 Labs',
       },
       {
         name: 'Priority Notice',
         href: '/priority-notice',
         icon: AlertCircle,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER'],
         badge: urgentAdminNotices.length > 0 ? `${urgentAdminNotices.length}` : undefined,
         isPriority: true,
       },
@@ -191,42 +213,58 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         href: '/users',
         icon: Users,
         adminOnly: true,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
         badge: 'Admin',
       },
       {
         name: 'Sample Registration',
         href: '/samples',
         icon: FileText,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'DOCUMENTATION_MANAGER', 'QC_ANALYST', 'ANALYST', 'TESTING_ANALYST', 'LAB_TECHNICIAN'],
         badge: labBadgeLabel,
       },
       {
         name: 'Sample Assignment',
         href: '/tasks',
         icon: UserCheck,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER'],
         badge: 'Tasks',
       },
       {
-        name: 'Documentation',
+        name: 'Documentation Manager',
         href: '/documentation-manager',
         icon: FileText,
-        roles: ['DOCUMENTATION_MANAGER', 'ADMIN', 'QA_MANAGER', 'MANAGER'],
-        badge: 'PDF Docs',
+        roles: ['DOCUMENTATION_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'QA_MANAGER', 'MANAGER'],
+        badge: 'STP Docs',
       },
       {
         name: 'Analyst Execution',
         href: '/testing',
         icon: Microscope,
+        roles: ['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST', 'LAB_TECHNICIAN', 'SUPER_ADMIN'],
       },
       {
-        name: 'Quality Review & Certificate (CoA)',
+        name: 'Quality Review & CoA',
         href: '/quality-review',
         icon: FileCheck2,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER'],
         badge: 'CoA',
       },
     ];
 
-  // Keep all menu items visible in the slider so nothing disappears
-  const visibleItems = menuItems;
+  // Strictly filter menu items to only permitted modules for the active role
+  const visibleItems = React.useMemo(() => {
+    return menuItems.filter((item) => {
+      if (isSuperAdmin) return true;
+      if (item.adminOnly) {
+        return userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+      }
+      if (item.roles && item.roles.length > 0) {
+        return item.roles.includes(userRole);
+      }
+      return true;
+    });
+  }, [menuItems, userRole, isSuperAdmin]);
 
   return (
     <>
@@ -432,8 +470,8 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
                 <p className="text-xs font-bold text-white truncate leading-tight">
                   {user?.fullName || 'Lab Staff'}
                 </p>
-                <p className="text-[10px] text-slate-400 truncate leading-tight">
-                  {isAdmin ? 'Super Admin' : user?.role === 'ANALYST' || user?.role === 'QC_ANALYST' || user?.role === 'TESTING_ANALYST' ? `Analyst (@${user?.username || 'user'})` : labBadgeLabel}
+                <p className="text-[10px] text-sky-300 font-medium truncate leading-tight">
+                  {userRole.replace(/_/g, ' ')} &bull; @{user?.username || 'user'}
                 </p>
               </div>
             </div>

@@ -116,7 +116,7 @@ export default function UserManagementPage() {
   });
 
   // Check if current user is admin
-  const isSuperAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'MANAGER';
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN';
 
   // Add User Mutation
   const addMutation = useMutation({

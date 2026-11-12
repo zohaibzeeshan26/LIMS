@@ -61,11 +61,11 @@ export class ProductsService {
   }
 
   async getProductById(id: string) {
-    const product = await prisma.product.findUnique({
+    let product = await prisma.product.findUnique({
       where: { id },
       include: {
         documents: {
-          orderBy: { version: 'desc' },
+          orderBy: { createdAt: 'desc' },
           include: {
             uploadedBy: {
               select: {
@@ -80,6 +80,34 @@ export class ProductsService {
         },
       },
     });
+
+    if (!product) {
+      product = await prisma.product.findFirst({
+        where: {
+          OR: [
+            { atmCode: { equals: id, mode: 'insensitive' } },
+            { brandName: { equals: id, mode: 'insensitive' } },
+            { genericName: { equals: id, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          documents: {
+            orderBy: { createdAt: 'desc' },
+            include: {
+              uploadedBy: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  employeeId: true,
+                  role: true,
+                  department: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
 
     if (!product) {
       throw new AppError('Product not found', 404);

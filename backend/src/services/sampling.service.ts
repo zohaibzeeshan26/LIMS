@@ -851,6 +851,24 @@ export class SamplingService {
 
     const { reasonForChange, ...data } = updateDto;
 
+    // Resolve assignedToId if it was provided as employeeId, username, or id
+    if (data.assignedToId) {
+      const userRecord = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: data.assignedToId },
+            { employeeId: data.assignedToId },
+            { username: data.assignedToId },
+          ],
+        },
+      });
+      if (userRecord) {
+        data.assignedToId = userRecord.id;
+      } else {
+        delete data.assignedToId;
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
       let chainOfCustodyUpdate = existing.chainOfCustody;
       if (data.status && data.status !== existing.status) {

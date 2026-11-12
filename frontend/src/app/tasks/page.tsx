@@ -13,6 +13,7 @@ import { getSampleSection } from '@/types/lims';
 import { formatDateTime } from '@/lib/date';
 import { AnalystUserOption } from '@/lib/analysts';
 import { auditService } from '@/services/audit.service';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
   UserCheck,
   PlusCircle,
@@ -537,6 +538,26 @@ function TaskAssignmentPageInner() {
 
     saveTasks(updated);
 
+    // Sync assignment directly to backend sample database if matched
+    const matchingSample = availableSamples.find((s: any) =>
+      s.id === targetSampleTask.sampleId ||
+      s.sampleCode === targetSampleTask.sampleId ||
+      s.accessionNo === targetSampleTask.sampleId ||
+      s.accessionNo === targetSampleTask.accessionNo
+    );
+
+    if (matchingSample?.id) {
+      samplingService.update(matchingSample.id, {
+        assignedToId: chosen.id,
+        status: 'ASSIGNED_FOR_TESTING' as any,
+      }).catch((err) => console.warn('Could not update sample assignedToId in db:', err));
+    }
+
+    // Notify other panels like testing & execution
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('lims-tasks-updated'));
+    }
+
     // 21 CFR Part 11 Audit Trail for Task Assignment
     auditService.logActivity({
       action: 'TASK_ASSIGNED',
@@ -769,6 +790,19 @@ function TaskAssignmentPageInner() {
 
     const updated = [newTask, ...tasks];
     saveTasks(updated);
+
+    // Sync task assignment to backend sample database if matched
+    if (match?.id && selectedAnalyst?.id && selectedAnalyst.id !== 'UNASSIGNED') {
+      samplingService.update(match.id, {
+        assignedToId: selectedAnalyst.id,
+        status: 'ASSIGNED_FOR_TESTING' as any,
+      }).catch((err) => console.warn('Could not update sample assignedToId in db:', err));
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('lims-tasks-updated'));
+    }
+
     setIsNewTaskModalOpen(false);
 
     // 21 CFR Part 11 Audit Trail for Task Assignment Creation
@@ -889,7 +923,11 @@ function TaskAssignmentPageInner() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER']}
+      moduleName="Sample Assignment & Task Board"
+    >
+      <div className="space-y-6 animate-in fade-in duration-300">
       {/* Breadcrumb & Navigation */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -2058,6 +2096,7 @@ function TaskAssignmentPageInner() {
         </Modal>
       )}
     </div>
+    </RoleRouteGuard>
   );
 }
 
