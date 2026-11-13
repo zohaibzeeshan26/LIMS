@@ -172,6 +172,38 @@ export default function WelcomePortalPage() {
     },
   ];
 
+  const userRole = (user?.role || '').toUpperCase();
+  const visiblePortalCards = React.useMemo(() => {
+    return portalCards
+      .filter((card) => {
+        if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') return true;
+        if (userRole === 'DOCUMENTATION_MANAGER') {
+          return card.id === 'dashboard' || card.id === 'documentation-manager';
+        }
+        if (userRole === 'LAB_TECHNICIAN') {
+          return card.id === 'dashboard' || card.id === 'samples';
+        }
+        if (userRole === 'QC_ANALYST' || userRole === 'ANALYST' || userRole === 'TESTING_ANALYST') {
+          return card.id === 'dashboard' || card.id === 'testing';
+        }
+        if (userRole === 'MANAGER' || userRole === 'DEPUTY_MANAGER' || userRole === 'SHIFT_INCHARGE' || userRole === 'QA_MANAGER') {
+          return card.id !== 'testing';
+        }
+        return true;
+      })
+      .map((card) => {
+        if (card.id === 'dashboard' && userRole === 'DOCUMENTATION_MANAGER') {
+          return {
+            ...card,
+            title: 'Doc Manager Hub',
+            description: 'Commercial formulation catalog, active dossiers, and testing synchronization.',
+            badgeText: 'STP Dossiers',
+          };
+        }
+        return card;
+      });
+  }, [portalCards, userRole]);
+
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       
@@ -244,9 +276,9 @@ export default function WelcomePortalPage() {
         </div>
       </div>
 
-      {/* ================= 2. SIX PROFESSIONAL PORTAL CARDS GRID ================= */}
+      {/* ================= 2. PROFESSIONAL PORTAL CARDS GRID ================= */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-        {portalCards.map((card) => {
+        {visiblePortalCards.map((card) => {
           const IconComponent = card.icon;
           const isSamplesCard = card.id === 'samples';
 

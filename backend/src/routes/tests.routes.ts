@@ -15,7 +15,7 @@ router.post('/specifications', requireRoles(Role.ADMIN, Role.QA_MANAGER), (req, 
 router.get('/:id', (req, res, next) => testsController.getTestById(req, res, next));
 router.patch(
   '/:id/record-result',
-  requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.LAB_TECHNICIAN, Role.ANALYST),
+  requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.ANALYST),
   (req, res, next) => testsController.recordResult(req, res, next)
 );
 router.patch('/:id/verify', requireRoles(Role.ADMIN, Role.QA_MANAGER), (req, res, next) =>

@@ -97,60 +97,55 @@ export function SampleRegistrationDashboard() {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
-      {/* 1. Terminal Header Banner */}
-      <div className="rounded-3xl bg-gradient-to-r from-teal-950 via-slate-900 to-indigo-950 text-white p-6 sm:p-8 shadow-xl relative overflow-hidden border border-teal-800/40">
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-teal-600 text-white shadow-sm flex items-center gap-1.5">
-                <FlaskConical className="w-3.5 h-3.5" />
-                <span>Sample Registration &amp; Accessioning Terminal</span>
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-teal-200 border border-white/20">
-                @{user?.username || 'reg.analyst'} &bull; {user?.employeeId || 'REG-001'}
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-400/30">
-                Specimen Intake Gate
-              </span>
+      {/* 1. Professional Executive Header */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-teal-50 text-teal-700 border border-teal-200/80 shadow-2xs shrink-0">
+              <FlaskConical className="w-5 h-5 text-teal-700" />
             </div>
-
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Pharmaceutical Sample Registration &amp; Accession History
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-200/90 max-w-3xl leading-relaxed">
-              Register incoming raw materials, finished products, and in-process samples. Every accessioned
-              sample automatically appears in the Manager and Deputy Manager dashboards for analyst allocation.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-            <Button
-              size="lg"
-              onClick={() => setIsRegisterModalOpen(true)}
-              className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg inline-flex items-center gap-2 cursor-pointer py-3 px-5 rounded-xl"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>+ Register Incoming Sample</span>
-            </Button>
-            <button
-              onClick={() => refetchSamples()}
-              className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all cursor-pointer"
-              title="Refresh Queue"
-            >
-              <RotateCcw className="w-4 h-4 text-teal-300" />
-            </button>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                  Sample Registration &amp; Intake
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                  Intake Gate
+                </span>
+                <span className="text-xs text-slate-400 font-mono">
+                  {user?.fullName || 'Sample Registration Analyst'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                City Pharma Quality Control Laboratory &bull; Log incoming specimens and accession records
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Workflow Routing Alert */}
-        <div className="mt-6 pt-4 border-t border-white/10 flex items-center gap-2 text-xs text-teal-200">
-          <ArrowRight className="w-4 h-4 text-teal-400 shrink-0" />
-          <span>
-            <strong>Automatic Manager Sync Active:</strong> Any new sample accessioned here will immediately reflect in the QC Manager Allocation Queue for tester assignment.
-          </span>
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Manager Auto-Sync Active</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => refetchSamples()}
+            className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors cursor-pointer"
+            title="Refresh queue"
+          >
+            <RotateCcw className={cn('w-4 h-4', isLoading && 'animate-spin text-teal-600')} />
+          </button>
+
+          <Button
+            size="md"
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs inline-flex items-center gap-2 cursor-pointer py-2 px-4 rounded-xl"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Register New Sample</span>
+          </Button>
         </div>
       </div>
 

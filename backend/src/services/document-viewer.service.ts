@@ -292,7 +292,6 @@ export async function renderDocumentToHtml(options: {
     </div>
     <div class="toolbar-actions">
       <button type="button" class="btn" onclick="window.print()">🖨️ Print</button>
-      <a class="btn btn-teal" href="${downloadUrl}">⬇️ Download Original</a>
     </div>
   </div>
 
@@ -318,7 +317,6 @@ export async function renderDocumentToHtml(options: {
       return `<div style="padding: 24px; font-family: sans-serif; text-align: center;">
         <h3>Could not preview Word document</h3>
         <p style="color: #64748b; margin-top: 8px;">${escapeHtml(err.message)}</p>
-        <a href="${downloadUrl}" style="display: inline-block; margin-top: 16px; padding: 8px 16px; background: #0d9488; color: white; text-decoration: none; border-radius: 6px;">Download Document</a>
       </div>`;
     }
   }
@@ -373,7 +371,6 @@ export async function renderDocumentToHtml(options: {
     </div>
     <div class="toolbar-actions">
       <button type="button" class="btn" onclick="window.print()">🖨️ Print</button>
-      <a class="btn btn-teal" href="${downloadUrl}">⬇️ Download Original</a>
     </div>
   </div>
 
@@ -411,7 +408,6 @@ export async function renderDocumentToHtml(options: {
       return `<div style="padding: 24px; font-family: sans-serif; text-align: center;">
         <h3>Could not preview Excel spreadsheet</h3>
         <p style="color: #64748b; margin-top: 8px;">${escapeHtml(err.message)}</p>
-        <a href="${downloadUrl}" style="display: inline-block; margin-top: 16px; padding: 8px 16px; background: #0d9488; color: white; text-decoration: none; border-radius: 6px;">Download Spreadsheet</a>
       </div>`;
     }
   }
@@ -449,7 +445,6 @@ export async function renderDocumentToHtml(options: {
     </div>
     <div class="toolbar-actions">
       <button type="button" class="btn" onclick="window.print()">🖨️ Print</button>
-      <a class="btn btn-teal" href="${downloadUrl}">⬇️ Download</a>
     </div>
   </div>
   <pre class="raw-text-box">${escapeHtml(rawContent)}</pre>
@@ -458,7 +453,6 @@ export async function renderDocumentToHtml(options: {
   } catch {
     return `<div style="padding: 24px; font-family: sans-serif; text-align: center;">
       <h3>Preview not available</h3>
-      <a href="${downloadUrl}" style="display: inline-block; margin-top: 16px; padding: 8px 16px; background: #0d9488; color: white; text-decoration: none; border-radius: 6px;">Download Document</a>
     </div>`;
   }
 }

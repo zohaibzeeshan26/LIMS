@@ -17,8 +17,28 @@ export const productService = {
   uploadDocument: (productId: string, formData: FormData) =>
     api.upload<ProductDocument>(`/products/${productId}/documents`, formData),
 
-  deleteDocument: (documentId: string) =>
-    api.delete<{ success: boolean; message: string }>(`/product-documents/${documentId}`),
+  getPendingDeletions: () =>
+    api.get<ProductDocument[]>('/product-documents/pending/deletions'),
+
+  approveDeletion: (documentId: string) =>
+    api.post<{ success: boolean; message: string }>(`/product-documents/${documentId}/approve-deletion`),
+
+  rejectDeletion: (documentId: string, reason?: string) =>
+    api.post<{ success: boolean; message: string; document: ProductDocument }>(
+      `/product-documents/${documentId}/reject-deletion`,
+      { reason }
+    ),
+
+  deleteDocument: (documentId: string, reason?: string) =>
+    api.delete<{ success: boolean; message: string; pendingApproval?: boolean }>(
+      `/product-documents/${documentId}`,
+      reason
+        ? {
+            body: JSON.stringify({ reason }),
+            headers: { 'Content-Type': 'application/json' },
+          }
+        : undefined
+    ),
 
   deleteProduct: (productId: string) =>
     api.delete<{ success: boolean; message: string }>(`/products/${productId}`),

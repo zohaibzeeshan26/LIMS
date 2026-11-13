@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Product, ProductDocument } from '@/types/lims';
 import { productService } from '@/services/product.service';
+import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   Folder,
@@ -20,8 +21,12 @@ import {
   Plus,
   ExternalLink,
   CheckCircle2,
+  Check,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
+  XCircle,
+  ShieldAlert,
 } from 'lucide-react';
 
 export interface DocumentCategoryConfig {
@@ -120,9 +125,18 @@ export function ProductFolderViewerModal({
   onDocumentDeleted,
   onDocumentUploaded,
 }: ProductFolderViewerModalProps) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+
   const [activeViewingDoc, setActiveViewingDoc] = useState<ProductDocument | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Deletion request dialog state for Documentation Manager
+  const [requestDeleteDoc, setRequestDeleteDoc] = useState<ProductDocument | null>(null);
+  const [deleteReasonInput, setDeleteReasonInput] = useState<string>('');
+  const [isSubmittingDeleteRequest, setIsSubmittingDeleteRequest] = useState<boolean>(false);
+  const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
 
   // In-modal direct upload state
   const [isUploadingInModal, setIsUploadingInModal] = useState<boolean>(false);
@@ -237,8 +251,27 @@ export function ProductFolderViewerModal({
     }
   };
 
-  const handleDeleteDoc = async (docId: string, fileName: string) => {
-    if (!window.confirm(`Are you sure you want to remove "${fileName}" from this folder?`)) {
+  const handleDeleteDocClick = (doc: ProductDocument) => {
+    if (doc.deleteRequested && !isAdmin) {
+      alert(
+        `A deletion request for "${doc.fileName}" has already been submitted to the Administrator and is currently pending review. The file remains active until an Admin approves or rejects the request.`
+      );
+      return;
+    }
+
+    if (!isAdmin) {
+      // Documentation Manager: Prompt with reason to request deletion from Admin
+      setRequestDeleteDoc(doc);
+      setDeleteReasonInput('');
+      return;
+    }
+
+    // Direct Administrator deletion
+    handleAdminDirectDelete(doc.id, doc.fileName);
+  };
+
+  const handleAdminDirectDelete = async (docId: string, fileName: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${fileName}"? This cannot be undone.`)) {
       return;
     }
     try {
@@ -247,11 +280,89 @@ export function ProductFolderViewerModal({
       if (activeViewingDoc?.id === docId) {
         setActiveViewingDoc(null);
       }
+      refetch();
       if (onDocumentDeleted) {
         onDocumentDeleted();
       }
     } catch (err: any) {
       alert(err?.message || 'Failed to delete document');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleSubmitDeleteRequest = async () => {
+    if (!requestDeleteDoc) return;
+    setIsSubmittingDeleteRequest(true);
+    setActionNotice(null);
+    try {
+      const res = await productService.deleteDocument(
+        requestDeleteDoc.id,
+        deleteReasonInput.trim() || undefined
+      );
+      setActionNotice({
+        type: 'info',
+        message:
+          res.message ||
+          `Deletion request for "${requestDeleteDoc.fileName}" submitted to Administrator. The file remains active until reviewed.`,
+      });
+      setRequestDeleteDoc(null);
+      setDeleteReasonInput('');
+      refetch();
+      if (onDocumentDeleted) {
+        onDocumentDeleted();
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to submit deletion request');
+    } finally {
+      setIsSubmittingDeleteRequest(false);
+    }
+  };
+
+  const handleAdminApproveInModal = async (doc: ProductDocument) => {
+    if (
+      !window.confirm(
+        `CRITICAL CONFIRMATION:\n\nApprove deletion of "${doc.fileName}" (v${doc.version}.0)?\nThis will permanently remove the file from the server.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setDeletingId(doc.id);
+      await productService.approveDeletion(doc.id);
+      setActionNotice({
+        type: 'success',
+        message: `Deletion of "${doc.fileName}" approved and document permanently removed.`,
+      });
+      if (activeViewingDoc?.id === doc.id) {
+        setActiveViewingDoc(null);
+      }
+      refetch();
+      if (onDocumentDeleted) onDocumentDeleted();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to approve deletion');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleAdminRejectInModal = async (doc: ProductDocument) => {
+    const reason = window.prompt(
+      `Rejection reason for keeping "${doc.fileName}":`,
+      'Document retained by Administrator.'
+    );
+    if (reason === null) return;
+    try {
+      setDeletingId(doc.id);
+      await productService.rejectDeletion(doc.id, reason);
+      setActionNotice({
+        type: 'info',
+        message: `Deletion request rejected. Document "${doc.fileName}" remains active.`,
+      });
+      refetch();
+      if (onDocumentDeleted) onDocumentDeleted();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to reject deletion');
     } finally {
       setDeletingId(null);
     }
@@ -342,6 +453,36 @@ export function ProductFolderViewerModal({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Action Feedback Notice */}
+          {actionNotice && (
+            <div
+              className={cn(
+                'p-3.5 rounded-xl border text-xs flex items-center justify-between gap-2.5',
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : actionNotice.type === 'info'
+                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                  : 'bg-rose-50 border-rose-300 text-rose-800'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                {actionNotice.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : actionNotice.type === 'info' ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span className="font-semibold">{actionNotice.message}</span>
+              </div>
+              <button
+                onClick={() => setActionNotice(null)}
+                className="text-xs underline hover:opacity-80 cursor-pointer font-medium"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
           {/* In-Modal Direct File Upload Drawer */}
           {isUploadingInModal && (
             <div className="bg-slate-50/90 border-2 border-teal-500/30 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5 animate-in fade-in duration-200">
@@ -681,6 +822,19 @@ export function ProductFolderViewerModal({
                             </p>
                           )}
 
+                          {/* Deletion Request Status Badge */}
+                          {doc.deleteRequested && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-semibold mt-1">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span>Deletion Pending Admin Approval</span>
+                              {doc.deleteRequestedByName && (
+                                <span className="text-amber-700 font-normal">
+                                  • Requested by {doc.deleteRequestedByName}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           <div className="text-[10px] text-slate-400 flex items-center gap-2 flex-wrap pt-0.5">
                             <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
                             <span>•</span>
@@ -727,14 +881,55 @@ export function ProductFolderViewerModal({
                             <Download className="w-4 h-4" />
                           </a>
 
-                          <button
-                            disabled={deletingId === doc.id}
-                            onClick={() => handleDeleteDoc(doc.id, doc.fileName)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
-                            title="Delete this file"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* Role-based deletion controls */}
+                          {doc.deleteRequested ? (
+                            isAdmin ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  disabled={deletingId === doc.id}
+                                  onClick={() => handleAdminApproveInModal(doc)}
+                                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-2xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                                  title="Approve Deletion (Permanently Remove)"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Approve Delete</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={deletingId === doc.id}
+                                  onClick={() => handleAdminRejectInModal(doc)}
+                                  className="px-2 py-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                                  title="Reject Request & Retain File"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Reject</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className="p-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 text-[11px] font-semibold inline-flex items-center gap-1 cursor-default"
+                                title="Deletion request submitted to Administrator for approval"
+                              >
+                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                <span className="hidden sm:inline">Pending Admin Approval</span>
+                              </span>
+                            )
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={deletingId === doc.id}
+                              onClick={() => handleDeleteDocClick(doc)}
+                              className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
+                              title={
+                                isAdmin
+                                  ? 'Directly delete this file'
+                                  : 'Submit deletion request to Administrator'
+                              }
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -758,6 +953,82 @@ export function ProductFolderViewerModal({
           </button>
         </div>
       </div>
+
+      {/* Deletion Request Confirmation Dialog Modal for Documentation Manager */}
+      {requestDeleteDoc && (
+        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800 shrink-0">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">
+                  Submit Document Deletion Request
+                </h4>
+                <p className="text-xs text-slate-500">Administrator Approval Required</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1.5 leading-relaxed">
+              <p className="font-semibold text-slate-900">
+                File: &ldquo;{requestDeleteDoc.fileName}&rdquo; (v{requestDeleteDoc.version}.0)
+              </p>
+              <p>
+                Documentation Manager cannot delete files directly. Once you submit this request, a notification will be dispatched to the <strong>Administrator</strong>.
+              </p>
+              <p className="text-[11px] text-amber-800 font-medium">
+                The file will <strong>remain completely active and accessible</strong> until an Administrator formally reviews and approves the deletion.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Reason for deletion request:
+              </label>
+              <textarea
+                rows={3}
+                value={deleteReasonInput}
+                onChange={(e) => setDeleteReasonInput(e.target.value)}
+                placeholder="e.g. Obsolete STP method version, replaced with approved revision, incorrect monograph uploaded..."
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500 text-slate-800"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isSubmittingDeleteRequest}
+                onClick={() => {
+                  setRequestDeleteDoc(null);
+                  setDeleteReasonInput('');
+                }}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingDeleteRequest}
+                onClick={handleSubmitDeleteRequest}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isSubmittingDeleteRequest ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Submitting to Admin...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>Submit to Admin for Approval</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

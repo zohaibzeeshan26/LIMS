@@ -14,14 +14,39 @@ router.use((req, res, next) => {
   authenticateToken(req, res, next);
 });
 
+// 0. Pending document deletion requests (Admin & Super Admin only)
+router.get(
+  '/pending/deletions',
+  requireRoles(Role.ADMIN, Role.SUPER_ADMIN),
+  productsController.getPendingDeletionRequests
+);
+
 // 1. Get metadata for a specific document
 router.get('/:id', productsController.getDocumentById);
 
 // 2. Download / view PDF document file (.pdf)
 router.get('/:id/file', productsController.streamDocumentFile);
 
-// 3. Delete document (Admin only)
-router.delete('/:id', requireRoles(Role.ADMIN), productsController.deleteDocument);
+// 3. Approve document deletion (Admin & Super Admin only)
+router.post(
+  '/:id/approve-deletion',
+  requireRoles(Role.ADMIN, Role.SUPER_ADMIN),
+  productsController.approveDeletion
+);
+
+// 4. Reject document deletion (Admin & Super Admin only)
+router.post(
+  '/:id/reject-deletion',
+  requireRoles(Role.ADMIN, Role.SUPER_ADMIN),
+  productsController.rejectDeletion
+);
+
+// 5. Delete document or submit deletion request (Admin, Super Admin, and Documentation Manager)
+router.delete(
+  '/:id',
+  requireRoles(Role.ADMIN, Role.SUPER_ADMIN, Role.DOCUMENTATION_MANAGER),
+  productsController.deleteDocument
+);
 
 export default router;
 

@@ -55,6 +55,7 @@ import { cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/date';
 import { Role, User, LaboratoryAccess } from '@/types/lims';
 import { NewSampleModal } from '@/components/samples/NewSampleModal';
+import { PendingDocumentDeletionsCard } from '@/components/dashboard/PendingDocumentDeletionsCard';
 
 interface SystemSettingsState {
   electronicSignatureEnforced: boolean;
@@ -594,6 +595,9 @@ export function SuperAdminDashboard() {
       {/* ================= TAB 1: COMMAND OVERVIEW & MODULE LAUNCHPAD ================= */}
       {adminTab === 'overview' && (
         <div className="space-y-6">
+          {/* Pending Document Deletion Requests (Admin Approval Gate) */}
+          <PendingDocumentDeletionsCard />
+
           {/* Key System Metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">

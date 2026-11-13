@@ -206,10 +206,41 @@ export class ProductsController {
     }
   }
 
+  async getPendingDeletionRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const requests = await productsService.getPendingDeletionRequests();
+      res.json(requests);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async approveDeletion(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const result = await productsService.approveDeletion(id, req.user);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async rejectDeletion(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const reason = req.body?.reason ? String(req.body.reason) : undefined;
+      const result = await productsService.rejectDeletion(id, req.user, reason);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async deleteDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = String(req.params.id);
-      const result = await productsService.deleteDocument(id, req.user);
+      const reason = req.body?.reason ? String(req.body.reason) : undefined;
+      const result = await productsService.deleteDocument(id, req.user, reason);
       res.json(result);
     } catch (err) {
       next(err);

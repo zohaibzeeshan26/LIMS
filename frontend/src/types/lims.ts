@@ -541,6 +541,11 @@ export interface ProductDocument {
   uploadedById?: string | null;
   uploadedByName: string;
   isCurrent: boolean;
+  deleteRequested?: boolean;
+  deleteRequestedAt?: string | null;
+  deleteRequestedById?: string | null;
+  deleteRequestedByName?: string | null;
+  deleteReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

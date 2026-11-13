@@ -18,6 +18,7 @@ import { PrintSampleModal } from '@/components/samples/PrintSampleModal';
 import { SubmitSampleModal } from '@/components/samples/SubmitSampleModal';
 import { QrScannerModal, ScannedSampleData } from '@/components/samples/QrScannerModal';
 import { SampleRoutingChitModal, SampleRoutingChitData } from '@/components/samples/SampleRoutingChitModal';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import { formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import {
@@ -644,7 +645,18 @@ function SamplesPageInner() {
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <RoleRouteGuard
+      allowedRoles={[
+        'SUPER_ADMIN',
+        'ADMIN',
+        'MANAGER',
+        'DEPUTY_MANAGER',
+        'SHIFT_INCHARGE',
+        'LAB_TECHNICIAN',
+      ]}
+      moduleName="Sample Registration & Accessioning"
+    >
+      <div className="space-y-6 font-sans">
       {/* Active Laboratory Banner (Strict Laboratory Isolation — Only active lab is shown) */}
       <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -1780,7 +1792,8 @@ function SamplesPageInner() {
           }}
         />
       )}
-    </div>
+      </div>
+    </RoleRouteGuard>
   );
 }
 

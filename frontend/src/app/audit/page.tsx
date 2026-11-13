@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { formatDateTime } from '@/lib/date';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
   History,
   ShieldCheck,
@@ -51,7 +52,11 @@ export default function AuditPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'MANAGER', 'QA_MANAGER']}
+      moduleName="21 CFR Part 11 Audit Trail"
+    >
+      <div className="space-y-6">
       {/* Title & Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -228,6 +233,7 @@ export default function AuditPage() {
           </table>
         </div>
       </div>
-    </div>
+      </div>
+    </RoleRouteGuard>
   );
 }

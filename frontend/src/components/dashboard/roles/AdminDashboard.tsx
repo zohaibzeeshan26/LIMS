@@ -41,6 +41,7 @@ import { Modal } from '@/components/ui/Modal';
 import { formatDateTime } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { Sample } from '@/types/lims';
+import { PendingDocumentDeletionsCard } from '@/components/dashboard/PendingDocumentDeletionsCard';
 
 export function AdminDashboard() {
   const { user } = useAuth();
@@ -348,6 +349,9 @@ export function AdminDashboard() {
       {/* ================= TAB 1: EXECUTIVE SYSTEM OVERVIEW ================= */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* Pending Document Deletion Requests (Admin Approval Gate) */}
+          <PendingDocumentDeletionsCard />
+
           {/* 4 Core Sample Statistics KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">

@@ -70,9 +70,6 @@ export function DocumentationManagerDashboard() {
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
               Standard Testing Procedures (STP) &amp; Product Dossiers
             </h1>
-            <p className="text-xs text-slate-300 max-w-2xl">
-              Upload multiple product files (Word, Excel, PDF), manage compendial STP methods, version control, and synchronize with Analysts.
-            </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -142,9 +139,6 @@ export function DocumentationManagerDashboard() {
               <Folder className="w-4 h-4 text-teal-600" />
               <span>Product Master Dossiers &amp; Uploaded Files</span>
             </h3>
-            <p className="text-[11px] text-slate-500">
-              Manage attached SOPs, calculation sheets, and compendial monographs for each formulation
-            </p>
           </div>
 
           <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import { samplingService } from '@/services/sampling.service';
 import { useAuth } from '@/context/AuthContext';
 import { getUserLabAccess } from '@/types/lims';
 import { cn } from '@/lib/utils';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
   formatLiveDate,
   formatLiveClock,
@@ -163,7 +164,11 @@ export default function PriorityNoticePage() {
   }, [allExpeditedSamples, selectedLab, selectedPriority, selectedSection, searchQuery]);
 
   return (
-    <div className="space-y-6 font-sans pb-12 max-w-7xl mx-auto">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER']}
+      moduleName="Priority Sample Notice Board"
+    >
+      <div className="space-y-6 font-sans pb-12 max-w-7xl mx-auto">
       
       {/* Header & Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
@@ -740,6 +745,7 @@ export default function PriorityNoticePage() {
         </div>
       )}
 
-    </div>
+      </div>
+    </RoleRouteGuard>
   );
 }

@@ -950,11 +950,6 @@ function DashboardInner() {
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
               {activeTab === 'lab-operations' ? 'Lab Operations Dashboard' : 'QC Executive Dashboard'}
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium">
-              {activeTab === 'lab-operations'
-                ? 'Real-time operational intake, workload comparison & testing tracking across General, Cephalosporin & Penicillin laboratories'
-                : 'Real-time laboratory governance, testing operations & analytical release control'}
-            </p>
           </div>
         </div>
 

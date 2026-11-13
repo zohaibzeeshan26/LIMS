@@ -48,7 +48,7 @@ router.post(
 // 8. Delete a product
 router.delete(
   '/:id',
-  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.QA_MANAGER, Role.MANAGER),
+  requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.MANAGER),
   productsController.deleteProduct
 );
 

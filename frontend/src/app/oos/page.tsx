@@ -8,6 +8,7 @@ import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { formatDateTime } from '@/lib/date';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
   AlertTriangle,
   ShieldCheck,
@@ -77,7 +78,11 @@ export default function OosPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER', 'QC_ANALYST']}
+      moduleName="Out of Specification (OOS) Investigations"
+    >
+      <div className="space-y-6">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -305,6 +310,7 @@ export default function OosPage() {
           </form>
         </Modal>
       )}
-    </div>
+      </div>
+    </RoleRouteGuard>
   );
 }

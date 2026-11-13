@@ -20,6 +20,7 @@ enum Role {
   LAB_TECHNICIAN
   AUDITOR
   DOCUMENTATION_MANAGER
+  PRODUCT_DOCUMENTATION_OFFICER
 }
 
 enum BatchStatus {
@@ -587,6 +588,11 @@ model ProductDocument {
   uploadedById   String?
   uploadedByName String
   isCurrent      Boolean  @default(true)
+  deleteRequested       Boolean   @default(false)
+  deleteRequestedAt     DateTime?
+  deleteRequestedById   String?
+  deleteRequestedByName String?
+  deleteReason          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -595,6 +601,7 @@ model ProductDocument {
 
   @@index([productId])
   @@index([isCurrent])
+  @@index([deleteRequested])
   @@map("product_documents")
 }
 

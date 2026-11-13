@@ -26,6 +26,7 @@ interface NavbarProps {
 import { useQuery } from '@tanstack/react-query';
 import { auditService } from '@/services/audit.service';
 import { samplingService } from '@/services/sampling.service';
+import { productService } from '@/services/product.service';
 import { Sample } from '@/types/lims';
 import { parseAuditItem, FormattedAuditItem } from '@/lib/auditFormatter';
 
@@ -131,6 +132,14 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
     refetchInterval: 5000,
   });
 
+  // Query pending document deletion requests for Administrator
+  const { data: pendingDeletions = [] } = useQuery({
+    queryKey: ['admin-pending-deletions-count'],
+    queryFn: () => productService.getPendingDeletions(),
+    enabled: isAdmin,
+    refetchInterval: 5000,
+  });
+
   const activeUrgentSamples: Sample[] = React.useMemo(() => {
     if (!urgentSamplesRes) return [];
     const list: Sample[] = Array.isArray(urgentSamplesRes)
@@ -162,6 +171,22 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
   // Notifications for BOTH Analyst and Admin: real-time urgent sample alerts and workflow activity
   const notifications: NotificationItem[] = React.useMemo(() => {
     const list: NotificationItem[] = [];
+
+    // 0. Pending Document Deletion Requests (Action Required by Admin)
+    if (isAdmin && Array.isArray(pendingDeletions) && pendingDeletions.length > 0) {
+      pendingDeletions.forEach((doc) => {
+        list.push({
+          id: `deletion-req-${doc.id}`,
+          title: `🗑️ Deletion Approval: ${doc.fileName}`,
+          description: `Requested by ${doc.deleteRequestedByName || 'Documentation Manager'} for ${doc.productName}. Admin sign-off required.`,
+          timestamp: 'Action Needed',
+          type: 'warning',
+          read: false,
+          link: '/dashboard',
+          actionBadge: 'Review & Approve',
+        });
+      });
+    }
 
     // 1. Real-time active Urgent samples (dispatched to Analyst and Admin)
     activeUrgentSamples.forEach((sample) => {

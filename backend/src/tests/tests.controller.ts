@@ -43,7 +43,7 @@ export class TestsController {
   }
 
   @Patch(':id/record-result')
-  @Roles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.TESTING_ANALYST, Role.LAB_TECHNICIAN, Role.ANALYST)
+  @Roles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.TESTING_ANALYST, Role.ANALYST)
   @ApiOperation({ summary: 'Record test result with automatic Out-of-Specification calculation' })
   recordResult(
     @Param('id') id: string,

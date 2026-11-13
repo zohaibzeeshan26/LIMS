@@ -42,6 +42,11 @@ export class ProductsService {
             uploadedById: true,
             uploadedByName: true,
             isCurrent: true,
+            deleteRequested: true,
+            deleteRequestedAt: true,
+            deleteRequestedById: true,
+            deleteRequestedByName: true,
+            deleteReason: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -476,7 +481,133 @@ export class ProductsService {
     };
   }
 
-  async deleteDocument(id: string, user: any) {
+  async getPendingDeletionRequests() {
+    return prisma.productDocument.findMany({
+      where: {
+        deleteRequested: true,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            brandName: true,
+            genericName: true,
+            atmCode: true,
+            laboratory: true,
+          },
+        },
+      },
+      orderBy: {
+        deleteRequestedAt: 'desc',
+      },
+    });
+  }
+
+  async deleteDocument(id: string, user: any, reason?: string) {
+    const doc = await prisma.productDocument.findUnique({
+      where: { id },
+    });
+
+    if (!doc) {
+      throw new AppError('Document not found', 404);
+    }
+
+    const userRole = String(user?.role || '').toUpperCase();
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+
+    // If non-admin (e.g. DOCUMENTATION_MANAGER), mark as pending admin approval
+    if (!isAdmin) {
+      const updated = await prisma.productDocument.update({
+        where: { id },
+        data: {
+          deleteRequested: true,
+          deleteRequestedAt: new Date(),
+          deleteRequestedById: user?.id || null,
+          deleteRequestedByName: user?.fullName || user?.username || 'Documentation Manager',
+          deleteReason: reason || 'Document deletion requested by Documentation Manager',
+        },
+      });
+
+      try {
+        await prisma.auditTrail.create({
+          data: {
+            entityName: 'ProductDocument',
+            entityId: id,
+            action: 'PRODUCT_DOCUMENT_DELETE_REQUESTED',
+            performedById: user?.id || null,
+            performedByName: user?.fullName || user?.username || 'Documentation Manager',
+            role: userRole,
+            reasonForChange: `Documentation Manager requested deletion of document "${doc.fileName}" (v${doc.version}.0) for product "${doc.productName}". Pending Administrator review & approval.`,
+            diffPayload: JSON.stringify({
+              docId: id,
+              fileName: doc.fileName,
+              deleteReason: reason || 'Document deletion requested by Documentation Manager',
+              requestedAt: new Date().toISOString(),
+            }),
+          },
+        });
+      } catch (auditErr) {
+        console.warn('Audit trail failed:', auditErr);
+      }
+
+      return {
+        success: true,
+        pendingApproval: true,
+        message: `Deletion request for "${doc.fileName}" submitted to Administrator for review. The file will remain active until approved.`,
+        document: updated,
+      };
+    }
+
+    // Direct Admin / Super Admin Deletion
+    if (doc.isCurrent) {
+      const remainingDocs = await prisma.productDocument.findMany({
+        where: { productId: doc.productId, id: { not: id } },
+        orderBy: { version: 'desc' },
+      });
+      if (remainingDocs.length > 0) {
+        await prisma.productDocument.update({
+          where: { id: remainingDocs[0].id },
+          data: { isCurrent: true },
+        });
+      }
+    }
+
+    if (fs.existsSync(doc.filePath)) {
+      try {
+        fs.unlinkSync(doc.filePath);
+      } catch (err) {
+        console.warn('Could not remove file from disk:', err);
+      }
+    }
+
+    await prisma.productDocument.delete({
+      where: { id },
+    });
+
+    try {
+      await prisma.auditTrail.create({
+        data: {
+          entityName: 'ProductDocument',
+          entityId: id,
+          action: 'PRODUCT_DOCUMENT_DELETED',
+          performedById: user?.id || null,
+          performedByName: user?.fullName || 'User',
+          role: userRole,
+          reasonForChange: `Directly deleted version ${doc.version} of product description document for product ${doc.productName} (${doc.productCode})`,
+          diffPayload: JSON.stringify({
+            deletedDocId: id,
+            productId: doc.productId,
+            version: doc.version,
+            fileName: doc.fileName,
+          }),
+        },
+      });
+    } catch (auditErr) {}
+
+    return { success: true, message: 'Document removed successfully' };
+  }
+
+  async approveDeletion(id: string, user: any) {
     const doc = await prisma.productDocument.findUnique({
       where: { id },
     });
@@ -515,22 +646,74 @@ export class ProductsService {
         data: {
           entityName: 'ProductDocument',
           entityId: id,
-          action: 'PRODUCT_DOCUMENT_DELETED',
+          action: 'PRODUCT_DOCUMENT_DELETION_APPROVED',
           performedById: user?.id || null,
-          performedByName: user?.fullName || 'User',
+          performedByName: user?.fullName || 'Administrator',
           role: String(user?.role || 'ADMIN'),
-          reasonForChange: `Deleted version ${doc.version} of product description document for product ${doc.productName} (${doc.productCode})`,
+          reasonForChange: `Administrator approved deletion request for document "${doc.fileName}" (requested by ${doc.deleteRequestedByName || 'Documentation Manager'})`,
           diffPayload: JSON.stringify({
             deletedDocId: id,
             productId: doc.productId,
             version: doc.version,
             fileName: doc.fileName,
+            requestedBy: doc.deleteRequestedByName,
+            requestedAt: doc.deleteRequestedAt,
+            approvedBy: user?.fullName || 'Administrator',
+            approvedAt: new Date().toISOString(),
           }),
         },
       });
     } catch (auditErr) {}
 
-    return { success: true, message: 'Document removed successfully' };
+    return { success: true, message: `Deletion of "${doc.fileName}" approved and document permanently removed.` };
+  }
+
+  async rejectDeletion(id: string, user: any, reason?: string) {
+    const doc = await prisma.productDocument.findUnique({
+      where: { id },
+    });
+
+    if (!doc) {
+      throw new AppError('Document not found', 404);
+    }
+
+    const updated = await prisma.productDocument.update({
+      where: { id },
+      data: {
+        deleteRequested: false,
+        deleteRequestedAt: null,
+        deleteRequestedById: null,
+        deleteRequestedByName: null,
+        deleteReason: null,
+      },
+    });
+
+    try {
+      await prisma.auditTrail.create({
+        data: {
+          entityName: 'ProductDocument',
+          entityId: id,
+          action: 'PRODUCT_DOCUMENT_DELETION_REJECTED',
+          performedById: user?.id || null,
+          performedByName: user?.fullName || 'Administrator',
+          role: String(user?.role || 'ADMIN'),
+          reasonForChange: `Administrator rejected deletion request for document "${doc.fileName}". File retained. Reason: ${reason || 'Retained by Administrator'}`,
+          diffPayload: JSON.stringify({
+            docId: id,
+            fileName: doc.fileName,
+            rejectedBy: user?.fullName || 'Administrator',
+            rejectReason: reason || 'Retained by Administrator',
+            rejectedAt: new Date().toISOString(),
+          }),
+        },
+      });
+    } catch (auditErr) {}
+
+    return {
+      success: true,
+      message: `Deletion request for "${doc.fileName}" rejected. Document retained.`,
+      document: updated,
+    };
   }
 
   async deleteProduct(id: string, user: any) {

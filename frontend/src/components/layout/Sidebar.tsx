@@ -220,7 +220,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Sample Registration',
         href: '/samples',
         icon: FileText,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'DOCUMENTATION_MANAGER', 'QC_ANALYST', 'ANALYST', 'TESTING_ANALYST', 'LAB_TECHNICIAN'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'LAB_TECHNICIAN'],
         badge: labBadgeLabel,
       },
       {
@@ -241,7 +241,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Analyst Execution',
         href: '/testing',
         icon: Microscope,
-        roles: ['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST', 'LAB_TECHNICIAN', 'SUPER_ADMIN'],
+        roles: ['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST'],
       },
       {
         name: 'Quality Review & CoA',
@@ -400,63 +400,70 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
             );
           })}
 
-          {/* Dedicated Analytical Laboratories Section (Always Visible) */}
-          <div className="pt-4 pb-1.5 px-3">
-            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Analytical Laboratories</span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold">
-                3 Units
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            {visibleLaboratories.map((lab) => {
-              const LabIcon = lab.icon;
-              const isThisLabActive =
-                isOnSamples &&
-                (activeLabParam === lab.id ||
-                  (lab.id === 'cephalosporin' && (activeLabParam === 'ceph' || activeLabParam === 'cp' || activeLabParam === 'saf')) ||
-                  (lab.id === 'penicillin' && (activeLabParam === 'pen' || activeLabParam === 'pl')) ||
-                  (lab.id === 'general' && (activeLabParam === 'gen' || activeLabParam === 'gl' || (!searchParams.get('lab') && pathname === '/samples'))));
-
-              return (
-                <Link
-                  key={lab.id}
-                  href={lab.href}
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                      onClose && onClose();
-                    }
-                  }}
-                  className={cn(
-                    'group flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150',
-                    isThisLabActive
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold ring-1 ring-white/20'
-                      : 'text-slate-300 hover:text-white hover:bg-white/10'
-                  )}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <LabIcon
-                      className={cn(
-                        'h-4 w-4 shrink-0 transition-colors',
-                        isThisLabActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-300'
-                      )}
-                    />
-                    <span className="truncate">{lab.name}</span>
-                  </div>
-                  <span
-                    className={cn(
-                      'text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase shrink-0',
-                      isThisLabActive ? 'bg-white/25 text-white' : 'bg-white/10 text-slate-300'
-                    )}
-                  >
-                    {lab.badge}
+          {/* Dedicated Analytical Laboratories Section (Hidden for Documentation Manager and Testing Analysts) */}
+          {userRole !== 'DOCUMENTATION_MANAGER' &&
+            userRole !== 'QC_ANALYST' &&
+            userRole !== 'ANALYST' &&
+            userRole !== 'TESTING_ANALYST' && (
+            <>
+              <div className="pt-4 pb-1.5 px-3">
+                <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                  <span>Analytical Laboratories</span>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold">
+                    3 Units
                   </span>
-                </Link>
-              );
-            })}
-          </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                {visibleLaboratories.map((lab) => {
+                  const LabIcon = lab.icon;
+                  const isThisLabActive =
+                    isOnSamples &&
+                    (activeLabParam === lab.id ||
+                      (lab.id === 'cephalosporin' && (activeLabParam === 'ceph' || activeLabParam === 'cp' || activeLabParam === 'saf')) ||
+                      (lab.id === 'penicillin' && (activeLabParam === 'pen' || activeLabParam === 'pl')) ||
+                      (lab.id === 'general' && (activeLabParam === 'gen' || activeLabParam === 'gl' || (!searchParams.get('lab') && pathname === '/samples'))));
+
+                  return (
+                    <Link
+                      key={lab.id}
+                      href={lab.href}
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                          onClose && onClose();
+                        }
+                      }}
+                      className={cn(
+                        'group flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150',
+                        isThisLabActive
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 font-bold ring-1 ring-white/20'
+                          : 'text-slate-300 hover:text-white hover:bg-white/10'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <LabIcon
+                          className={cn(
+                            'h-4 w-4 shrink-0 transition-colors',
+                            isThisLabActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-300'
+                          )}
+                        />
+                        <span className="truncate">{lab.name}</span>
+                      </div>
+                      <span
+                        className={cn(
+                          'text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase shrink-0',
+                          isThisLabActive ? 'bg-white/25 text-white' : 'bg-white/10 text-slate-300'
+                        )}
+                      >
+                        {lab.badge}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* User Account & Sign Out footer */}

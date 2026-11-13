@@ -8,6 +8,7 @@ import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { formatDateTime, formatDateOnly } from '@/lib/date';
+import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
   Boxes,
   PlusCircle,
@@ -103,7 +104,11 @@ export default function BatchesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <RoleRouteGuard
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER', 'QC_ANALYST']}
+      moduleName="Batches & Certificate of Analysis (CoA)"
+    >
+      <div className="space-y-6">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -613,6 +618,7 @@ export default function BatchesPage() {
           </div>
         </form>
       </Modal>
-    </div>
+      </div>
+    </RoleRouteGuard>
   );
 }
