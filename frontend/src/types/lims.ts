@@ -1,6 +1,7 @@
 export type Role =
   | 'SUPER_ADMIN'
   | 'ADMIN'
+  | 'HOD'
   | 'QA_MANAGER'
   | 'QC_ANALYST'
   | 'LAB_TECHNICIAN'
@@ -39,6 +40,8 @@ export function getUserLabAccess(
   // QC Analysts, Administrators, and Managers have full operational access across all 3 laboratories
   if (
     role === 'ADMIN' ||
+    role === 'SUPER_ADMIN' ||
+    role === 'HOD' ||
     role === 'ANALYST' ||
     role === 'QC_ANALYST' ||
     role === 'QC_OFFICER' ||
@@ -546,6 +549,11 @@ export interface ProductDocument {
   deleteRequestedById?: string | null;
   deleteRequestedByName?: string | null;
   deleteReason?: string | null;
+  deleteStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'DELETED' | null;
+  deleteApprovedById?: string | null;
+  deleteApprovedByName?: string | null;
+  deleteApprovedAt?: string | null;
+  deleteRejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

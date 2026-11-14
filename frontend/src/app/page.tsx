@@ -53,7 +53,6 @@ export default function WelcomePortalPage() {
       id: 'general',
       name: 'General Lab',
       code: 'GENERAL',
-      badge: 'GL',
       desc: '',
       href: '/samples?lab=general',
       icon: FlaskConical,
@@ -65,7 +64,6 @@ export default function WelcomePortalPage() {
       id: 'penicillin',
       name: 'Penicillin Lab',
       code: 'PENICILLIN',
-      badge: 'PEN',
       desc: '',
       href: '/samples?lab=penicillin',
       icon: Microscope,
@@ -77,7 +75,6 @@ export default function WelcomePortalPage() {
       id: 'cephalosporin',
       name: 'Cephalosporin Lab',
       code: 'CEPHALOSPORIN',
-      badge: 'CEPH',
       desc: '',
       href: '/samples?lab=cephalosporin',
       icon: ShieldAlert,
@@ -173,6 +170,13 @@ export default function WelcomePortalPage() {
   ];
 
   const userRole = (user?.role || '').toUpperCase();
+  const isAdminOrSuperAdmin =
+    userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'HOD';
+  const isSampleRegistration =
+    userRole === 'LAB_TECHNICIAN' ||
+    userRole === 'SAMPLE_REGISTRATION' ||
+    userRole === 'SAMPLE_REGISTRATION_ANALYST';
+
   const visiblePortalCards = React.useMemo(() => {
     return portalCards
       .filter((card) => {
@@ -186,7 +190,7 @@ export default function WelcomePortalPage() {
         if (userRole === 'QC_ANALYST' || userRole === 'ANALYST' || userRole === 'TESTING_ANALYST') {
           return card.id === 'dashboard' || card.id === 'testing';
         }
-        if (userRole === 'MANAGER' || userRole === 'DEPUTY_MANAGER' || userRole === 'SHIFT_INCHARGE' || userRole === 'QA_MANAGER') {
+        if (userRole === 'DEPUTY_MANAGER') {
           return card.id !== 'testing';
         }
         return true;
@@ -316,15 +320,17 @@ export default function WelcomePortalPage() {
 
               {/* Bottom Subtle Highlight Bar on Hover */}
               <div className="mt-5 pt-3 border-t border-slate-200/50 flex items-center justify-between text-[11px] text-slate-400 font-medium">
-                <span>{isSamplesCard ? 'Select Laboratory' : 'Access Portal Module'}</span>
+                <span>
+                  {isSamplesCard && !isAdminOrSuperAdmin ? 'Select Laboratory' : 'Access Portal Module'}
+                </span>
                 <span className="font-semibold group-hover:text-blue-600 transition-colors flex items-center gap-1">
-                  {isSamplesCard ? 'Choose Lab' : 'Open'} <span>&rarr;</span>
+                  {isSamplesCard && !isAdminOrSuperAdmin ? 'Choose Lab' : 'Open'} <span>&rarr;</span>
                 </span>
               </div>
             </>
           );
 
-          if (isSamplesCard) {
+          if (isSamplesCard && !isAdminOrSuperAdmin) {
             return (
               <button
                 key={card.id}
@@ -340,7 +346,7 @@ export default function WelcomePortalPage() {
             );
           }
 
-          if (card.id === 'tasks') {
+          if (card.id === 'tasks' && !isAdminOrSuperAdmin) {
             return (
               <button
                 key={card.id}
@@ -386,10 +392,10 @@ export default function WelcomePortalPage() {
             const LabIcon = lab.icon;
             const labCount =
               lab.id === 'general'
-                ? metrics?.byLab?.general ?? 8
+                ? metrics?.byLab?.general ?? 0
                 : lab.id === 'penicillin'
-                ? metrics?.byLab?.penicillin ?? 5
-                : metrics?.byLab?.cephalosporin ?? 4;
+                ? metrics?.byLab?.penicillin ?? 0
+                : metrics?.byLab?.cephalosporin ?? 0;
 
             const countBadgeText =
               labModalTarget === 'tasks'
@@ -412,12 +418,35 @@ export default function WelcomePortalPage() {
                 disabled={isLocked}
                 onClick={() => {
                   if (!isLocked) {
-                    setSelectedLabForAuth({
-                      ...lab,
-                      href: labModalTarget === 'tasks' ? `/tasks?lab=${lab.id}` : `/samples?lab=${lab.id}`,
-                      desc: labModalTarget === 'tasks' ? `Task Allocation & Workload Delegation for ${lab.name}` : '',
-                    });
-                    setIsAuthModalOpen(true);
+                    const targetHref =
+                      labModalTarget === 'tasks' ? `/tasks?lab=${lab.id}` : `/samples?lab=${lab.id}`;
+
+                    const canDirectAccessLab =
+                      isAdminOrSuperAdmin ||
+                      (isSampleRegistration && labModalTarget === 'samples');
+
+                    if (canDirectAccessLab) {
+                      // Admin, Super Admin & Sample Registration: Direct access with existing session without re-entering credentials
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('lab_security_auth', 'true');
+                        sessionStorage.setItem('lab_security_auth_time', Date.now().toString());
+                        sessionStorage.setItem(`lab_auth_${lab.id.toLowerCase()}`, 'true');
+                        sessionStorage.setItem('lab_security_active_lab', lab.id.toLowerCase());
+                      }
+                      setIsLabModalOpen(false);
+                      router.push(targetHref);
+                    } else {
+                      // Analyst & Manager roles: Designated lab credentials verification
+                      setSelectedLabForAuth({
+                        ...lab,
+                        href: targetHref,
+                        desc:
+                          labModalTarget === 'tasks'
+                            ? `Task Allocation & Workload Delegation for ${lab.name}`
+                            : '',
+                      });
+                      setIsAuthModalOpen(true);
+                    }
                   }
                 }}
                 className={cn(
@@ -436,9 +465,6 @@ export default function WelcomePortalPage() {
                       <h4 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
                         {lab.name}
                       </h4>
-                      <span className={cn('text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border', lab.badgeBg)}>
-                        {lab.badge}
-                      </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/90 text-slate-700 border border-slate-200 shadow-2xs">
                         {countBadgeText}
                       </span>
@@ -464,7 +490,11 @@ export default function WelcomePortalPage() {
         </div>
 
         <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-          <span>Click any laboratory above to authenticate with its designated security credentials.</span>
+          <span>
+            {isAdminOrSuperAdmin || isSampleRegistration
+              ? 'Session verified: Click any laboratory for direct access.'
+              : 'Click any laboratory above to authenticate with its designated security credentials.'}
+          </span>
           <button
             type="button"
             onClick={() => setIsLabModalOpen(false)}

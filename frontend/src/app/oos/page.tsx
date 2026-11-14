@@ -23,6 +23,7 @@ import {
 
 export default function OosPage() {
   const { user } = useAuth();
+  const isHOD = user?.role === 'ADMIN' || (user?.role as string) === 'HOD';
   const queryClient = useQueryClient();
 
   const [selectedOos, setSelectedOos] = useState<any | null>(null);
@@ -79,7 +80,7 @@ export default function OosPage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER', 'QC_ANALYST']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER', 'QC_ANALYST']}
       moduleName="Out of Specification (OOS) Investigations"
     >
       <div className="space-y-6">
@@ -189,11 +190,11 @@ export default function OosPage() {
 
                 <Button
                   size="sm"
-                  variant="primary"
+                  variant={isHOD ? 'outline' : 'primary'}
                   onClick={() => handleOpenEdit(oos)}
                   className="text-xs h-8"
                 >
-                  Update Investigation / QA Sign-Off
+                  {isHOD ? 'Inspect Investigation Dossier' : 'Update Investigation / QA Sign-Off'}
                 </Button>
               </div>
             </div>
@@ -301,11 +302,13 @@ export default function OosPage() {
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
               <Button type="button" variant="outline" onClick={() => setSelectedOos(null)}>
-                Cancel
+                {isHOD ? 'Close Dossier' : 'Cancel'}
               </Button>
-              <Button type="submit" variant="primary" isLoading={updateOosMutation.isPending}>
-                Save Investigation Record
-              </Button>
+              {!isHOD && (
+                <Button type="submit" variant="primary" isLoading={updateOosMutation.isPending}>
+                  Save Investigation Record
+                </Button>
+              )}
             </div>
           </form>
         </Modal>

@@ -28,7 +28,11 @@ export function RoleRouteGuard({ allowedRoles, children, moduleName = 'This Modu
 
   const userRole = (user?.role || 'QC_ANALYST') as Role;
   const isSuperAdmin = userRole === 'SUPER_ADMIN';
-  const isAllowed = isSuperAdmin || allowedRoles.includes(userRole);
+  const isAdminOrHod = userRole === 'ADMIN' || (userRole as string) === 'HOD';
+  const isAllowed =
+    isSuperAdmin ||
+    allowedRoles.includes(userRole) ||
+    (isAdminOrHod && (allowedRoles.includes('ADMIN') || allowedRoles.includes('SUPER_ADMIN')));
 
   if (!isAllowed) {
     return (

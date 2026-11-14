@@ -16,14 +16,14 @@ router.get('/', productsController.getAllProducts);
 // 2. Create product
 router.post(
   '/',
-  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.QA_MANAGER, Role.MANAGER),
+  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.DEPUTY_MANAGER),
   productsController.createProduct
 );
 
 // 3. Upload document via generic upload endpoint (with productId in body)
 router.post(
   '/upload',
-  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.QA_MANAGER, Role.MANAGER),
+  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.DEPUTY_MANAGER),
   uploadPdfMiddleware.single('file'),
   productsController.uploadDocument
 );
@@ -40,7 +40,7 @@ router.get('/:id/current-document', productsController.getCurrentDocument);
 // 7. Upload/replace PDF document for a specific product
 router.post(
   '/:id/documents',
-  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.QA_MANAGER, Role.MANAGER),
+  requireRoles(Role.ADMIN, Role.DOCUMENTATION_MANAGER, Role.DEPUTY_MANAGER),
   uploadPdfMiddleware.single('file'),
   productsController.uploadDocument
 );
@@ -48,7 +48,7 @@ router.post(
 // 8. Delete a product
 router.delete(
   '/:id',
-  requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.MANAGER),
+  requireRoles(Role.ADMIN, Role.DEPUTY_MANAGER),
   productsController.deleteProduct
 );
 

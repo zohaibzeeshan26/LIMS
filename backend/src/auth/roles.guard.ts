@@ -18,8 +18,12 @@ export class RolesGuard implements CanActivate {
     if (!user) {
       return false;
     }
-    // ADMIN has bypass privileges
-    if (user.role === Role.ADMIN) {
+    // ADMIN, SUPER_ADMIN, and HOD have direct access with existing authenticated session
+    if (
+      user.role === Role.ADMIN ||
+      user.role === Role.SUPER_ADMIN ||
+      (user.role as any) === 'HOD'
+    ) {
       return true;
     }
     return requiredRoles.includes(user.role);

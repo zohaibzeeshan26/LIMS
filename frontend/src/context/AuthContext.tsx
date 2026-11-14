@@ -131,9 +131,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Route protection guard
+  // Route protection guard & Admin/SuperAdmin direct lab authorization sync
   useEffect(() => {
     if (isLoading) return;
+
+    // Admin, Super Admin & Sample Registration: Automatically authorize laboratory access using their existing session
+    if (user) {
+      const role = (user.role || '').toUpperCase();
+      if (
+        role === 'SUPER_ADMIN' ||
+        role === 'ADMIN' ||
+        role === 'HOD' ||
+        role === 'LAB_TECHNICIAN' ||
+        role === 'SAMPLE_REGISTRATION' ||
+        role === 'SAMPLE_REGISTRATION_ANALYST'
+      ) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('lab_security_auth', 'true');
+          sessionStorage.setItem('lab_security_auth_time', Date.now().toString());
+          sessionStorage.setItem('lab_auth_general', 'true');
+          sessionStorage.setItem('lab_auth_penicillin', 'true');
+          sessionStorage.setItem('lab_auth_cephalosporin', 'true');
+        }
+      }
+    }
 
     const isLoginPage = pathname === '/login';
 

@@ -65,9 +65,7 @@ import { LabOperationsView } from '@/components/dashboard/LabOperationsView';
 import { SuperAdminDashboard } from '@/components/dashboard/roles/SuperAdminDashboard';
 import { AdminDashboard } from '@/components/dashboard/roles/AdminDashboard';
 import { DocumentationManagerDashboard } from '@/components/dashboard/roles/DocumentationManagerDashboard';
-import { ManagerDashboard } from '@/components/dashboard/roles/ManagerDashboard';
 import { DeputyManagerDashboard } from '@/components/dashboard/roles/DeputyManagerDashboard';
-import { InchargeDashboard } from '@/components/dashboard/roles/InchargeDashboard';
 import { AnalystDashboard } from '@/components/dashboard/roles/AnalystDashboard';
 import { SampleRegistrationDashboard } from '@/components/dashboard/roles/SampleRegistrationDashboard';
 
@@ -92,9 +90,9 @@ function DashboardInner() {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const userRole = (user?.role || 'QC_ANALYST').toUpperCase();
-  const isSuperAdminOrAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
+  const isSuperAdminOnly = userRole === 'SUPER_ADMIN';
 
-  // Role preview switcher for admins
+  // Role preview switcher strictly for SUPER_ADMIN
   const [previewRole, setPreviewRole] = useState<string>(userRole);
 
   useEffect(() => {
@@ -103,23 +101,24 @@ function DashboardInner() {
     }
   }, [user?.role]);
 
-  const effectiveRole = isSuperAdminOrAdmin ? previewRole : userRole;
+  // Only SUPER_ADMIN can preview other roles; regular ADMIN/HOD always sees their own role
+  const effectiveRole = isSuperAdminOnly ? previewRole : userRole;
 
   function renderRoleDashboard(roleKey: string) {
+    // SECURITY GUARD: Non-superadmin users can NEVER view SuperAdminDashboard
+    if (roleKey === 'SUPER_ADMIN' && !isSuperAdminOnly) {
+      return <AdminDashboard />;
+    }
     switch (roleKey) {
       case 'SUPER_ADMIN':
-        return <SuperAdminDashboard />;
+        return isSuperAdminOnly ? <SuperAdminDashboard /> : <AdminDashboard />;
       case 'ADMIN':
+      case 'HOD':
         return <AdminDashboard />;
       case 'DOCUMENTATION_MANAGER':
         return <DocumentationManagerDashboard />;
-      case 'MANAGER':
-      case 'QA_MANAGER':
-        return <ManagerDashboard />;
       case 'DEPUTY_MANAGER':
         return <DeputyManagerDashboard />;
-      case 'SHIFT_INCHARGE':
-        return <InchargeDashboard />;
       case 'LAB_TECHNICIAN':
         return <SampleRegistrationDashboard />;
       case 'ANALYST':
@@ -238,8 +237,8 @@ function DashboardInner() {
   };
 
   // User role classification
-  const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN';
-  const isManagerOrSupervisor = isSuperAdmin || user?.role === 'MANAGER' || user?.role === 'DEPUTY_MANAGER' || user?.role === 'SHIFT_INCHARGE';
+  const isSuperAdmin = user?.role === 'ADMIN' || user?.role === 'HOD' || (user?.role as string) === 'SUPER_ADMIN';
+  const isManagerOrSupervisor = isSuperAdmin || user?.role === 'DEPUTY_MANAGER';
   const isAnalyst = !isManagerOrSupervisor;
 
   // Analyst filter for Super Admin / Managers ('ALL' or employeeId / username)
@@ -1035,8 +1034,8 @@ function DashboardInner() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Admin Role Preview Bar for Super Admin / Admin to switch perspective easily */}
-          {isSuperAdminOrAdmin && (
+          {/* Role Preview Bar strictly for Super Admin to switch perspective */}
+          {isSuperAdminOnly && (
             <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl border border-indigo-800/40 shadow-xs text-xs">
               <div className="flex items-center gap-2">
                 <span className="flex h-2.5 w-2.5 relative">
@@ -1057,13 +1056,11 @@ function DashboardInner() {
                   className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-hidden focus:border-indigo-400 cursor-pointer font-semibold"
                 >
                   <option value="SUPER_ADMIN">1. Super Admin Dashboard</option>
-                  <option value="ADMIN">2. Admin Dashboard</option>
+                  <option value="ADMIN">2. HOD Dashboard</option>
                   <option value="DOCUMENTATION_MANAGER">3. Documentation Manager</option>
-                  <option value="MANAGER">4. QC Manager Dashboard</option>
-                  <option value="DEPUTY_MANAGER">5. Deputy Manager Dashboard</option>
-                  <option value="SHIFT_INCHARGE">6. Shift Incharge Dashboard</option>
-                  <option value="LAB_TECHNICIAN">7. Sample Registration Analyst Terminal</option>
-                  <option value="QC_ANALYST">8. Testing Analyst Execution Workstation</option>
+                  <option value="DEPUTY_MANAGER">4. Deputy Manager Dashboard</option>
+                  <option value="LAB_TECHNICIAN">5. Sample Registration Analyst Terminal</option>
+                  <option value="QC_ANALYST">6. Testing Analyst Execution Workstation</option>
                 </select>
                 {previewRole !== userRole && (
                   <button
@@ -1168,9 +1165,9 @@ function DashboardInner() {
                   onChange={(e) => setAddUserForm({ ...addUserForm, assignedLab: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
                 >
-                  <option value="GENERAL">General Lab (GL)</option>
-                  <option value="PENICILLIN">Penicillin Lab (PEN)</option>
-                  <option value="CEPHALOSPORIN">Cephalosporin Lab (CEPH)</option>
+                  <option value="GENERAL">General Lab</option>
+                  <option value="PENICILLIN">Penicillin Lab</option>
+                  <option value="CEPHALOSPORIN">Cephalosporin Lab</option>
                   <option value="ALL">All Laboratories</option>
                 </select>
               </div>
@@ -1186,8 +1183,8 @@ function DashboardInner() {
                 >
                   <option value="QC_ANALYST">Testing Analyst — Worksheets &amp; Testing</option>
                   <option value="ANALYST">QC Analyst — General Testing</option>
-                  <option value="MANAGER">QC Manager — Supervision &amp; Assignment</option>
-                  <option value="ADMIN">Super Admin — Full Authority</option>
+                  <option value="DEPUTY_MANAGER">Deputy Manager — Supervision &amp; Assignment</option>
+                  <option value="ADMIN">HOD (Head of Department) — Executive Authority</option>
                 </select>
               </div>
 

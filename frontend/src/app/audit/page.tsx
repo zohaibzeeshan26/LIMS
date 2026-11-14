@@ -53,7 +53,7 @@ export default function AuditPage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'MANAGER', 'QA_MANAGER']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'DEPUTY_MANAGER']}
       moduleName="21 CFR Part 11 Audit Trail"
     >
       <div className="space-y-6">

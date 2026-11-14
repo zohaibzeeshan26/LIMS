@@ -163,9 +163,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2.5">
               <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="truncate max-w-[160px]">{user?.fullName || 'Authorized Staff'}</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200">
-                  {user?.role || 'QC'}
+                <span className="truncate max-w-[180px]">
+                  {(user?.fullName || 'Authorized Staff')
+                    .replace(/\s*\([^)]*\)/g, '')
+                    .trim()}
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200 font-bold">
+                  {user?.role === 'LAB_TECHNICIAN' ? 'Lab Analyst' : user?.role || 'QC'}
                 </span>
               </div>
 

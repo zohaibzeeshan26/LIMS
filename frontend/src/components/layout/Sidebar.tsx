@@ -41,7 +41,6 @@ export const LABORATORIES = [
     code: 'GENERAL',
     href: '/samples?lab=general',
     icon: FlaskConical,
-    badge: 'GL',
   },
   {
     id: 'cephalosporin',
@@ -50,7 +49,6 @@ export const LABORATORIES = [
     code: 'CEPHALOSPORIN',
     href: '/samples?lab=cephalosporin',
     icon: ShieldAlert,
-    badge: 'CEPH',
   },
   {
     id: 'penicillin',
@@ -59,7 +57,6 @@ export const LABORATORIES = [
     code: 'PENICILLIN',
     href: '/samples?lab=penicillin',
     icon: Microscope,
-    badge: 'PEN',
   },
 ];
 
@@ -81,6 +78,13 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
   const visibleLaboratories = LABORATORIES;
 
   const labBadgeLabel = '3 Labs';
+
+  // Dedicated query to fetch live laboratory metrics (sample counts per lab) from DB
+  const { data: metricsData } = useQuery({
+    queryKey: ['sidebar-live-lab-metrics'],
+    queryFn: () => samplingService.getMetrics(),
+    refetchInterval: 3000,
+  });
 
   // Dedicated query to fetch ALL active expedited (Immediate / STAT & Urgent) samples
   const { data: expeditedSamplesData } = useQuery({
@@ -160,16 +164,12 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
   const dashboardLabel =
     userRole === 'SUPER_ADMIN'
       ? 'Super Admin Hub'
-      : userRole === 'ADMIN'
-      ? 'Admin Dashboard'
+      : userRole === 'ADMIN' || userRole === 'HOD'
+      ? 'HOD Dashboard'
       : userRole === 'DOCUMENTATION_MANAGER'
       ? 'Doc Manager Hub'
-      : userRole === 'MANAGER' || userRole === 'QA_MANAGER'
-      ? 'Manager Dashboard'
       : userRole === 'DEPUTY_MANAGER'
       ? 'Deputy Manager Hub'
-      : userRole === 'SHIFT_INCHARGE'
-      ? 'Incharge Dashboard'
       : userRole === 'LAB_TECHNICIAN'
       ? 'Intake Terminal'
       : 'Testing Workstation';
@@ -197,14 +197,14 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Lab Operations',
         href: '/dashboard?tab=lab-operations',
         icon: Activity,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
         badge: '3 Labs',
       },
       {
         name: 'Priority Notice',
         href: '/priority-notice',
         icon: AlertCircle,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
         badge: urgentAdminNotices.length > 0 ? `${urgentAdminNotices.length}` : undefined,
         isPriority: true,
       },
@@ -213,28 +213,28 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         href: '/users',
         icon: Users,
         adminOnly: true,
-        roles: ['SUPER_ADMIN', 'ADMIN'],
-        badge: 'Admin',
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD'],
+        badge: 'HOD',
       },
       {
         name: 'Sample Registration',
         href: '/samples',
         icon: FileText,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'LAB_TECHNICIAN'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER', 'LAB_TECHNICIAN'],
         badge: labBadgeLabel,
       },
       {
         name: 'Sample Assignment',
         href: '/tasks',
         icon: UserCheck,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
         badge: 'Tasks',
       },
       {
         name: 'Documentation Manager',
         href: '/documentation-manager',
         icon: FileText,
-        roles: ['DOCUMENTATION_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'QA_MANAGER', 'MANAGER'],
+        roles: ['DOCUMENTATION_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
         badge: 'STP Docs',
       },
       {
@@ -247,7 +247,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Quality Review & CoA',
         href: '/quality-review',
         icon: FileCheck2,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
         badge: 'CoA',
       },
     ];
@@ -257,7 +257,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
     return menuItems.filter((item) => {
       if (isSuperAdmin) return true;
       if (item.adminOnly) {
-        return userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+        return userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'HOD';
       }
       if (item.roles && item.roles.length > 0) {
         return item.roles.includes(userRole);
@@ -430,6 +430,12 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
                       key={lab.id}
                       href={lab.href}
                       onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          sessionStorage.setItem('lab_security_auth', 'true');
+                          sessionStorage.setItem('lab_security_auth_time', Date.now().toString());
+                          sessionStorage.setItem(`lab_auth_${lab.id}`, 'true');
+                          sessionStorage.setItem('lab_security_active_lab', lab.id);
+                        }
                         if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                           onClose && onClose();
                         }
@@ -450,14 +456,27 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
                         />
                         <span className="truncate">{lab.name}</span>
                       </div>
-                      <span
-                        className={cn(
-                          'text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase shrink-0',
-                          isThisLabActive ? 'bg-white/25 text-white' : 'bg-white/10 text-slate-300'
-                        )}
-                      >
-                        {lab.badge}
-                      </span>
+                      {(() => {
+                        const count =
+                          lab.id === 'general'
+                            ? (metricsData?.byLab?.general ?? 0)
+                            : lab.id === 'cephalosporin'
+                            ? (metricsData?.byLab?.cephalosporin ?? 0)
+                            : (metricsData?.byLab?.penicillin ?? 0);
+                        return (
+                          <span
+                            className={cn(
+                              'text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 transition-all duration-150',
+                              isThisLabActive
+                                ? 'bg-white text-blue-700 shadow-xs ring-1 ring-white/30'
+                                : 'bg-white/10 text-slate-200 group-hover:bg-white/20'
+                            )}
+                            title={`${count} registered sample${count === 1 ? '' : 's'}`}
+                          >
+                            {count}
+                          </span>
+                        );
+                      })()}
                     </Link>
                   );
                 })}
@@ -475,10 +494,12 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-white truncate leading-tight">
-                  {user?.fullName || 'Lab Staff'}
+                  {(user?.fullName || 'Lab Staff')
+                    .replace(/\s*\([^)]*\)/g, '')
+                    .trim()}
                 </p>
                 <p className="text-[10px] text-sky-300 font-medium truncate leading-tight">
-                  {userRole.replace(/_/g, ' ')} &bull; @{user?.username || 'user'}
+                  {(userRole === 'LAB_TECHNICIAN' ? 'Lab Analyst' : userRole.replace(/_/g, ' '))} &bull; @{user?.username || 'user'}
                 </p>
               </div>
             </div>

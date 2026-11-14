@@ -20,6 +20,8 @@ import {
   Plus,
   BookOpen,
   Layers,
+  Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ProductFolderViewerModal } from '@/components/documentation/ProductFolderViewerModal';
@@ -38,6 +40,15 @@ export function DocumentationManagerDashboard() {
     queryFn: () => productService.getAll(),
     refetchInterval: 4000,
   });
+
+  // Query deletion updates from Admin (Approved / Rejected)
+  const { data: deletionUpdates = [], refetch: refetchDeletions } = useQuery({
+    queryKey: ['doc-manager-deletion-updates'],
+    queryFn: () => productService.getDeletionUpdates(),
+    refetchInterval: 4000,
+  });
+
+  const approvedDocs = deletionUpdates.filter((d) => d.deleteStatus === 'APPROVED');
 
   const totalDocuments = React.useMemo(() => {
     return products.reduce((acc, p) => acc + (p.documents?.length || 0), 0);
@@ -130,6 +141,66 @@ export function DocumentationManagerDashboard() {
           <p className="text-[11px] text-slate-400">Instantly delivered to Testing Panel</p>
         </div>
       </div>
+
+      {/* Admin Approved Deletions Banner */}
+      {approvedDocs.length > 0 && (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50/80 p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-600 text-white shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-emerald-950 text-sm">
+                  Document Deletion Approved by Administrator ({approvedDocs.length})
+                </h3>
+                <p className="text-xs text-emerald-800">
+                  Administrator has approved the deletion of the following document(s). You are now authorized to permanently delete them.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {approvedDocs.map((doc) => (
+              <div
+                key={doc.id}
+                className="bg-white rounded-xl border border-emerald-200 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-700" />
+                    <span className="font-bold text-slate-900 text-xs">{doc.fileName}</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                      v{doc.version}.0
+                    </span>
+                    <span className="text-[10px] text-slate-500">Product: {doc.productName}</span>
+                  </div>
+                  <div className="text-[11px] text-emerald-700 mt-0.5">
+                    Approved by: <strong>{doc.deleteApprovedByName || 'Administrator'}</strong>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      const prod = products.find((p) => p.id === doc.productId);
+                      if (prod) {
+                        setSelectedProduct(prod);
+                        setIsFolderModalOpen(true);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Open Folder &amp; Delete</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Product Documentation Table */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 space-y-4">
@@ -242,6 +313,7 @@ export function DocumentationManagerDashboard() {
             setIsFolderModalOpen(false);
             setSelectedProduct(null);
             refetch();
+            refetchDeletions();
           }}
           product={selectedProduct}
         />

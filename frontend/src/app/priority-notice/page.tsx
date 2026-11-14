@@ -165,7 +165,7 @@ export default function PriorityNoticePage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER']}
       moduleName="Priority Sample Notice Board"
     >
       <div className="space-y-6 font-sans pb-12 max-w-7xl mx-auto">

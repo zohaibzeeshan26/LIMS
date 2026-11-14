@@ -105,30 +105,14 @@ export function SampleRegistrationDashboard() {
               <FlaskConical className="w-5 h-5 text-teal-700" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Sample Registration &amp; Intake
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                  Intake Gate
-                </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  {user?.fullName || 'Sample Registration Analyst'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                City Pharma Quality Control Laboratory &bull; Log incoming specimens and accession records
-              </p>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Sample Registration &amp; Intake
+              </h1>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Manager Auto-Sync Active</span>
-          </div>
-
           <button
             type="button"
             onClick={() => refetchSamples()}
@@ -137,15 +121,6 @@ export function SampleRegistrationDashboard() {
           >
             <RotateCcw className={cn('w-4 h-4', isLoading && 'animate-spin text-teal-600')} />
           </button>
-
-          <Button
-            size="md"
-            onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs inline-flex items-center gap-2 cursor-pointer py-2 px-4 rounded-xl"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Register New Sample</span>
-          </Button>
         </div>
       </div>
 
@@ -157,16 +132,14 @@ export function SampleRegistrationDashboard() {
             <Layers className="w-4 h-4 text-teal-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-slate-900">{metrics.total}</div>
-          <p className="text-[11px] text-slate-400">Total samples registered in LIMS</p>
         </div>
 
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Awaiting Manager Action</span>
+            <span>Awaiting Allocation</span>
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-amber-700">{metrics.awaitingAssignment}</div>
-          <p className="text-[11px] text-slate-400">Ready in Manager allocation board</p>
         </div>
 
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
@@ -175,7 +148,6 @@ export function SampleRegistrationDashboard() {
             <ShieldCheck className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-blue-700">{metrics.assigned}</div>
-          <p className="text-[11px] text-slate-400">Allocated to testing workstations</p>
         </div>
 
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
@@ -184,7 +156,6 @@ export function SampleRegistrationDashboard() {
             <FlaskConical className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl sm:text-3xl font-black text-emerald-700">{metrics.inTesting}</div>
-          <p className="text-[11px] text-slate-400">Worksheets executing in labs</p>
         </div>
       </div>
 
@@ -196,19 +167,7 @@ export function SampleRegistrationDashboard() {
               <FileText className="w-5 h-5 text-teal-600" />
               <span>Sample Registration History &amp; Specimen Logs</span>
             </h2>
-            <p className="text-xs text-slate-500">
-              Accessioned specimens, QR routing tags, batch details, and automatic Manager dispatch status
-            </p>
           </div>
-
-          <Button
-            size="sm"
-            onClick={() => setIsRegisterModalOpen(true)}
-            className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>New Sample Accession</span>
-          </Button>
         </div>
 
         {/* Filters */}
@@ -231,9 +190,9 @@ export function SampleRegistrationDashboard() {
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none"
             >
               <option value="ALL">All Laboratories (3 Facilities)</option>
-              <option value="GEN">General Lab (GL)</option>
-              <option value="PEN">Penicillin Lab (PEN)</option>
-              <option value="CEPH">Cephalosporin Lab (CEPH)</option>
+              <option value="GEN">General Lab</option>
+              <option value="PEN">Penicillin Lab</option>
+              <option value="CEPH">Cephalosporin Lab</option>
             </select>
           </div>
 
@@ -244,7 +203,6 @@ export function SampleRegistrationDashboard() {
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none"
             >
               <option value="ALL">All Priorities</option>
-              <option value="STAT">STAT Immediate (24 Hours)</option>
               <option value="URGENT">Urgent (48 Hours)</option>
               <option value="ROUTINE">Routine Standard</option>
             </select>
@@ -331,7 +289,7 @@ export function SampleRegistrationDashboard() {
                         {isManagerPending ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
                             <Clock className="w-3 h-3 text-amber-600" />
-                            <span>In Manager Allocation Queue</span>
+                            <span>In Deputy Manager Allocation Queue</span>
                           </span>
                         ) : s.status === 'ASSIGNED_FOR_TESTING' || s.status === 'ASSIGNED' ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 border border-blue-200">

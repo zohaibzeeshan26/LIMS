@@ -35,6 +35,7 @@ import {
   Eye,
   Check,
   ChevronDown,
+  Lock,
 } from 'lucide-react';
 
 export interface TaskItem {
@@ -459,13 +460,12 @@ function TaskAssignmentPageInner() {
     setNewLab(activeLabKey);
   }, [activeLabKey]);
 
-  // Check role permission: Manager, Deputy Manager, Incharge, Admin can assign samples
+  // Check role permission: Super Admin and Deputy Manager can assign samples. HOD is strictly Read-Only surveillance.
+  const isHOD = user?.role === 'ADMIN' || (user?.role as string) === 'HOD';
   const canAssign =
-    user?.role === 'ADMIN' ||
-    (user?.role as string) === 'SUPER_ADMIN' ||
-    user?.role === 'MANAGER' ||
-    user?.role === 'DEPUTY_MANAGER' ||
-    user?.role === 'SHIFT_INCHARGE';
+    !isHOD &&
+    ((user?.role as string) === 'SUPER_ADMIN' ||
+      user?.role === 'DEPUTY_MANAGER');
 
   // Real Database Analysts Query (combined with system analysts)
   const { data: dbPersonnelData } = useQuery({
@@ -563,8 +563,8 @@ function TaskAssignmentPageInner() {
       action: 'TASK_ASSIGNED',
       entityName: 'SampleTask',
       entityId: targetSampleTask.id || targetSampleTask.sampleId,
-      performedByName: user?.fullName || 'QC Supervisor',
-      role: user?.role || 'MANAGER',
+      performedByName: user?.fullName || 'Deputy Manager',
+      role: user?.role || 'DEPUTY_MANAGER',
       reasonForChange: `Assigned sample ${targetSampleTask.sampleId} (${targetSampleTask.sampleName}) to analyst ${chosen.name} (@${chosen.username || chosen.id}) for ${selectedProtocol}`,
       diffPayload: {
         details: `Assigned sample ${targetSampleTask.sampleId} to ${chosen.name} (@${chosen.username || chosen.id}) — Protocol: ${selectedProtocol} (${selectedPriorityVal})`,
@@ -810,8 +810,8 @@ function TaskAssignmentPageInner() {
       action: 'TASK_ASSIGNED',
       entityName: 'SampleTask',
       entityId: newTask.id || newTask.taskCode,
-      performedByName: user?.fullName || 'QC Supervisor',
-      role: user?.role || 'MANAGER',
+      performedByName: user?.fullName || 'Deputy Manager',
+      role: user?.role || 'DEPUTY_MANAGER',
       reasonForChange: `Created and assigned QC task ${newTask.taskCode} (${newTask.sampleName}) to analyst ${selectedAnalyst.name} (@${selectedAnalyst.username || selectedAnalyst.id})`,
       diffPayload: {
         details: `Task ${newTask.taskCode} assigned to ${selectedAnalyst.name} (@${selectedAnalyst.username || selectedAnalyst.id}) — Protocol: ${newTask.testProtocol} (${newTask.priority})`,
@@ -924,7 +924,7 @@ function TaskAssignmentPageInner() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'QA_MANAGER']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER']}
       moduleName="Sample Assignment & Task Board"
     >
       <div className="space-y-6 animate-in fade-in duration-300">
@@ -1152,13 +1152,20 @@ function TaskAssignmentPageInner() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsNewTaskModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer shrink-0 self-start md:self-auto hover:shadow-md"
-        >
-          <PlusCircle className="h-4 w-4" />
-          <span>Assign New Task</span>
-        </button>
+        {isHOD ? (
+          <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs shrink-0 self-start md:self-auto">
+            <Lock className="w-3.5 h-3.5 text-amber-600" />
+            <span>HOD Read-Only Mode &bull; Assignment Restricted</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsNewTaskModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer shrink-0 self-start md:self-auto hover:shadow-md"
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>Assign New Task</span>
+          </button>
+        )}
       </div>
 
       {/* KPI Cards Row */}

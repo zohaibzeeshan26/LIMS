@@ -215,6 +215,15 @@ export class ProductsController {
     }
   }
 
+  async getDeletionUpdates(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const updates = await productsService.getDeletionUpdates();
+      res.json(updates);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async approveDeletion(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = String(req.params.id);

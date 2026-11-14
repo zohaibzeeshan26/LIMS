@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   RotateCcw,
   ExternalLink,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/date';
@@ -22,11 +23,13 @@ import { formatDateTime } from '@/lib/date';
 interface PendingDocumentDeletionsCardProps {
   className?: string;
   onActionComplete?: () => void;
+  readOnly?: boolean;
 }
 
 export function PendingDocumentDeletionsCard({
   className,
   onActionComplete,
+  readOnly = false,
 }: PendingDocumentDeletionsCardProps) {
   const queryClient = useQueryClient();
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export function PendingDocumentDeletionsCard({
 
   const handleApprove = async (doc: ProductDocument) => {
     const confirmed = window.confirm(
-      `CRITICAL CONFIRMATION:\n\nAre you sure you want to APPROVE the deletion of:\n"${doc.fileName}" (v${doc.version}.0)\nProduct: ${doc.productName}?\n\nThis will PERMANENTLY erase the file from the server.`
+      `APPROVAL CONFIRMATION:\n\nAre you sure you want to APPROVE deletion for:\n"${doc.fileName}" (v${doc.version}.0)\nProduct: ${doc.productName}?\n\nApproving will notify the Documentation Manager and grant them permission to permanently delete ONLY this approved document.`
     );
     if (!confirmed) return;
 
@@ -55,10 +58,11 @@ export function PendingDocumentDeletionsCard({
       const res = await productService.approveDeletion(doc.id);
       setFeedback({
         type: 'success',
-        message: res.message || `Document "${doc.fileName}" permanently removed upon Admin approval.`,
+        message: res.message || `Deletion request for "${doc.fileName}" APPROVED. Documentation user authorized to delete.`,
       });
       await refetch();
       await queryClient.invalidateQueries({ queryKey: ['admin-pending-deletions-count'] });
+      await queryClient.invalidateQueries({ queryKey: ['doc-deletion-updates'] });
       await queryClient.invalidateQueries({ queryKey: ['products-list'] });
       await queryClient.invalidateQueries({ queryKey: ['navbar-audit-alerts'] });
       if (onActionComplete) onActionComplete();
@@ -85,10 +89,11 @@ export function PendingDocumentDeletionsCard({
       const res = await productService.rejectDeletion(doc.id, reason);
       setFeedback({
         type: 'success',
-        message: res.message || `Deletion request rejected. Document "${doc.fileName}" remains active.`,
+        message: res.message || `Deletion request REJECTED. Document "${doc.fileName}" remains active.`,
       });
       await refetch();
       await queryClient.invalidateQueries({ queryKey: ['admin-pending-deletions-count'] });
+      await queryClient.invalidateQueries({ queryKey: ['doc-deletion-updates'] });
       await queryClient.invalidateQueries({ queryKey: ['products-list'] });
       await queryClient.invalidateQueries({ queryKey: ['navbar-audit-alerts'] });
       if (onActionComplete) onActionComplete();
@@ -125,12 +130,12 @@ export function PendingDocumentDeletionsCard({
                 Pending Document Deletion Requests ({pendingDocs.length})
               </h3>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
-                Admin Sign-off Required
+                Admin / HOD Sign-off Required
               </span>
             </div>
             <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
               The Documentation Manager submitted the following file deletion requests. A document is
-              only removed from the system if an Administrator approves it; otherwise, it remains active.
+              only removed from the system if an Administrator or HOD approves it; otherwise, it remains active.
             </p>
           </div>
         </div>
@@ -262,27 +267,36 @@ export function PendingDocumentDeletionsCard({
                     <span>Inspect</span>
                   </a>
 
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={() => handleReject(doc)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-                    title="Reject request and keep file in the system"
-                  >
-                    <XCircle className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Reject &amp; Keep</span>
-                  </button>
+                  {readOnly ? (
+                    <span className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs">
+                      <Lock className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Read-Only Surveillance Mode</span>
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => handleReject(doc)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 text-rose-700 bg-white hover:bg-rose-50 text-xs font-bold inline-flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Reject request and keep file in the system"
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Reject</span>
+                      </button>
 
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={() => handleApprove(doc)}
-                    className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
-                    title="Approve request and permanently delete this document"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Approve &amp; Delete</span>
-                  </button>
+                      <button
+                        type="button"
+                        disabled={isProcessing}
+                        onClick={() => handleApprove(doc)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                        title="Approve deletion request and authorize Documentation user to delete"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Approve Deletion</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

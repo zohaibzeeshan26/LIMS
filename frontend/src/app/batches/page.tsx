@@ -22,10 +22,12 @@ import {
   Layers,
   ArrowRight,
   FileText,
+  Lock,
 } from 'lucide-react';
 
 export default function BatchesPage() {
   const { user } = useAuth();
+  const isHOD = user?.role === 'ADMIN' || (user?.role as string) === 'HOD';
   const queryClient = useQueryClient();
 
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function BatchesPage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER', 'QC_ANALYST']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER', 'QC_ANALYST']}
       moduleName="Batches & Certificate of Analysis (CoA)"
     >
       <div className="space-y-6">
@@ -121,14 +123,21 @@ export default function BatchesPage() {
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsNewBatchModalOpen(true)}
-          variant="primary"
-          className="bg-navy-900 hover:bg-navy-800 text-white shadow-xs"
-        >
-          <PlusCircle className="h-4 w-4 text-teal-400" />
-          <span>New Production Lot</span>
-        </Button>
+        {isHOD ? (
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs">
+            <Lock className="w-3.5 h-3.5 text-amber-600" />
+            <span>HOD Read-Only Mode &bull; Production Intake Restricted</span>
+          </div>
+        ) : (
+          <Button
+            onClick={() => setIsNewBatchModalOpen(true)}
+            variant="primary"
+            className="bg-navy-900 hover:bg-navy-800 text-white shadow-xs"
+          >
+            <PlusCircle className="h-4 w-4 text-teal-400" />
+            <span>New Production Lot</span>
+          </Button>
+        )}
       </div>
 
       {/* Phase 2 Roadmap Notice Banner */}
@@ -210,17 +219,21 @@ export default function BatchesPage() {
                           <span>{b.coa.certificateNumber}</span>
                         </button>
                       ) : b.status === 'RELEASED' ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedBatchId(b.id);
-                            issueCoaMutation.mutate(b.id);
-                          }}
-                          className="h-7 text-xs text-primary-700 border-primary-200"
-                        >
-                          Generate CoA
-                        </Button>
+                        !isHOD ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedBatchId(b.id);
+                              issueCoaMutation.mutate(b.id);
+                            }}
+                            className="h-7 text-xs text-primary-700 border-primary-200"
+                          >
+                            Generate CoA
+                          </Button>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Pending QA CoA</span>
+                        )
                       ) : (
                         <span className="text-slate-400 italic text-[11px]">Requires QA Release</span>
                       )}
@@ -228,7 +241,7 @@ export default function BatchesPage() {
 
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        {b.status === 'QUARANTINE' && (
+                        {b.status === 'QUARANTINE' && !isHOD && (
                           <Button
                             size="sm"
                             variant="primary"

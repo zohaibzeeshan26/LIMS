@@ -4,11 +4,28 @@ import { auditService } from '../services/audit.service';
 export class AuditController {
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const { entityName, action, limit } = req.query;
+      const {
+        entityName,
+        action,
+        limit,
+        role,
+        userId,
+        performedByName,
+        startDate,
+        endDate,
+        search,
+      } = req.query;
+
       const result = await auditService.findAll({
         entityName: entityName as string,
         action: action as string,
         limit: limit ? parseInt(limit as string, 10) : undefined,
+        role: role as string,
+        userId: userId as string,
+        performedByName: performedByName as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        search: search as string,
       });
       res.json(result);
     } catch (err) {

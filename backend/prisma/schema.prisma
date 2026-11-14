@@ -10,6 +10,7 @@ generator client {
 enum Role {
   SUPER_ADMIN
   ADMIN
+  HOD
   MANAGER
   DEPUTY_MANAGER
   SHIFT_INCHARGE
@@ -593,6 +594,11 @@ model ProductDocument {
   deleteRequestedById   String?
   deleteRequestedByName String?
   deleteReason          String?
+  deleteStatus          String?   // 'PENDING' | 'APPROVED' | 'REJECTED' | 'DELETED'
+  deleteApprovedById    String?
+  deleteApprovedByName  String?
+  deleteApprovedAt      DateTime?
+  deleteRejectionReason String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

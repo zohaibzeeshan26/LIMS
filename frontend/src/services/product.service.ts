@@ -20,6 +20,9 @@ export const productService = {
   getPendingDeletions: () =>
     api.get<ProductDocument[]>('/product-documents/pending/deletions'),
 
+  getDeletionUpdates: () =>
+    api.get<ProductDocument[]>('/product-documents/updates/deletions'),
+
   approveDeletion: (documentId: string) =>
     api.post<{ success: boolean; message: string }>(`/product-documents/${documentId}/approve-deletion`),
 

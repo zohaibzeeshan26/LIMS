@@ -51,3 +51,5 @@ uploads/
 
 frontend/portalbe/
 *.err
+backups/
+*.sql

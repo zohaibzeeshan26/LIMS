@@ -135,9 +135,9 @@ function SamplesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Permissions check: Strict RBAC — Only Administrator can edit existing records
-  // Non-admin staff (QA Manager, QC Analyst, Lab Technician, Auditor) can enter new data only
-  const canEdit = user?.role === 'ADMIN';
+  // Permissions check: Strict RBAC — HOD has strictly Read-Only access across all records
+  const isHOD = user?.role === 'ADMIN' || (user?.role as string) === 'HOD';
+  const canEdit = !isHOD && user?.role === 'SUPER_ADMIN';
 
   // 3-Laboratory System: General Lab, Penicillin Lab, Cephalosporin Lab
   const userLabAccess = useMemo(() => getUserLabAccess(user), [user]);
@@ -649,9 +649,7 @@ function SamplesPageInner() {
       allowedRoles={[
         'SUPER_ADMIN',
         'ADMIN',
-        'MANAGER',
         'DEPUTY_MANAGER',
-        'SHIFT_INCHARGE',
         'LAB_TECHNICIAN',
       ]}
       moduleName="Sample Registration & Accessioning"
@@ -847,24 +845,31 @@ function SamplesPageInner() {
           </h1>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons (Strictly View-Only for HOD) */}
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          <Button
-            onClick={() => setIsAccessionModalOpen(true)}
-            variant="primary"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <PlusCircle className="h-4 w-4 text-white" />
-            <span>
-              Add New Sample (
-              {activeSection === 'semi-base'
-                ? 'Semi Basics'
-                : activeSection === 'formulation'
-                ? 'Formulation'
-                : activeLab.name}
-              )
-            </span>
-          </Button>
+          {isHOD ? (
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>HOD Read-Only Mode &bull; Accessioning Restricted</span>
+            </div>
+          ) : (
+            <Button
+              onClick={() => setIsAccessionModalOpen(true)}
+              variant="primary"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <PlusCircle className="h-4 w-4 text-white" />
+              <span>
+                Add New Sample (
+                {activeSection === 'semi-base'
+                  ? 'Semi Basics'
+                  : activeSection === 'formulation'
+                  ? 'Formulation'
+                  : activeLab.name}
+                )
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 

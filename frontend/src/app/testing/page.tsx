@@ -302,7 +302,7 @@ function TestingPageContent() {
   const { analysts: allAnalystsList } = useAllAnalysts();
 
   const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN';
-  const isManager = isSuperAdmin || user?.role === 'MANAGER' || user?.role === 'DEPUTY_MANAGER' || user?.role === 'SHIFT_INCHARGE';
+  const isManager = isSuperAdmin || user?.role === 'DEPUTY_MANAGER';
   const isAnalyst = !isManager;
 
   // Active Laboratory Tab

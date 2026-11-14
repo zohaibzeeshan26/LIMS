@@ -487,6 +487,9 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
     onSuccess: (newSample: any) => {
       queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['sidebar-live-lab-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['lab-operations-summary'] });
       queryClient.invalidateQueries({ queryKey: ['samples-for-task-assignment'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-audit-logs'] });

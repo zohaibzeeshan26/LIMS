@@ -177,11 +177,13 @@ export class SamplingService {
     const role = user.role || '';
     if (
       role === 'ADMIN' ||
-      role === 'QA_MANAGER' ||
+      role === 'SUPER_ADMIN' ||
+      role === 'HOD' ||
       role === 'AUDITOR' ||
-      role === 'MANAGER' ||
       role === 'DEPUTY_MANAGER' ||
-      role === 'SHIFT_INCHARGE'
+      role === 'DOCUMENTATION_MANAGER' ||
+      role === 'LAB_TECHNICIAN' ||
+      role === 'SAMPLE_REGISTRATION'
     ) {
       return 'ALL';
     }

@@ -336,7 +336,7 @@ export function SuperAdminDashboard() {
     },
     {
       role: 'ADMIN',
-      label: 'Admin',
+      label: 'HOD',
       color: 'bg-blue-50 text-blue-800 border-blue-300',
       permissions: {
         user_mgmt: 'FULL',
@@ -369,23 +369,6 @@ export function SuperAdminDashboard() {
       },
     },
     {
-      role: 'MANAGER',
-      label: 'QC Manager',
-      color: 'bg-indigo-50 text-indigo-800 border-indigo-300',
-      permissions: {
-        user_mgmt: 'NONE',
-        system_settings: 'NONE',
-        sample_logging: 'FULL',
-        task_assignment: 'FULL',
-        stp_upload: 'FULL',
-        doc_view: 'FULL',
-        testing_entry: 'FULL',
-        qc_review: 'FULL',
-        coa_release: 'FULL',
-        audit_trail: 'FULL',
-      },
-    },
-    {
       role: 'DEPUTY_MANAGER',
       label: 'Deputy Manager',
       color: 'bg-purple-50 text-purple-800 border-purple-300',
@@ -398,25 +381,8 @@ export function SuperAdminDashboard() {
         doc_view: 'FULL',
         testing_entry: 'FULL',
         qc_review: 'FULL',
-        coa_release: 'VIEW',
-        audit_trail: 'VIEW',
-      },
-    },
-    {
-      role: 'SHIFT_INCHARGE',
-      label: 'Shift Incharge',
-      color: 'bg-cyan-50 text-cyan-800 border-cyan-300',
-      permissions: {
-        user_mgmt: 'NONE',
-        system_settings: 'NONE',
-        sample_logging: 'FULL',
-        task_assignment: 'FULL',
-        stp_upload: 'NONE',
-        doc_view: 'FULL',
-        testing_entry: 'FULL',
-        qc_review: 'VIEW',
-        coa_release: 'NONE',
-        audit_trail: 'VIEW',
+        coa_release: 'FULL',
+        audit_trail: 'FULL',
       },
     },
     {
@@ -982,14 +948,13 @@ export function SuperAdminDashboard() {
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none"
               >
-                <option value="">All Roles (7 Total)</option>
+                <option value="">All Roles (6 Total)</option>
                 <option value="SUPER_ADMIN">1. Super Admin</option>
-                <option value="ADMIN">2. Admin</option>
+                <option value="ADMIN">2. HOD</option>
                 <option value="DOCUMENTATION_MANAGER">3. Documentation Manager</option>
-                <option value="MANAGER">4. QC Manager</option>
-                <option value="DEPUTY_MANAGER">5. Deputy Manager</option>
-                <option value="SHIFT_INCHARGE">6. Shift Incharge</option>
-                <option value="QC_ANALYST">7. QC Analyst</option>
+                <option value="DEPUTY_MANAGER">4. Deputy Manager</option>
+                <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
+                <option value="QC_ANALYST">6. Testing Analyst</option>
               </select>
             </div>
 
@@ -1000,9 +965,9 @@ export function SuperAdminDashboard() {
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none"
               >
                 <option value="">All Laboratories</option>
-                <option value="GENERAL">General Lab (GL)</option>
-                <option value="PENICILLIN">Penicillin Lab (PEN)</option>
-                <option value="CEPHALOSPORIN">Cephalosporin Lab (CEPH)</option>
+                <option value="GENERAL">General Lab</option>
+                <option value="PENICILLIN">Penicillin Lab</option>
+                <option value="CEPHALOSPORIN">Cephalosporin Lab</option>
                 <option value="ALL">Facility-wide (ALL)</option>
               </select>
             </div>
@@ -1047,14 +1012,12 @@ export function SuperAdminDashboard() {
                         ? 'bg-rose-50 text-rose-700 border-rose-200'
                         : u.role === 'ADMIN'
                         ? 'bg-blue-50 text-blue-700 border-blue-200'
-                        : u.role === 'MANAGER' || u.role === 'QA_MANAGER'
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         : u.role === 'DEPUTY_MANAGER'
                         ? 'bg-purple-50 text-purple-700 border-purple-200'
-                        : u.role === 'SHIFT_INCHARGE'
-                        ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
                         : u.role === 'DOCUMENTATION_MANAGER'
                         ? 'bg-teal-50 text-teal-700 border-teal-200'
+                        : u.role === 'LAB_TECHNICIAN'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200';
 
                     return (
@@ -1279,7 +1242,7 @@ export function SuperAdminDashboard() {
                 href="/dashboard?tab=lab-operations"
                 className="w-full py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
-                <span>Inspect GL Operations</span>
+                <span>Inspect General Lab Operations</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -1324,7 +1287,7 @@ export function SuperAdminDashboard() {
                 href="/dashboard?tab=lab-operations"
                 className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
-                <span>Inspect PEN Operations</span>
+                <span>Inspect Penicillin Lab Operations</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -1369,7 +1332,7 @@ export function SuperAdminDashboard() {
                 href="/dashboard?tab=lab-operations"
                 className="w-full py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
-                <span>Inspect CEPH Operations</span>
+                <span>Inspect Cephalosporin Lab Operations</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -1458,7 +1421,7 @@ export function SuperAdminDashboard() {
                   <div>
                     <span className="font-bold text-slate-800 block">Dual-Authorization for CoA Release</span>
                     <span className="text-[11px] text-slate-500">
-                      Require both QC Manager and QA Officer sign-off before Certificate release
+                      Require both Deputy Manager and Administrator sign-off before Certificate release
                     </span>
                   </div>
                   <input
@@ -1473,7 +1436,7 @@ export function SuperAdminDashboard() {
                   <div>
                     <span className="font-bold text-slate-800 block">Automatic OOS Quarantine Flag</span>
                     <span className="text-[11px] text-slate-500">
-                      Instantly quarantine sample and alert QC Manager if test falls out of limits
+                      Instantly quarantine sample and alert Deputy Manager if test falls out of limits
                     </span>
                   </div>
                   <input
@@ -1659,12 +1622,11 @@ export function SuperAdminDashboard() {
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
                 >
                   <option value="SUPER_ADMIN">1. Super Admin</option>
-                  <option value="ADMIN">2. Admin</option>
+                  <option value="ADMIN">2. HOD</option>
                   <option value="DOCUMENTATION_MANAGER">3. Documentation Manager</option>
-                  <option value="MANAGER">4. QC Manager</option>
-                  <option value="DEPUTY_MANAGER">5. Deputy Manager</option>
-                  <option value="SHIFT_INCHARGE">6. Shift Incharge</option>
-                  <option value="QC_ANALYST">7. QC Analyst</option>
+                  <option value="DEPUTY_MANAGER">4. Deputy Manager</option>
+                  <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
+                  <option value="QC_ANALYST">6. Testing Analyst</option>
                 </select>
               </div>
 
@@ -1744,12 +1706,11 @@ export function SuperAdminDashboard() {
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
               >
                 <option value="SUPER_ADMIN">1. Super Admin (Full Governance)</option>
-                <option value="ADMIN">2. Admin (Operations &amp; Samples)</option>
+                <option value="ADMIN">2. HOD (Head of Department)</option>
                 <option value="DOCUMENTATION_MANAGER">3. Documentation Manager (STP Dossier)</option>
-                <option value="MANAGER">4. QC Manager (Supervision &amp; Allocation)</option>
-                <option value="DEPUTY_MANAGER">5. Deputy Manager (Section Oversight)</option>
-                <option value="SHIFT_INCHARGE">6. Shift Incharge (Floor Management)</option>
-                <option value="QC_ANALYST">7. QC Analyst (Worksheet Execution)</option>
+                <option value="DEPUTY_MANAGER">4. Deputy Manager (Supervision &amp; Allocation)</option>
+                <option value="LAB_TECHNICIAN">5. Sample Registration Analyst (Specimen Intake)</option>
+                <option value="QC_ANALYST">6. Testing Analyst (Worksheet Execution)</option>
               </select>
             </div>
 
@@ -1782,9 +1743,9 @@ export function SuperAdminDashboard() {
                 onChange={(e) => setSelectedLab(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
               >
-                <option value="GENERAL">General Laboratory (GL) — Non-Beta-Lactam</option>
-                <option value="PENICILLIN">Penicillin Laboratory (PEN) — Bio-Containment Suite</option>
-                <option value="CEPHALOSPORIN">Cephalosporin Laboratory (CEPH) — Bio-Containment Suite</option>
+                <option value="GENERAL">General Laboratory — Non-Beta-Lactam</option>
+                <option value="PENICILLIN">Penicillin Laboratory — Bio-Containment Suite</option>
+                <option value="CEPHALOSPORIN">Cephalosporin Laboratory — Bio-Containment Suite</option>
                 <option value="ALL">All Laboratories / Facility-wide Access</option>
               </select>
             </div>

@@ -68,6 +68,8 @@ const DEFAULT_STAFF_NOTIFICATIONS: NotificationItem[] = [
 function NavbarInner({ onToggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const isHod = (user?.role as string) === 'HOD' || user?.username === 'admin.office' || user?.fullName?.toUpperCase().includes('HOD');
+  const canApproveDeletions = isAdmin || isHod;
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -111,12 +113,14 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
   const [readAlertIds, setReadAlertIds] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
-      const stored = sessionStorage.getItem('cp_admin_read_alerts');
+      const stored = sessionStorage.getItem('cp_user_read_alerts') || sessionStorage.getItem('cp_admin_read_alerts');
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
   });
+
+  const isDocManager = user?.role === 'DOCUMENTATION_MANAGER';
 
   // Query live real-time audit logs from database (refreshes every 5 seconds)
   const { data: rawAuditLogs } = useQuery({
@@ -132,11 +136,19 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
     refetchInterval: 5000,
   });
 
-  // Query pending document deletion requests for Administrator
+  // Query pending document deletion requests for Administrator & HOD
   const { data: pendingDeletions = [] } = useQuery({
     queryKey: ['admin-pending-deletions-count'],
     queryFn: () => productService.getPendingDeletions(),
-    enabled: isAdmin,
+    enabled: canApproveDeletions,
+    refetchInterval: 5000,
+  });
+
+  // Query document deletion updates (APPROVED / REJECTED) for Documentation Manager & HOD/Admin
+  const { data: deletionUpdates = [] } = useQuery({
+    queryKey: ['doc-deletion-updates'],
+    queryFn: () => productService.getDeletionUpdates(),
+    enabled: isDocManager || canApproveDeletions,
     refetchInterval: 5000,
   });
 
@@ -172,19 +184,48 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
   const notifications: NotificationItem[] = React.useMemo(() => {
     const list: NotificationItem[] = [];
 
-    // 0. Pending Document Deletion Requests (Action Required by Admin)
-    if (isAdmin && Array.isArray(pendingDeletions) && pendingDeletions.length > 0) {
+    // 0. Pending Document Deletion Requests (Action Required by Admin or HOD)
+    if (canApproveDeletions && Array.isArray(pendingDeletions) && pendingDeletions.length > 0) {
       pendingDeletions.forEach((doc) => {
         list.push({
           id: `deletion-req-${doc.id}`,
           title: `🗑️ Deletion Approval: ${doc.fileName}`,
-          description: `Requested by ${doc.deleteRequestedByName || 'Documentation Manager'} for ${doc.productName}. Admin sign-off required.`,
+          description: `Requested by ${doc.deleteRequestedByName || 'Documentation Manager'} for ${doc.productName}. Admin / HOD sign-off required.`,
           timestamp: 'Action Needed',
           type: 'warning',
           read: false,
           link: '/dashboard',
           actionBadge: 'Review & Approve',
         });
+      });
+    }
+
+    // 0b. Document Deletion Updates (Instant notifications for Documentation Manager)
+    if (isDocManager && Array.isArray(deletionUpdates) && deletionUpdates.length > 0) {
+      deletionUpdates.forEach((doc) => {
+        if (doc.deleteStatus === 'APPROVED') {
+          list.push({
+            id: `doc-del-approved-${doc.id}`,
+            title: `✅ Deletion Approved: ${doc.fileName}`,
+            description: `${doc.deleteApprovedByName || 'Admin / HOD'} approved deletion of "${doc.fileName}". You are now authorized to permanently delete this document.`,
+            timestamp: 'Ready to Delete',
+            type: 'info',
+            read: readAlertIds.includes(`doc-del-approved-${doc.id}`),
+            link: '/documentation-manager',
+            actionBadge: 'Delete Allowed',
+          });
+        } else if (doc.deleteStatus === 'REJECTED') {
+          list.push({
+            id: `doc-del-rejected-${doc.id}`,
+            title: `❌ Deletion Rejected: ${doc.fileName}`,
+            description: `Deletion of "${doc.fileName}" was rejected. Reason: ${doc.deleteRejectionReason || 'Document retained'}.`,
+            timestamp: 'Rejected',
+            type: 'warning',
+            read: readAlertIds.includes(`doc-del-rejected-${doc.id}`),
+            link: '/documentation-manager',
+            actionBadge: 'Retained',
+          });
+        }
       });
     }
 
@@ -270,12 +311,16 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
     }
   };
 
-  const displayName = user?.fullName || 'Lab Staff';
+  const displayName = (user?.fullName || 'Lab Staff')
+    .replace(/\s*\([^)]*\)/g, '')
+    .trim();
   const displayRole =
     user?.role === 'SUPER_ADMIN'
       ? 'Chief Super Admin'
       : user?.role === 'ADMIN'
       ? 'Master Administrator'
+      : user?.role === 'LAB_TECHNICIAN'
+      ? 'Lab Analyst'
       : user?.role
       ? user.role.replace(/_/g, ' ')
       : 'Lab Staff';
@@ -377,11 +422,11 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
                       key={item.id}
                       href={item.link || '#'}
                       onClick={() => {
-                        if (isAdmin && !readAlertIds.includes(item.id)) {
+                        if (!readAlertIds.includes(item.id)) {
                           const updated = [...readAlertIds, item.id];
                           setReadAlertIds(updated);
                           try {
-                            sessionStorage.setItem('cp_admin_read_alerts', JSON.stringify(updated));
+                            sessionStorage.setItem('cp_user_read_alerts', JSON.stringify(updated));
                           } catch {}
                         }
                         setIsNotifOpen(false);

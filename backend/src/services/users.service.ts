@@ -30,8 +30,19 @@ export interface UpdateUserInput {
 }
 
 export class UsersService {
-  async findAll() {
+  async findAll(requestingUserRole?: string) {
+    // Super Admin and HOD (Head of Department) can view all users and their assigned roles for facility surveillance
+    const canViewAll =
+      requestingUserRole === 'SUPER_ADMIN' ||
+      requestingUserRole === 'HOD' ||
+      requestingUserRole === 'ADMIN';
+    const where: any = {};
+    if (!canViewAll) {
+      where.role = { not: 'SUPER_ADMIN' };
+    }
+
     return prisma.user.findMany({
+      where,
       select: {
         id: true,
         email: true,
@@ -58,7 +69,8 @@ export class UsersService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, requestingUserRole?: string) {
+    const isSuperAdmin = requestingUserRole === 'SUPER_ADMIN';
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -80,14 +92,19 @@ export class UsersService {
             accessionedSamples: true,
             performedTests: true,
             calibrations: true,
-            submittedSamples: true,
-            assignedSamples: true,
           },
         },
       },
     });
 
-    if (!user) throw new AppError('User not found', 404);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.role === 'SUPER_ADMIN' && !isSuperAdmin) {
+      throw new AppError('Access Denied: Super Admin data is restricted', 403);
+    }
+
     return user;
   }
 
@@ -200,13 +217,21 @@ export class UsersService {
     return newUser;
   }
 
-  async update(id: string, data: UpdateUserInput) {
+  async update(id: string, data: UpdateUserInput, requestingUserRole?: string) {
     const existingUser = await prisma.user.findUnique({
       where: { id },
     });
 
     if (!existingUser) {
       throw new AppError('User not found', 404);
+    }
+
+    const isSuperAdmin = requestingUserRole === 'SUPER_ADMIN';
+    if (existingUser.role === 'SUPER_ADMIN' && !isSuperAdmin) {
+      throw new AppError('Access Denied: Super Admin account cannot be modified by non-superadmin users', 403);
+    }
+    if (data.role === 'SUPER_ADMIN' && !isSuperAdmin) {
+      throw new AppError('Access Denied: Only Super Admin can assign the Super Admin role', 403);
     }
 
     const updateData: any = {};
@@ -306,10 +331,18 @@ export class UsersService {
     });
   }
 
-  async updateRole(id: string, role: Role) {
+  async updateRole(id: string, role: Role, requestingUserRole?: string) {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new AppError('User not found', 404);
+    }
+
+    const isSuperAdmin = requestingUserRole === 'SUPER_ADMIN';
+    if (existing.role === 'SUPER_ADMIN' && !isSuperAdmin) {
+      throw new AppError('Access Denied: Super Admin role cannot be modified by non-superadmin users', 403);
+    }
+    if (role === 'SUPER_ADMIN' && !isSuperAdmin) {
+      throw new AppError('Access Denied: Only Super Admin can assign the Super Admin role', 403);
     }
 
     const updated = await prisma.user.update({
@@ -351,10 +384,14 @@ export class UsersService {
     return updated;
   }
 
-  async delete(id: string, requesterUserId?: string) {
+  async delete(id: string, requesterUserId?: string, requestingUserRole?: string) {
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new AppError('User not found', 404);
+    }
+
+    if (existing.role === 'SUPER_ADMIN') {
+      throw new AppError('Access Denied: Super Admin account cannot be deleted or deactivated', 403);
     }
 
     if (requesterUserId && id === requesterUserId) {

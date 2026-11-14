@@ -484,7 +484,10 @@ export class ProductsService {
   async getPendingDeletionRequests() {
     return prisma.productDocument.findMany({
       where: {
-        deleteRequested: true,
+        OR: [
+          { deleteRequested: true },
+          { deleteStatus: 'PENDING' },
+        ],
       },
       include: {
         product: {
@@ -503,6 +506,30 @@ export class ProductsService {
     });
   }
 
+  async getDeletionUpdates() {
+    return prisma.productDocument.findMany({
+      where: {
+        deleteStatus: {
+          in: ['PENDING', 'APPROVED', 'REJECTED'],
+        },
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            brandName: true,
+            genericName: true,
+            atmCode: true,
+            laboratory: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+  }
+
   async deleteDocument(id: string, user: any, reason?: string) {
     const doc = await prisma.productDocument.findUnique({
       where: { id },
@@ -513,18 +540,99 @@ export class ProductsService {
     }
 
     const userRole = String(user?.role || '').toUpperCase();
-    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+    const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'HOD';
 
-    // If non-admin (e.g. DOCUMENTATION_MANAGER), mark as pending admin approval
+    // If non-admin (e.g. DOCUMENTATION_MANAGER):
     if (!isAdmin) {
+      // 1. If already APPROVED by Administrator: allow the Documentation user to execute deletion of this approved document!
+      if (doc.deleteStatus === 'APPROVED') {
+        if (doc.isCurrent) {
+          const remainingDocs = await prisma.productDocument.findMany({
+            where: { productId: doc.productId, id: { not: id } },
+            orderBy: { version: 'desc' },
+          });
+          if (remainingDocs.length > 0) {
+            await prisma.productDocument.update({
+              where: { id: remainingDocs[0].id },
+              data: { isCurrent: true },
+            });
+          }
+        }
+
+        if (fs.existsSync(doc.filePath)) {
+          try {
+            fs.unlinkSync(doc.filePath);
+          } catch (err) {
+            console.warn('Could not remove file from disk:', err);
+          }
+        }
+
+        await prisma.productDocument.delete({
+          where: { id },
+        });
+
+        try {
+          await prisma.auditTrail.create({
+            data: {
+              entityName: 'ProductDocument',
+              entityId: id,
+              action: 'PRODUCT_DOCUMENT_DELETED',
+              performedById: user?.id || null,
+              performedByName: user?.fullName || user?.username || 'Documentation User',
+              role: userRole,
+              reasonForChange: `Documentation Manager executed authorized permanent deletion of document "${doc.fileName}" (v${doc.version}.0) following Administrator approval by ${doc.deleteApprovedByName || 'Administrator'}.`,
+              diffPayload: JSON.stringify({
+                deletedDocId: id,
+                productId: doc.productId,
+                version: doc.version,
+                fileName: doc.fileName,
+                status: 'DELETED',
+                approvedBy: doc.deleteApprovedByName,
+                approvedAt: doc.deleteApprovedAt,
+                executedBy: user?.fullName || user?.username,
+                executedAt: new Date().toISOString(),
+              }),
+            },
+          });
+        } catch (auditErr) {}
+
+        return {
+          success: true,
+          deleted: true,
+          message: `Approved document "${doc.fileName}" has been permanently deleted from the system.`,
+        };
+      }
+
+      // 2. If deletion request is currently PENDING approval: prevent deletion!
+      if (doc.deleteStatus === 'PENDING' || doc.deleteRequested) {
+        throw new AppError(
+          `Cannot delete document "${doc.fileName}". Deletion request is currently pending Administrator approval.`,
+          403
+        );
+      }
+
+      // 3. If deletion request was REJECTED: prevent deletion!
+      if (doc.deleteStatus === 'REJECTED') {
+        throw new AppError(
+          `Cannot delete document "${doc.fileName}". Deletion request was rejected by Administrator: "${doc.deleteRejectionReason || 'Document retained by Administrator.'}".`,
+          403
+        );
+      }
+
+      // 4. Initial request from Documentation user: submit request to Admin (Status: PENDING)
       const updated = await prisma.productDocument.update({
         where: { id },
         data: {
           deleteRequested: true,
+          deleteStatus: 'PENDING',
           deleteRequestedAt: new Date(),
           deleteRequestedById: user?.id || null,
           deleteRequestedByName: user?.fullName || user?.username || 'Documentation Manager',
           deleteReason: reason || 'Document deletion requested by Documentation Manager',
+          deleteApprovedById: null,
+          deleteApprovedByName: null,
+          deleteApprovedAt: null,
+          deleteRejectionReason: null,
         },
       });
 
@@ -537,10 +645,11 @@ export class ProductsService {
             performedById: user?.id || null,
             performedByName: user?.fullName || user?.username || 'Documentation Manager',
             role: userRole,
-            reasonForChange: `Documentation Manager requested deletion of document "${doc.fileName}" (v${doc.version}.0) for product "${doc.productName}". Pending Administrator review & approval.`,
+            reasonForChange: `Documentation Manager requested deletion of document "${doc.fileName}" (v${doc.version}.0) for product "${doc.productName}". Status: PENDING. Sent to Administrator for sign-off.`,
             diffPayload: JSON.stringify({
               docId: id,
               fileName: doc.fileName,
+              status: 'PENDING',
               deleteReason: reason || 'Document deletion requested by Documentation Manager',
               requestedAt: new Date().toISOString(),
             }),
@@ -553,7 +662,7 @@ export class ProductsService {
       return {
         success: true,
         pendingApproval: true,
-        message: `Deletion request for "${doc.fileName}" submitted to Administrator for review. The file will remain active until approved.`,
+        message: `Deletion request for "${doc.fileName}" submitted to Administrator for review. Status: Pending.`,
         document: updated,
       };
     }
@@ -591,7 +700,7 @@ export class ProductsService {
           entityId: id,
           action: 'PRODUCT_DOCUMENT_DELETED',
           performedById: user?.id || null,
-          performedByName: user?.fullName || 'User',
+          performedByName: user?.fullName || 'Administrator',
           role: userRole,
           reasonForChange: `Directly deleted version ${doc.version} of product description document for product ${doc.productName} (${doc.productCode})`,
           diffPayload: JSON.stringify({
@@ -599,6 +708,7 @@ export class ProductsService {
             productId: doc.productId,
             version: doc.version,
             fileName: doc.fileName,
+            status: 'DELETED',
           }),
         },
       });
@@ -616,29 +726,26 @@ export class ProductsService {
       throw new AppError('Document not found', 404);
     }
 
-    if (doc.isCurrent) {
-      const remainingDocs = await prisma.productDocument.findMany({
-        where: { productId: doc.productId, id: { not: id } },
-        orderBy: { version: 'desc' },
-      });
-      if (remainingDocs.length > 0) {
-        await prisma.productDocument.update({
-          where: { id: remainingDocs[0].id },
-          data: { isCurrent: true },
-        });
-      }
-    }
+    const userRoleStr = String(user?.role || 'ADMIN');
+    const isUserHOD =
+      userRoleStr === 'HOD' ||
+      (user?.role === 'ADMIN' &&
+        (user?.username === 'admin.office' ||
+          user?.employeeId?.includes('HOD') ||
+          user?.fullName?.toUpperCase().includes('HOD')));
+    const approverRoleLabel = isUserHOD ? 'HOD' : userRoleStr === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
+    const approverName = user?.fullName || (isUserHOD ? 'Head of Department (HOD)' : user?.username || 'Administrator');
 
-    if (fs.existsSync(doc.filePath)) {
-      try {
-        fs.unlinkSync(doc.filePath);
-      } catch (err) {
-        console.warn('Could not remove file from disk:', err);
-      }
-    }
-
-    await prisma.productDocument.delete({
+    const updated = await prisma.productDocument.update({
       where: { id },
+      data: {
+        deleteRequested: false,
+        deleteStatus: 'APPROVED',
+        deleteApprovedById: user?.id || null,
+        deleteApprovedByName: `${approverName} (${approverRoleLabel})`,
+        deleteApprovedAt: new Date(),
+        deleteRejectionReason: null,
+      },
     });
 
     try {
@@ -648,24 +755,30 @@ export class ProductsService {
           entityId: id,
           action: 'PRODUCT_DOCUMENT_DELETION_APPROVED',
           performedById: user?.id || null,
-          performedByName: user?.fullName || 'Administrator',
-          role: String(user?.role || 'ADMIN'),
-          reasonForChange: `Administrator approved deletion request for document "${doc.fileName}" (requested by ${doc.deleteRequestedByName || 'Documentation Manager'})`,
+          performedByName: approverName,
+          role: isUserHOD ? 'HOD' : userRoleStr,
+          reasonForChange: `${approverRoleLabel} (${approverName}) approved deletion request for document "${doc.fileName}" (requested by ${doc.deleteRequestedByName || 'Documentation Manager'}). Documentation user is authorized to delete only this document.`,
           diffPayload: JSON.stringify({
-            deletedDocId: id,
+            docId: id,
             productId: doc.productId,
             version: doc.version,
             fileName: doc.fileName,
+            status: 'APPROVED',
             requestedBy: doc.deleteRequestedByName,
             requestedAt: doc.deleteRequestedAt,
-            approvedBy: user?.fullName || 'Administrator',
+            approvedBy: approverName,
+            approvedByRole: approverRoleLabel,
             approvedAt: new Date().toISOString(),
           }),
         },
       });
     } catch (auditErr) {}
 
-    return { success: true, message: `Deletion of "${doc.fileName}" approved and document permanently removed.` };
+    return {
+      success: true,
+      message: `Deletion request for "${doc.fileName}" APPROVED by ${approverRoleLabel} (${approverName}). Documentation user has been notified and authorized to delete this document.`,
+      document: updated,
+    };
   }
 
   async rejectDeletion(id: string, user: any, reason?: string) {
@@ -677,14 +790,25 @@ export class ProductsService {
       throw new AppError('Document not found', 404);
     }
 
+    const userRoleStr = String(user?.role || 'ADMIN');
+    const isUserHOD =
+      userRoleStr === 'HOD' ||
+      (user?.role === 'ADMIN' &&
+        (user?.username === 'admin.office' ||
+          user?.employeeId?.includes('HOD') ||
+          user?.fullName?.toUpperCase().includes('HOD')));
+    const approverRoleLabel = isUserHOD ? 'HOD' : userRoleStr === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
+    const approverName = user?.fullName || (isUserHOD ? 'Head of Department (HOD)' : user?.username || 'Administrator');
+
+    const rejectionReasonText =
+      reason || `Document retained by ${approverRoleLabel} - required for laboratory reference.`;
+
     const updated = await prisma.productDocument.update({
       where: { id },
       data: {
         deleteRequested: false,
-        deleteRequestedAt: null,
-        deleteRequestedById: null,
-        deleteRequestedByName: null,
-        deleteReason: null,
+        deleteStatus: 'REJECTED',
+        deleteRejectionReason: rejectionReasonText,
       },
     });
 
@@ -695,14 +819,17 @@ export class ProductsService {
           entityId: id,
           action: 'PRODUCT_DOCUMENT_DELETION_REJECTED',
           performedById: user?.id || null,
-          performedByName: user?.fullName || 'Administrator',
-          role: String(user?.role || 'ADMIN'),
-          reasonForChange: `Administrator rejected deletion request for document "${doc.fileName}". File retained. Reason: ${reason || 'Retained by Administrator'}`,
+          performedByName: approverName,
+          role: isUserHOD ? 'HOD' : userRoleStr,
+          reasonForChange: `${approverRoleLabel} (${approverName}) rejected deletion request for document "${doc.fileName}". File retained and deletion prevented. Reason: ${rejectionReasonText}`,
           diffPayload: JSON.stringify({
             docId: id,
             fileName: doc.fileName,
-            rejectedBy: user?.fullName || 'Administrator',
-            rejectReason: reason || 'Retained by Administrator',
+            status: 'REJECTED',
+            requestedBy: doc.deleteRequestedByName,
+            rejectedBy: approverName,
+            rejectedByRole: approverRoleLabel,
+            rejectReason: rejectionReasonText,
             rejectedAt: new Date().toISOString(),
           }),
         },
@@ -711,7 +838,7 @@ export class ProductsService {
 
     return {
       success: true,
-      message: `Deletion request for "${doc.fileName}" rejected. Document retained.`,
+      message: `Deletion request for "${doc.fileName}" REJECTED by ${approverRoleLabel} (${approverName}). Document retained and deletion prevented.`,
       document: updated,
     };
   }

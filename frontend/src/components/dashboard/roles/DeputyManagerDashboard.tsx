@@ -421,7 +421,6 @@ export function DeputyManagerDashboard() {
               >
                 <option value="ROUTINE">Routine Standard</option>
                 <option value="URGENT">Urgent Expedited</option>
-                <option value="STAT">STAT Immediate</option>
               </select>
             </div>
 

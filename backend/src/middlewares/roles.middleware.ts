@@ -13,7 +13,11 @@ export function requireRoles(...allowedRoles: Role[]) {
 
     const userRole = (req.user as any)?.role;
     if (allowedRoles.length > 0) {
-      if (userRole === Role.SUPER_ADMIN) {
+      if (
+        userRole === Role.SUPER_ADMIN ||
+        userRole === Role.ADMIN ||
+        (userRole as any) === 'HOD'
+      ) {
         return next();
       }
       if (!allowedRoles.includes(userRole)) {

@@ -188,7 +188,7 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
     LabKey,
     {
       title: string;
-      code: string;
+      code?: string;
       icon: any;
       headerBg: string;
       cardBorder: string;
@@ -201,7 +201,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
   > = {
     general: {
       title: 'General Lab',
-      code: 'GL',
       icon: FlaskConical,
       headerBg: 'from-blue-900 via-blue-800 to-indigo-950',
       cardBorder: 'border-blue-200 hover:border-blue-400',
@@ -213,7 +212,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
     },
     cephalosporin: {
       title: 'Cephalosporin Lab',
-      code: 'CEPH',
       icon: ShieldAlert,
       headerBg: 'from-purple-950 via-purple-900 to-slate-900',
       cardBorder: 'border-purple-200 hover:border-purple-400',
@@ -225,7 +223,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
     },
     penicillin: {
       title: 'Penicillin Lab',
-      code: 'PEN',
       icon: Microscope,
       headerBg: 'from-teal-950 via-teal-900 to-slate-900',
       cardBorder: 'border-teal-200 hover:border-teal-400',
@@ -503,12 +500,12 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                             <IconComponent className="h-5 w-5 stroke-[2]" />
                           </div>
                           <div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                               <h3 className="font-bold text-base text-slate-900 group-hover:text-blue-700 transition-colors">
                                 {lab.name}
                               </h3>
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                                {lab.code}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                                {lab.totalSamples} {lab.totalSamples === 1 ? 'Sample' : 'Samples'}
                               </span>
                             </div>
                             <span className="text-[11px] text-slate-500 font-medium">
@@ -739,7 +736,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-xs text-slate-900">{labPerf.labName}</span>
-                            <span className="text-[10px] font-mono font-bold text-slate-500">({labPerf.code})</span>
                           </div>
                           <span className="text-xs font-black text-emerald-700">
                             {passRate}% Pass Rate
@@ -817,7 +813,7 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/20 text-white border border-white/20">
-                        {theme.code} Workstation
+                        Analytical Workstation
                       </span>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-slate-200 border border-white/20">
                         Filter: {individualData?.filter?.label || 'Today'}

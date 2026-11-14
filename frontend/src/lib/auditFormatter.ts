@@ -69,9 +69,11 @@ export function formatAuditRole(role: string): { label: string; badgeClass: stri
   const normalized = (role || '').toUpperCase();
   const isNonAdmin = normalized !== 'ADMIN' && normalized !== 'SUPER_ADMIN';
   switch (normalized) {
-    case 'ADMIN':
     case 'SUPER_ADMIN':
       return { label: 'Super Admin', badgeClass: 'bg-rose-50 text-rose-800 border-rose-200 font-bold', isNonAdmin: false };
+    case 'ADMIN':
+    case 'HOD':
+      return { label: 'HOD', badgeClass: 'bg-blue-50 text-blue-800 border-blue-200 font-bold', isNonAdmin: false };
     case 'QA_MANAGER':
       return { label: 'QA Manager', badgeClass: 'bg-purple-50 text-purple-800 border-purple-200 font-bold', isNonAdmin: true };
     case 'MANAGER':
@@ -86,7 +88,7 @@ export function formatAuditRole(role: string): { label: string; badgeClass: stri
     case 'ANALYST':
       return { label: 'QC Analyst', badgeClass: 'bg-blue-50 text-blue-800 border-blue-200 font-bold', isNonAdmin: true };
     case 'LAB_TECHNICIAN':
-      return { label: 'Lab Tech', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 font-bold', isNonAdmin: true };
+      return { label: 'Lab Analyst', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 font-bold', isNonAdmin: true };
     case 'AUDITOR':
       return { label: 'Auditor', badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold', isNonAdmin: true };
     default:

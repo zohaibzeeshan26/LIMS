@@ -377,11 +377,11 @@ export default function LoginPage() {
                 Role-Based One-Click Logins
               </span>
               <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                8 Roles Active
+                6 Roles Active
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => handleDirectLogin('superadmin', 'admin123')}
@@ -398,7 +398,7 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="p-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-blue-950 transition-colors text-left cursor-pointer disabled:opacity-50"
               >
-                <div className="font-bold text-[11px] text-blue-900">2. Admin</div>
+                <div className="font-bold text-[11px] text-blue-900">2. HOD</div>
                 <div className="text-[10px] text-blue-600 font-mono">admin.office</div>
               </button>
 
@@ -414,32 +414,12 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => handleDirectLogin('qc.manager', 'manager123')}
-                disabled={isSubmitting}
-                className="p-2 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 text-indigo-950 transition-colors text-left cursor-pointer disabled:opacity-50"
-              >
-                <div className="font-bold text-[11px] text-indigo-900">4. QC Manager</div>
-                <div className="text-[10px] text-indigo-600 font-mono">qc.manager</div>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => handleDirectLogin('deputy.manager', 'deputy123')}
                 disabled={isSubmitting}
                 className="p-2 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100/80 text-purple-950 transition-colors text-left cursor-pointer disabled:opacity-50"
               >
-                <div className="font-bold text-[11px] text-purple-900">5. Deputy Mgr</div>
+                <div className="font-bold text-[11px] text-purple-900">4. Deputy Manager</div>
                 <div className="text-[10px] text-purple-600 font-mono">deputy.manager</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDirectLogin('shift.incharge', 'incharge123')}
-                disabled={isSubmitting}
-                className="p-2 rounded-xl border border-cyan-200 bg-cyan-50/70 hover:bg-cyan-100/80 text-cyan-950 transition-colors text-left cursor-pointer disabled:opacity-50"
-              >
-                <div className="font-bold text-[11px] text-cyan-900">6. Shift Incharge</div>
-                <div className="text-[10px] text-cyan-600 font-mono">shift.incharge</div>
               </button>
 
               <button
@@ -448,7 +428,7 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="p-2 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 text-amber-950 transition-colors text-left cursor-pointer disabled:opacity-50"
               >
-                <div className="font-bold text-[11px] text-amber-900">7. Registration</div>
+                <div className="font-bold text-[11px] text-amber-900">5. Registration</div>
                 <div className="text-[10px] text-amber-600 font-mono">reg.analyst</div>
               </button>
 
@@ -458,7 +438,7 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="p-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-950 transition-colors text-left cursor-pointer disabled:opacity-50"
               >
-                <div className="font-bold text-[11px] text-emerald-900">8. Testing Analyst</div>
+                <div className="font-bold text-[11px] text-emerald-900">6. Testing Analyst</div>
                 <div className="text-[10px] text-emerald-600 font-mono">qc.analyst</div>
               </button>
             </div>

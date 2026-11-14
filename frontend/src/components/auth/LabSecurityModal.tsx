@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { Modal } from '@/components/ui/Modal';
 import {
   ShieldAlert,
@@ -20,7 +21,7 @@ import { cn } from '@/lib/utils';
 export interface TargetLabInfo {
   id: string;
   name: string;
-  badge: string;
+  badge?: string;
   code?: string;
   desc?: string;
   href: string;
@@ -50,8 +51,8 @@ export interface LabCredentialInfo {
 export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
   general: {
     labId: 'general',
-    name: 'General Lab (GL)',
-    badge: 'GL',
+    name: 'General Lab',
+    badge: '',
     username: 'general',
     password: 'gen123',
     aliases: ['general', 'gl', 'generallab', 'gl_lab', 'gen_lab'],
@@ -67,8 +68,8 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
   },
   penicillin: {
     labId: 'penicillin',
-    name: 'Penicillin Lab (PEN)',
-    badge: 'PEN',
+    name: 'Penicillin Lab',
+    badge: '',
     username: 'penicillin',
     password: 'pen123',
     aliases: ['penicillin', 'pen', 'penlab', 'pen_lab'],
@@ -84,8 +85,8 @@ export const LAB_SECURITY_CREDENTIALS: Record<string, LabCredentialInfo> = {
   },
   cephalosporin: {
     labId: 'cephalosporin',
-    name: 'Cephalosporin Lab (CEPH)',
-    badge: 'CEPH',
+    name: 'Cephalosporin Lab',
+    badge: '',
     username: 'cephalosporin',
     password: 'ceph123',
     aliases: ['cephalosporin', 'ceph', 'cephlab', 'saf', 'sef', 'ceph_lab'],
@@ -122,14 +123,37 @@ export function LabSecurityModal({
   const [isSuccess, setIsSuccess] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
+  const { user } = useAuth();
+  const userRole = (user?.role || '').toUpperCase();
+  const isAdminOrSuperAdmin =
+    userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'HOD';
+  const isSampleRegistration =
+    userRole === 'LAB_TECHNICIAN' ||
+    userRole === 'SAMPLE_REGISTRATION' ||
+    userRole === 'SAMPLE_REGISTRATION_ANALYST';
+  const hasDirectLabAccess = isAdminOrSuperAdmin || isSampleRegistration;
+
   // Normalize target lab id to key ('general', 'penicillin', or 'cephalosporin')
   const targetLabKey = (targetLab?.id || 'general').toLowerCase();
   const labConfig: LabCredentialInfo =
     LAB_SECURITY_CREDENTIALS[targetLabKey] || LAB_SECURITY_CREDENTIALS.general;
 
+  // Direct bypass for Admin, Super Admin, and Sample Registration using their existing authenticated session
+  useEffect(() => {
+    if (isOpen && hasDirectLabAccess && targetLab) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('lab_security_auth', 'true');
+        sessionStorage.setItem('lab_security_auth_time', Date.now().toString());
+        sessionStorage.setItem(`lab_auth_${targetLabKey}`, 'true');
+        sessionStorage.setItem('lab_security_active_lab', targetLabKey);
+      }
+      onSuccess(targetLab);
+    }
+  }, [isOpen, hasDirectLabAccess, targetLab, targetLabKey, onSuccess]);
+
   // Reset fields whenever modal opens or targetLab changes
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !hasDirectLabAccess) {
       setUsername('');
       setPassword('');
       setError(null);
@@ -138,7 +162,9 @@ export function LabSecurityModal({
       setIsSuccess(false);
       setSuccessMsg('');
     }
-  }, [isOpen, targetLab]);
+  }, [isOpen, targetLab, hasDirectLabAccess]);
+
+  if (!isOpen || !targetLab || hasDirectLabAccess) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,14 +294,16 @@ export function LabSecurityModal({
               <span className="text-xs font-bold text-slate-900 tracking-tight">
                 {targetLab.name}
               </span>
-              <span
-                className={cn(
-                  'text-[10px] font-mono font-extrabold px-1.5 py-0.2 rounded border',
-                  labConfig.badgeBg
-                )}
-              >
-                {labConfig.badge}
-              </span>
+              {labConfig.badge ? (
+                <span
+                  className={cn(
+                    'text-[10px] font-mono font-extrabold px-1.5 py-0.2 rounded border',
+                    labConfig.badgeBg
+                  )}
+                >
+                  {labConfig.badge}
+                </span>
+              ) : null}
               <span className="text-[10px] font-semibold text-slate-500 bg-white/80 px-1.5 py-0.2 rounded border border-slate-200">
                 Restricted Access
               </span>

@@ -39,15 +39,14 @@ import {
 } from 'lucide-react';
 
 const ALL_ROLES: { value: Role; label: string; desc: string; badgeColor: string }[] = [
-  { value: 'ADMIN', label: 'Administrator', desc: 'Full system control, personnel & audit access', badgeColor: 'bg-rose-50 text-rose-700 border-rose-200' },
-  { value: 'QA_MANAGER', label: 'QA Manager', desc: 'Quality assurance sign-off & release', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200' },
-  { value: 'MANAGER', label: 'QC Manager', desc: 'Laboratory operations & workflow oversight', badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  { value: 'DEPUTY_MANAGER', label: 'Deputy Manager', desc: 'Assists QC management & test scheduling', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200' },
-  { value: 'SHIFT_INCHARGE', label: 'Shift In-Charge', desc: 'Floor supervision & shift management', badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  { value: 'SUPER_ADMIN' as Role, label: 'Super Admin', desc: 'Root authority, master settings & system oversight', badgeColor: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' },
+  { value: 'ADMIN', label: 'HOD (Head of Department)', desc: 'Departmental leadership, administrative approvals & operations', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Manager', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { value: 'DEPUTY_MANAGER', label: 'Deputy Manager', desc: 'Sole supervisory management, test assignment & verification', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200' },
   { value: 'TESTING_ANALYST', label: 'Testing Analyst', desc: 'Analytical test execution & instrument runs', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
   { value: 'QC_ANALYST', label: 'QC Analyst', desc: 'Quality control sample analysis & logging', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
   { value: 'ANALYST', label: 'Analyst', desc: 'Standard sample testing & results reporting', badgeColor: 'bg-blue-50/70 text-blue-600 border-blue-200' },
-  { value: 'LAB_TECHNICIAN', label: 'Lab Technician', desc: 'Sample accessioning & preparation', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { value: 'LAB_TECHNICIAN', label: 'Lab Analyst', desc: 'Sample accessioning & preparation', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
   { value: 'AUDITOR', label: 'Auditor', desc: 'Read-only regulatory compliance review', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
 ];
 
@@ -115,8 +114,27 @@ export default function UserManagementPage() {
     queryFn: () => userService.getAll(),
   });
 
-  // Check if current user is admin
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN';
+  // Check role authorization
+  const isSuperAdminOnly = currentUser?.role === 'SUPER_ADMIN';
+  const isHOD = currentUser?.role === 'ADMIN' || (currentUser?.role as string) === 'HOD';
+  const isSuperAdmin = isSuperAdminOnly || isHOD;
+
+  // Base visible users: Super Admin and HOD can view all users across all roles (Requirement 1 & 2)
+  const visibleUsers = useMemo(() => {
+    if (isSuperAdminOnly || isHOD) return users;
+    return users.filter(
+      (u) =>
+        u.role !== 'SUPER_ADMIN' &&
+        u.username !== 'superadmin' &&
+        u.username !== 'admin'
+    );
+  }, [users, isSuperAdminOnly, isHOD]);
+
+  // Roles available for selection: only Super Admin can assign or filter by SUPER_ADMIN
+  const availableRoles = useMemo(() => {
+    if (isSuperAdminOnly) return ALL_ROLES;
+    return ALL_ROLES.filter((r) => (r.value as string) !== 'SUPER_ADMIN');
+  }, [isSuperAdminOnly]);
 
   // Add User Mutation
   const addMutation = useMutation({
@@ -233,7 +251,7 @@ export default function UserManagementPage() {
 
   // Filtered users list
   const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
+    return visibleUsers.filter((u) => {
       // Search filter
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -263,19 +281,23 @@ export default function UserManagementPage() {
 
       return matchesSearch && matchesRole && matchesLab && matchesStatus;
     });
-  }, [users, searchQuery, roleFilter, labFilter, statusFilter]);
+  }, [visibleUsers, searchQuery, roleFilter, labFilter, statusFilter]);
 
   // Statistics
   const stats = useMemo(() => {
-    const total = users.length;
-    const active = users.filter((u) => u.isActive !== false).length;
-    const admins = users.filter((u) => u.role === 'ADMIN' || u.role === 'MANAGER' || u.role === 'QA_MANAGER').length;
-    const analysts = users.filter((u) => u.role.includes('ANALYST') || u.role.includes('TECHNICIAN')).length;
+    const total = visibleUsers.length;
+    const active = visibleUsers.filter((u) => u.isActive !== false).length;
+    const admins = visibleUsers.filter((u) => u.role === 'ADMIN' || (u.role as string) === 'SUPER_ADMIN' || u.role === 'DEPUTY_MANAGER').length;
+    const analysts = visibleUsers.filter((u) => u.role.includes('ANALYST') || u.role.includes('TECHNICIAN')).length;
     return { total, active, admins, analysts };
-  }, [users]);
+  }, [visibleUsers]);
 
   // Open Edit Modal
   const handleOpenEdit = (userToEdit: User) => {
+    if (!isSuperAdminOnly && (userToEdit.role === 'SUPER_ADMIN' || userToEdit.username === 'superadmin' || userToEdit.username === 'admin')) {
+      showNotice('error', 'Access Denied: Super Admin accounts cannot be viewed or modified.');
+      return;
+    }
     setEditingUser(userToEdit);
     setEditForm({
       fullName: userToEdit.fullName,
@@ -371,16 +393,23 @@ export default function UserManagementPage() {
           >
             <RefreshCw className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => {
-              setIsAddModalOpen(true);
-              setAddFormError(null);
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs hover:shadow-sm transition-all cursor-pointer"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span>Add New User</span>
-          </button>
+          {isHOD ? (
+            <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>HOD Read-Only Mode</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                setIsAddModalOpen(true);
+                setAddFormError(null);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs hover:shadow-sm transition-all cursor-pointer"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add New User</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -530,7 +559,7 @@ export default function UserManagementPage() {
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">All cGMP Roles</option>
-              {ALL_ROLES.map((r) => (
+              {availableRoles.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -652,10 +681,12 @@ export default function UserManagementPage() {
                           <div
                             className={cn(
                               'h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border shadow-2xs',
-                              u.role === 'ADMIN'
+                              u.role === 'ADMIN' || (u.role as string) === 'SUPER_ADMIN'
                                 ? 'bg-rose-100 text-rose-700 border-rose-200'
-                                : u.role === 'MANAGER' || u.role === 'QA_MANAGER'
+                                : u.role === 'DEPUTY_MANAGER'
                                 ? 'bg-purple-100 text-purple-700 border-purple-200'
+                                : u.role === 'DOCUMENTATION_MANAGER'
+                                ? 'bg-teal-100 text-teal-700 border-teal-200'
                                 : 'bg-blue-100 text-blue-700 border-blue-200'
                             )}
                           >
@@ -756,14 +787,23 @@ export default function UserManagementPage() {
                       <td className="py-3 px-4 whitespace-nowrap">
                         <button
                           type="button"
-                          disabled={u.id === currentUser?.id || toggleStatusMutation.isPending}
-                          onClick={() => toggleStatusMutation.mutate({ id: u.id, isActive: !isUserActive })}
+                          disabled={isHOD || u.id === currentUser?.id || toggleStatusMutation.isPending}
+                          onClick={() => {
+                            if (!isHOD) {
+                              toggleStatusMutation.mutate({ id: u.id, isActive: !isUserActive });
+                            }
+                          }}
                           title={
-                            u.id === currentUser?.id
+                            isHOD
+                              ? 'HOD has view-only permissions'
+                              : u.id === currentUser?.id
                               ? 'Cannot deactivate your own logged-in account'
                               : `Click to ${isUserActive ? 'Deactivate' : 'Activate'} user account`
                           }
-                          className="group inline-flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+                          className={cn(
+                            'group inline-flex items-center gap-1.5',
+                            isHOD ? 'cursor-default' : 'cursor-pointer disabled:cursor-not-allowed'
+                          )}
                         >
                           {isUserActive ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 group-hover:bg-emerald-100 group-hover:border-emerald-300 transition-colors shadow-2xs">
@@ -779,50 +819,63 @@ export default function UserManagementPage() {
                         </button>
                       </td>
 
-                      {/* Actions */}
+                      {/* Actions (Strictly View-Only for HOD) */}
                       <td className="py-3 px-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Reset Password Button */}
-                          <button
-                            onClick={() => {
-                              setResetPasswordUser(u);
-                              setNewPasswordVal('lab123');
-                              setResetPasswordError(null);
-                            }}
-                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600 hover:text-amber-700 transition-colors shadow-2xs cursor-pointer"
-                            title="Reset Password for this user"
-                          >
-                            <KeyRound className="h-3.5 w-3.5" />
-                          </button>
+                        {isHOD ? (
+                          <div className="flex items-center justify-end">
+                            <button
+                              onClick={() => handleOpenView(u)}
+                              className="px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50/70 hover:bg-blue-100/90 text-blue-700 text-xs font-semibold inline-flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                              title="Inspect User Details & cGMP Profile (View-Only)"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>View Dossier</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Reset Password Button */}
+                            <button
+                              onClick={() => {
+                                setResetPasswordUser(u);
+                                setNewPasswordVal('lab123');
+                                setResetPasswordError(null);
+                              }}
+                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600 hover:text-amber-700 transition-colors shadow-2xs cursor-pointer"
+                              title="Reset Password for this user"
+                            >
+                              <KeyRound className="h-3.5 w-3.5" />
+                            </button>
 
-                          {/* View Button */}
-                          <button
-                            onClick={() => handleOpenView(u)}
-                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs cursor-pointer"
-                            title="View Full User Details & Change Role"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
+                            {/* View Button */}
+                            <button
+                              onClick={() => handleOpenView(u)}
+                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-200 text-slate-600 hover:text-blue-600 transition-colors shadow-2xs cursor-pointer"
+                              title="View Full User Details & Change Role"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
 
-                          {/* Edit Button */}
-                          <button
-                            onClick={() => handleOpenEdit(u)}
-                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
-                            title="Edit User Information"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
+                            {/* Edit Button */}
+                            <button
+                              onClick={() => handleOpenEdit(u)}
+                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 transition-colors shadow-2xs cursor-pointer"
+                              title="Edit User Information"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
 
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => setDeletingUser(u)}
-                            disabled={u.id === currentUser?.id}
-                            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-600 hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-2xs cursor-pointer"
-                            title={u.id === currentUser?.id ? 'Cannot delete yourself' : 'Delete or Deactivate User'}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => setDeletingUser(u)}
+                              disabled={u.id === currentUser?.id}
+                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-600 hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-2xs cursor-pointer"
+                              title={u.id === currentUser?.id ? 'Cannot delete yourself' : 'Delete or Deactivate User'}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -885,10 +938,10 @@ export default function UserManagementPage() {
                   {/* ADMIN */}
                   <tr className="hover:bg-slate-50/80 font-medium">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-rose-50 text-rose-700 border border-rose-200">
-                        ADMIN
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
+                        ADMIN / HOD
                       </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Administrator</span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">HOD (Head of Department)</span>
                     </td>
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
@@ -898,42 +951,6 @@ export default function UserManagementPage() {
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
-                  </tr>
-
-                  {/* QA_MANAGER */}
-                  <tr className="hover:bg-slate-50/80">
-                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 border border-purple-200">
-                        QA_MANAGER
-                      </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QA Manager</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
-                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold bg-purple-50/30">Authorize</td>
-                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold bg-purple-50/30">Release CoA</td>
-                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Upload &amp; View</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold">Full Audit</td>
-                  </tr>
-
-                  {/* MANAGER */}
-                  <tr className="hover:bg-slate-50/80">
-                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        MANAGER
-                      </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QC Manager</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Approve</td>
-                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Assign</td>
-                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Supervise</td>
-                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Verify</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Review</td>
-                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Upload &amp; View</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Inspect</td>
                   </tr>
 
                   {/* DEPUTY_MANAGER */}
@@ -946,30 +963,12 @@ export default function UserManagementPage() {
                     </td>
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Access</td>
                     <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Assign</td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">Supervise</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Supervise</td>
                     <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Verify</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-semibold">Review CoA</td>
                     <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Inspect</td>
-                  </tr>
-
-                  {/* SHIFT_INCHARGE */}
-                  <tr className="hover:bg-slate-50/80">
-                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200">
-                        SHIFT_INCHARGE
-                      </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Shift In-Charge</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-700">Access</td>
-                    <td className="py-2.5 px-3 text-center text-cyan-700 font-bold bg-cyan-50/30">Delegate</td>
-                    <td className="py-2.5 px-3 text-center text-cyan-700 font-semibold">Monitor</td>
-                    <td className="py-2.5 px-3 text-center text-cyan-700 font-semibold">Preliminary</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-500">Read</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Inspect</td>
                   </tr>
 
                   {/* TESTING_ANALYST */}
@@ -1032,7 +1031,7 @@ export default function UserManagementPage() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-50 text-teal-700 border border-teal-200">
                         LAB_TECHNICIAN
                       </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Lab Technician</span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Lab Analyst</span>
                     </td>
                     <td className="py-2.5 px-3 text-center text-teal-700 font-bold bg-teal-50/30">Accession &amp; Log</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
@@ -1319,61 +1318,70 @@ export default function UserManagementPage() {
               </div>
             )}
 
-            {/* Role Modification Section (Authorized Admins) */}
-            <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-3">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-blue-600" />
-                <h4 className="font-bold text-xs text-slate-900">
-                  Authorized Administrator Action: Change User Role
-                </h4>
-              </div>
-              <p className="text-[11px] text-slate-600">
-                Administrators can directly promote, reassign, or adjust system permissions for this personnel record in accordance with 21 CFR Part 11 electronic identity rules.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
-                <div className="flex-1">
-                  <select
-                    value={selectedNewRole}
-                    onChange={(e) => setSelectedNewRole(e.target.value as Role)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
-                  >
-                    {ALL_ROLES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label} — {r.desc}
-                      </option>
-                    ))}
-                  </select>
+            {/* Role Modification Section (Super Admin Only; Hidden for Read-Only HOD) */}
+            {!isHOD && (
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <h4 className="font-bold text-xs text-slate-900">
+                    Authorized Administrator Action: Change User Role
+                  </h4>
                 </div>
-                <button
-                  type="button"
-                  disabled={!selectedNewRole || selectedNewRole === viewingUser.role || roleMutation.isPending}
-                  onClick={() => {
-                    if (selectedNewRole && selectedNewRole !== viewingUser.role) {
-                      roleMutation.mutate({ id: viewingUser.id, role: selectedNewRole as Role });
-                    }
-                  }}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                >
-                  {roleMutation.isPending ? 'Updating Role...' : 'Save Role Change'}
-                </button>
+                <p className="text-[11px] text-slate-600">
+                  Administrators can directly promote, reassign, or adjust system permissions for this personnel record in accordance with 21 CFR Part 11 electronic identity rules.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                  <div className="flex-1">
+                    <select
+                      value={selectedNewRole}
+                      onChange={(e) => setSelectedNewRole(e.target.value as Role)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
+                    >
+                      {availableRoles.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label} — {r.desc}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!selectedNewRole || selectedNewRole === viewingUser.role || roleMutation.isPending}
+                    onClick={() => {
+                      if (selectedNewRole && selectedNewRole !== viewingUser.role) {
+                        roleMutation.mutate({ id: viewingUser.id, role: selectedNewRole as Role });
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  >
+                    {roleMutation.isPending ? 'Updating Role...' : 'Save Role Change'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Modal Footer */}
             <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  const u = viewingUser;
-                  setViewingUser(null);
-                  handleOpenEdit(u);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Edit className="h-3.5 w-3.5" />
-                <span>Edit Full Profile</span>
-              </button>
+              {!isHOD ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const u = viewingUser;
+                    setViewingUser(null);
+                    handleOpenEdit(u);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  <span>Edit Full Profile</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>HOD Read-Only Dossier</span>
+                </div>
+              )}
 
               <button
                 type="button"
@@ -1513,7 +1521,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setAddForm({ ...addForm, role: e.target.value as Role })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
                 >
-                  {ALL_ROLES.map((r) => (
+                  {availableRoles.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label} — {r.desc}
                     </option>
@@ -1702,7 +1710,7 @@ export default function UserManagementPage() {
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value as Role })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
                 >
-                  {ALL_ROLES.map((r) => (
+                  {availableRoles.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label} — {r.desc}
                     </option>

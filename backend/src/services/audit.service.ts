@@ -1,10 +1,50 @@
 import { prisma } from '../config/prisma';
 
 export class AuditService {
-  async findAll(query: { entityName?: string; action?: string; limit?: number }) {
+  async findAll(query: {
+    entityName?: string;
+    action?: string;
+    limit?: number;
+    role?: string;
+    userId?: string;
+    performedByName?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }) {
     const where: any = {};
-    if (query.entityName) where.entityName = query.entityName;
-    if (query.action) where.action = { contains: query.action, mode: 'insensitive' };
+    if (query.entityName && query.entityName !== 'ALL') {
+      where.entityName = query.entityName;
+    }
+    if (query.action && query.action !== 'ALL') {
+      where.action = { contains: query.action, mode: 'insensitive' };
+    }
+    if (query.role && query.role !== 'ALL') {
+      where.role = { contains: query.role, mode: 'insensitive' };
+    }
+    if (query.userId && query.userId !== 'ALL') {
+      where.performedById = query.userId;
+    }
+    if (query.performedByName) {
+      where.performedByName = { contains: query.performedByName, mode: 'insensitive' };
+    }
+    if (query.startDate || query.endDate) {
+      where.timestamp = {};
+      if (query.startDate) where.timestamp.gte = new Date(query.startDate);
+      if (query.endDate) {
+        const end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+        where.timestamp.lte = end;
+      }
+    }
+    if (query.search) {
+      where.OR = [
+        { performedByName: { contains: query.search, mode: 'insensitive' } },
+        { action: { contains: query.search, mode: 'insensitive' } },
+        { entityName: { contains: query.search, mode: 'insensitive' } },
+        { reasonForChange: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
 
     return prisma.auditTrail.findMany({
       where,
@@ -18,6 +58,7 @@ export class AuditService {
             employeeId: true,
             department: true,
             role: true,
+            username: true,
           },
         },
       },

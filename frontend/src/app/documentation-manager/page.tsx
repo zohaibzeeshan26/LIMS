@@ -338,12 +338,12 @@ export default function DocumentationManagerDashboard() {
   const canUpload =
     user?.role === 'DOCUMENTATION_MANAGER' ||
     user?.role === 'ADMIN' ||
-    user?.role === 'QA_MANAGER' ||
-    user?.role === 'MANAGER';
+    (user?.role as string) === 'SUPER_ADMIN' ||
+    user?.role === 'DEPUTY_MANAGER';
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DOCUMENTATION_MANAGER', 'MANAGER', 'QA_MANAGER', 'DEPUTY_MANAGER']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DOCUMENTATION_MANAGER', 'DEPUTY_MANAGER']}
       moduleName="Product Documentation Repository"
     >
       <div className="space-y-6 pb-16">

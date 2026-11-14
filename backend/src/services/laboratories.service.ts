@@ -239,6 +239,8 @@ export class LaboratoriesService {
           { laboratoryType: 'SAF' as any },
           { sampleId: { startsWith: 'CEPH/' } },
           { sampleCode: { startsWith: 'CEPH/' } },
+          { accessionNo: { contains: 'CEP' } },
+          { recordNumber: { contains: 'CEP' } },
         ],
       };
     }
@@ -248,6 +250,8 @@ export class LaboratoriesService {
           { laboratoryType: 'PENICILLIN' as any },
           { sampleId: { startsWith: 'PEN/' } },
           { sampleCode: { startsWith: 'PEN/' } },
+          { accessionNo: { contains: 'PEN' } },
+          { recordNumber: { contains: 'PEN' } },
         ],
       };
     }
@@ -256,6 +260,8 @@ export class LaboratoriesService {
         { laboratoryType: 'GENERAL' as any },
         { sampleId: { startsWith: 'GL/' } },
         { sampleCode: { startsWith: 'GL/' } },
+        { accessionNo: { contains: 'GEN' } },
+        { recordNumber: { contains: 'GEN' } },
       ],
     };
   }

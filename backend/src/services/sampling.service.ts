@@ -19,11 +19,13 @@ export class SamplingService {
 
     if (
       role === 'ADMIN' ||
-      role === 'QA_MANAGER' ||
+      role === 'SUPER_ADMIN' ||
+      role === 'HOD' ||
       role === 'AUDITOR' ||
-      role === 'MANAGER' ||
       role === 'DEPUTY_MANAGER' ||
-      role === 'SHIFT_INCHARGE'
+      role === 'DOCUMENTATION_MANAGER' ||
+      role === 'LAB_TECHNICIAN' ||
+      role === 'SAMPLE_REGISTRATION'
     ) {
       return 'ALL';
     }
@@ -229,11 +231,38 @@ export class SamplingService {
       }),
       prisma.batch.count({ where: { status: { notIn: ['RELEASED', 'REJECTED'] } } }),
       prisma.batch.count(),
-      prisma.sample.count({ where: { laboratoryType: 'GENERAL' } }),
-      prisma.sample.count({ where: { laboratoryType: 'PENICILLIN' } }),
       prisma.sample.count({
         where: {
-          OR: [{ laboratoryType: 'CEPHALOSPORIN' }, { laboratoryType: 'SAF' }],
+          OR: [
+            { laboratoryType: 'GENERAL' },
+            { sampleCode: { startsWith: 'GL/' } },
+            { sampleId: { startsWith: 'GL/' } },
+            { accessionNo: { contains: 'GEN' } },
+            { recordNumber: { contains: 'GEN' } },
+          ],
+        },
+      }),
+      prisma.sample.count({
+        where: {
+          OR: [
+            { laboratoryType: 'PENICILLIN' },
+            { sampleCode: { startsWith: 'PEN/' } },
+            { sampleId: { startsWith: 'PEN/' } },
+            { accessionNo: { contains: 'PEN' } },
+            { recordNumber: { contains: 'PEN' } },
+          ],
+        },
+      }),
+      prisma.sample.count({
+        where: {
+          OR: [
+            { laboratoryType: 'CEPHALOSPORIN' },
+            { laboratoryType: 'SAF' },
+            { sampleCode: { startsWith: 'CEPH/' } },
+            { sampleId: { startsWith: 'CEPH/' } },
+            { accessionNo: { contains: 'CEP' } },
+            { recordNumber: { contains: 'CEP' } },
+          ],
         },
       }),
     ]);

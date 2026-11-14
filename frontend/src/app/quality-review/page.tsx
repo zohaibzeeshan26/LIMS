@@ -43,8 +43,8 @@ export default function QualityReviewAndCoaPage() {
 
   const isQaOrAdmin =
     user?.role === 'ADMIN' ||
-    user?.role === 'QA_MANAGER' ||
-    user?.role === 'MANAGER';
+    (user?.role as string) === 'SUPER_ADMIN' ||
+    user?.role === 'DEPUTY_MANAGER';
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'REVIEW_QUEUE' | 'COA_ARCHIVE'>('REVIEW_QUEUE');
@@ -171,7 +171,7 @@ export default function QualityReviewAndCoaPage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER']}
       moduleName="Quality Review & Certificate of Analysis (CoA)"
     >
       <div className="space-y-6 pb-16 animate-in fade-in duration-300">
@@ -209,7 +209,7 @@ export default function QualityReviewAndCoaPage() {
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-800 border border-teal-200 text-xs font-semibold">
             <ShieldCheck className="w-4 h-4 text-teal-600" />
-            <span>Role: {user?.role || 'QA_MANAGER'}</span>
+            <span>Role: {user?.role || 'DEPUTY_MANAGER'}</span>
           </div>
 
           <button
@@ -534,7 +534,7 @@ export default function QualityReviewAndCoaPage() {
                             {c.authorizedBy?.fullName || 'QA Manager'}
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            {c.authorizedBy?.role || 'QA_MANAGER'}
+                            {c.authorizedBy?.role || 'DEPUTY_MANAGER'}
                           </div>
                         </td>
 
@@ -914,7 +914,7 @@ export default function QualityReviewAndCoaPage() {
                     {viewingCoa.authorizedBy?.fullName || 'Zohaib Zeeshan / Fatima Noor'}
                   </span>
                   <span className="text-[11px] text-slate-600 block">
-                    {viewingCoa.authorizedBy?.role || 'QA_MANAGER'} &bull; Quality Assurance Directorate
+                    {viewingCoa.authorizedBy?.role || 'DEPUTY_MANAGER'} &bull; Quality Management Directorate
                   </span>
                   <span className="text-[10px] text-slate-400 block mt-1">
                     Sign Date: {new Date(viewingCoa.issuedDate).toLocaleString()}

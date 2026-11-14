@@ -836,7 +836,6 @@ export function ManagerDashboard() {
                 >
                   <option value="ROUTINE">Routine Standard (72 Hours)</option>
                   <option value="URGENT">Urgent Expedited (48 Hours)</option>
-                  <option value="STAT">STAT Immediate (24 Hours)</option>
                 </select>
               </div>
 
