@@ -131,14 +131,15 @@ export function LabSecurityModal({
     userRole === 'LAB_TECHNICIAN' ||
     userRole === 'SAMPLE_REGISTRATION' ||
     userRole === 'SAMPLE_REGISTRATION_ANALYST';
-  const hasDirectLabAccess = isAdminOrSuperAdmin || isSampleRegistration;
+  const isDeputyManager = userRole === 'DEPUTY_MANAGER';
+  const hasDirectLabAccess = isAdminOrSuperAdmin || isSampleRegistration || isDeputyManager;
 
   // Normalize target lab id to key ('general', 'penicillin', or 'cephalosporin')
   const targetLabKey = (targetLab?.id || 'general').toLowerCase();
   const labConfig: LabCredentialInfo =
     LAB_SECURITY_CREDENTIALS[targetLabKey] || LAB_SECURITY_CREDENTIALS.general;
 
-  // Direct bypass for Admin, Super Admin, and Sample Registration using their existing authenticated session
+  // Direct bypass for Admin, Super Admin, Deputy Manager, and Sample Registration using their existing authenticated session
   useEffect(() => {
     if (isOpen && hasDirectLabAccess && targetLab) {
       if (typeof window !== 'undefined') {

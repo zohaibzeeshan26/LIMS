@@ -68,6 +68,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
   const role = user?.role || 'QC_ANALYST';
 
   const isOnSamples = pathname.startsWith('/samples');
+  const isOnTasks = pathname.startsWith('/tasks');
 
   const userAccess = getUserLabAccess(user);
   const activeLabParam =
@@ -167,7 +168,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
       : userRole === 'ADMIN' || userRole === 'HOD'
       ? 'HOD Dashboard'
       : userRole === 'DOCUMENTATION_MANAGER'
-      ? 'Doc Manager Hub'
+      ? 'Dashboard'
       : userRole === 'DEPUTY_MANAGER'
       ? 'Deputy Manager Hub'
       : userRole === 'LAB_TECHNICIAN'
@@ -234,7 +235,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Documentation Manager',
         href: '/documentation-manager',
         icon: FileText,
-        roles: ['DOCUMENTATION_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
+        roles: ['DOCUMENTATION_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'HOD'],
         badge: 'STP Docs',
       },
       {
@@ -247,7 +248,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Quality Review & CoA',
         href: '/quality-review',
         icon: FileCheck2,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD'],
         badge: 'CoA',
       },
     ];
@@ -418,17 +419,22 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
               <div className="space-y-1">
                 {visibleLaboratories.map((lab) => {
                   const LabIcon = lab.icon;
+                  const currentSection = searchParams?.get('section');
                   const isThisLabActive =
-                    isOnSamples &&
+                    (isOnSamples || isOnTasks) &&
                     (activeLabParam === lab.id ||
                       (lab.id === 'cephalosporin' && (activeLabParam === 'ceph' || activeLabParam === 'cp' || activeLabParam === 'saf')) ||
                       (lab.id === 'penicillin' && (activeLabParam === 'pen' || activeLabParam === 'pl')) ||
-                      (lab.id === 'general' && (activeLabParam === 'gen' || activeLabParam === 'gl' || (!searchParams.get('lab') && pathname === '/samples'))));
+                      (lab.id === 'general' && (activeLabParam === 'gen' || activeLabParam === 'gl' || (!searchParams?.get('lab') && (pathname === '/samples' || pathname === '/tasks')))));
+
+                  const labHref = isOnTasks
+                    ? `/tasks?lab=${lab.id}${currentSection ? `&section=${currentSection}` : ''}`
+                    : lab.href;
 
                   return (
                     <Link
                       key={lab.id}
-                      href={lab.href}
+                      href={labHref}
                       onClick={() => {
                         if (typeof window !== 'undefined') {
                           sessionStorage.setItem('lab_security_auth', 'true');

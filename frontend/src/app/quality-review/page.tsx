@@ -43,8 +43,7 @@ export default function QualityReviewAndCoaPage() {
 
   const isQaOrAdmin =
     user?.role === 'ADMIN' ||
-    (user?.role as string) === 'SUPER_ADMIN' ||
-    user?.role === 'DEPUTY_MANAGER';
+    (user?.role as string) === 'SUPER_ADMIN';
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'REVIEW_QUEUE' | 'COA_ARCHIVE'>('REVIEW_QUEUE');
@@ -171,7 +170,7 @@ export default function QualityReviewAndCoaPage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN']}
       moduleName="Quality Review & Certificate of Analysis (CoA)"
     >
       <div className="space-y-6 pb-16 animate-in fade-in duration-300">

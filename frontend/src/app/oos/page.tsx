@@ -80,7 +80,7 @@ export default function OosPage() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER', 'QC_ANALYST']}
+      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'QC_ANALYST']}
       moduleName="Out of Specification (OOS) Investigations"
     >
       <div className="space-y-6">

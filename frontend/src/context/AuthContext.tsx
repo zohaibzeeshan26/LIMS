@@ -135,13 +135,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    // Admin, Super Admin & Sample Registration: Automatically authorize laboratory access using their existing session
+    // Admin, Super Admin, Deputy Manager & Sample Registration: Automatically authorize laboratory access using their existing session
     if (user) {
       const role = (user.role || '').toUpperCase();
       if (
         role === 'SUPER_ADMIN' ||
         role === 'ADMIN' ||
         role === 'HOD' ||
+        role === 'DEPUTY_MANAGER' ||
         role === 'LAB_TECHNICIAN' ||
         role === 'SAMPLE_REGISTRATION' ||
         role === 'SAMPLE_REGISTRATION_ANALYST'

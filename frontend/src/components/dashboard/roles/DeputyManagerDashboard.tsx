@@ -366,18 +366,26 @@ export function DeputyManagerDashboard() {
                   <td className="py-3 px-3.5">
                     <StatusBadge status={s.status} />
                   </td>
-                  <td className="py-3 px-3.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAssigningSample(s);
-                        setAssignAnalystId(qualifiedAnalysts[0]?.id || '');
-                      }}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-sm inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <UserCheck className="w-3.5 h-3.5" />
-                      <span>Assign</span>
-                    </button>
+                  <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssigningSample(s);
+                          setAssignAnalystId(qualifiedAnalysts[0]?.id || '');
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-2xs hover:shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Assign</span>
+                      </button>
+                      <Link
+                        href={`/tasks?lab=${(s.laboratoryType || s.laboratory?.name || s.laboratory?.code || s.laboratory || 'general').toString().toLowerCase().includes('pen') ? 'penicillin' : (s.laboratoryType || s.laboratory?.name || s.laboratory?.code || s.laboratory || 'general').toString().toLowerCase().includes('ceph') ? 'cephalosporin' : 'general'}&section=${(s.sampleCode || s.accessionNo || '').includes('/SB') ? 'semi-base' : 'formulation'}`}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50 text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Details</span>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

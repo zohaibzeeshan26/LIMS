@@ -172,6 +172,7 @@ export default function WelcomePortalPage() {
   const userRole = (user?.role || '').toUpperCase();
   const isAdminOrSuperAdmin =
     userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'HOD';
+  const isDeputyManager = userRole === 'DEPUTY_MANAGER';
   const isSampleRegistration =
     userRole === 'LAB_TECHNICIAN' ||
     userRole === 'SAMPLE_REGISTRATION' ||
@@ -191,7 +192,7 @@ export default function WelcomePortalPage() {
           return card.id === 'dashboard' || card.id === 'testing';
         }
         if (userRole === 'DEPUTY_MANAGER') {
-          return card.id !== 'testing';
+          return card.id === 'dashboard' || card.id === 'samples' || card.id === 'tasks';
         }
         return true;
       })
@@ -199,7 +200,7 @@ export default function WelcomePortalPage() {
         if (card.id === 'dashboard' && userRole === 'DOCUMENTATION_MANAGER') {
           return {
             ...card,
-            title: 'Doc Manager Hub',
+            title: 'Dashboard',
             description: 'Commercial formulation catalog, active dossiers, and testing synchronization.',
             badgeText: 'STP Dossiers',
           };
@@ -423,10 +424,11 @@ export default function WelcomePortalPage() {
 
                     const canDirectAccessLab =
                       isAdminOrSuperAdmin ||
+                      isDeputyManager ||
                       (isSampleRegistration && labModalTarget === 'samples');
 
                     if (canDirectAccessLab) {
-                      // Admin, Super Admin & Sample Registration: Direct access with existing session without re-entering credentials
+                      // Admin, Super Admin, Deputy Manager & Sample Registration: Direct access with existing session without re-entering credentials
                       if (typeof window !== 'undefined') {
                         sessionStorage.setItem('lab_security_auth', 'true');
                         sessionStorage.setItem('lab_security_auth_time', Date.now().toString());
@@ -491,7 +493,7 @@ export default function WelcomePortalPage() {
 
         <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
           <span>
-            {isAdminOrSuperAdmin || isSampleRegistration
+            {isAdminOrSuperAdmin || isSampleRegistration || isDeputyManager
               ? 'Session verified: Click any laboratory for direct access.'
               : 'Click any laboratory above to authenticate with its designated security credentials.'}
           </span>

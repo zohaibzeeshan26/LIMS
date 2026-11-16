@@ -674,7 +674,7 @@ export default function PriorityNoticePage() {
                 <tr className="bg-slate-50/80 text-slate-500 font-semibold border-b border-slate-200/70 text-[11px]">
                   <th className="py-3 px-4">Priority SLA</th>
                   <th className="py-3 px-4">Sample Code</th>
-                  <th className="py-3 px-4">Nomenclature</th>
+                  <th className="py-3 px-4">Product Title</th>
                   <th className="py-3 px-4">Batch / Lot</th>
                   <th className="py-3 px-4">Facility</th>
                   <th className="py-3 px-4">Section</th>

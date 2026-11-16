@@ -83,6 +83,8 @@ function getSampleLabKey(s: any): 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN' {
   if (
     labRaw.includes('CEPH') ||
     labRaw.includes('SAF') ||
+    labRaw.includes('SEF') ||
+    labRaw.includes('CEP') ||
     code.includes('CEPH') ||
     code.includes('CEP') ||
     code.startsWith('CEPH/')
@@ -92,11 +94,60 @@ function getSampleLabKey(s: any): 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN' {
   return 'GENERAL';
 }
 
+function normalizeLabKey(lab: any): 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN' {
+  if (!lab) return 'GENERAL';
+  if (typeof lab === 'object') {
+    return getSampleLabKey(lab);
+  }
+  const str = String(lab).trim().toUpperCase();
+  if (str.includes('PEN')) return 'PENICILLIN';
+  if (str.includes('CEPH') || str.includes('CEP') || str.includes('SAF') || str.includes('SEF')) return 'CEPHALOSPORIN';
+  return 'GENERAL';
+}
+
+const LAB_FACILITIES = [
+  {
+    id: 'general',
+    key: 'GENERAL' as const,
+    name: 'General Lab',
+    shortLabel: 'General Lab',
+    icon: FlaskConical,
+    activeBorder: 'border-indigo-500',
+    activeBg: 'bg-indigo-50/50 ring-1 ring-indigo-400/30 shadow-sm',
+    iconBgActive: 'bg-indigo-600 text-white',
+    badgeActive: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  },
+  {
+    id: 'cephalosporin',
+    key: 'CEPHALOSPORIN' as const,
+    name: 'Cephalosporin Lab',
+    shortLabel: 'Cephalosporin Lab',
+    icon: ShieldAlert,
+    activeBorder: 'border-emerald-500',
+    activeBg: 'bg-emerald-50/50 ring-1 ring-emerald-400/30 shadow-sm',
+    iconBgActive: 'bg-emerald-600 text-white',
+    badgeActive: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  },
+  {
+    id: 'penicillin',
+    key: 'PENICILLIN' as const,
+    name: 'Penicillin Lab',
+    shortLabel: 'Penicillin Lab',
+    icon: Microscope,
+    activeBorder: 'border-purple-500',
+    activeBg: 'bg-purple-50/50 ring-1 ring-purple-400/30 shadow-sm',
+    iconBgActive: 'bg-purple-600 text-white',
+    badgeActive: 'bg-purple-100 text-purple-800 border-purple-200',
+  },
+];
+
 function getTaskSection(task: Partial<TaskItem>): 'semi-base' | 'formulation' {
   if (task.section) return task.section;
   const sampleId = (task.sampleId || '').toUpperCase();
   const sampleName = (task.sampleName || '').toLowerCase();
   if (
+    sampleId.includes('/SB-') ||
+    sampleId.includes('/SB/') ||
     sampleId.includes('/SB') ||
     sampleId.includes('SB-') ||
     sampleId.includes('SEMI') ||
@@ -403,8 +454,8 @@ function TaskAssignmentPageInner() {
 
   // Strict Laboratory Identification from query parameter
   const activeLabKey: 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN' = useMemo(() => {
-    if (labParam === 'cephalosporin' || labParam === 'ceph' || labParam === 'saf') return 'CEPHALOSPORIN';
-    if (labParam === 'penicillin' || labParam === 'pen') return 'PENICILLIN';
+    if (labParam === 'cephalosporin' || labParam === 'ceph' || labParam === 'saf' || labParam === 'cp' || labParam === 'sef') return 'CEPHALOSPORIN';
+    if (labParam === 'penicillin' || labParam === 'pen' || labParam === 'pl') return 'PENICILLIN';
     return 'GENERAL';
   }, [labParam]);
 
@@ -421,8 +472,15 @@ function TaskAssignmentPageInner() {
     return 'all';
   }, [sectionParam]);
 
+  const selectLab = (labId: 'general' | 'cephalosporin' | 'penicillin') => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('lab', labId);
+    router.push(`/tasks?${params.toString()}`);
+  };
+
   const selectSection = (section: 'all' | 'semi-base' | 'formulation') => {
     const params = new URLSearchParams(searchParams.toString());
+    params.set('lab', activeLabKey.toLowerCase());
     if (section === 'all') {
       params.delete('section');
     } else {
@@ -634,11 +692,58 @@ function TaskAssignmentPageInner() {
     if (!availableSamples || availableSamples.length === 0) return;
 
     setTasks((prevTasks) => {
+      let updatedExisting = false;
+      const updatedTasks = prevTasks.map((t) => {
+        const key = (t.sampleId || '').trim().toUpperCase();
+        const matched = availableSamples.find((s: any) => {
+          const sCode = (s.sampleCode || s.accessionNo || s.sampleId || s.id || '').trim().toUpperCase();
+          return sCode === key || (s.accessionNo && s.accessionNo.trim().toUpperCase() === key);
+        });
+
+        if (matched) {
+          const sampleLab = getSampleLabKey(matched);
+          const sampleSec = getSampleSection(matched);
+          const sampleName = matched.nomenclature || matched.materialName || t.sampleName;
+          const lotNum = matched.lotNumber || matched.batchLotNumber || matched.batch?.batchNumber || t.lotNumber;
+          const stage = matched.stageType || matched.sampleType || t.stageType;
+          const qty = matched.sampleQty || matched.quantity || t.sampleQty;
+          const unit = matched.unit || matched.quantityUnit || t.unit;
+          const mfg = matched.mfgDate || matched.manufacturingDate || matched.batch?.manufacturingDate || t.mfgDate;
+          const exp = matched.expDate || matched.expiryDate || matched.batch?.expiryDate || t.expDate;
+          const submitted = matched.submittedBy || matched.submittedByUser?.fullName || t.submittedBy;
+          const received = matched.accessionedBy?.fullName || matched.receivedByUser?.fullName || t.receivedBy;
+
+          if (
+            t.laboratory !== sampleLab ||
+            t.section !== sampleSec ||
+            t.sampleName !== sampleName ||
+            t.lotNumber !== lotNum
+          ) {
+            updatedExisting = true;
+            return {
+              ...t,
+              laboratory: sampleLab,
+              section: sampleSec,
+              sampleName,
+              lotNumber: lotNum,
+              stageType: stage,
+              sampleQty: qty,
+              unit,
+              mfgDate: mfg,
+              expDate: exp,
+              submittedBy: submitted,
+              receivedBy: received,
+            };
+          }
+        }
+        return t;
+      });
+
       const existingSampleIds = new Set(
-        prevTasks.map((t) => (t.sampleId || '').trim().toUpperCase())
+        updatedTasks.map((t) => (t.sampleId || '').trim().toUpperCase())
       );
       const existingTaskCodes = new Set(
-        prevTasks.map((t) => (t.taskCode || '').trim().toUpperCase())
+        updatedTasks.map((t) => (t.taskCode || '').trim().toUpperCase())
       );
 
       const newlyGeneratedTasks: TaskItem[] = [];
@@ -675,8 +780,8 @@ function TaskAssignmentPageInner() {
               sampleName: sampleName,
               laboratory: sampleLab,
               section: sampleSec,
-              assignedAnalystName: defaultAnalyst.name,
-              assignedAnalystId: defaultAnalyst.id,
+              assignedAnalystName: s.assignedTo?.fullName || defaultAnalyst.name,
+              assignedAnalystId: s.assignedToId || defaultAnalyst.id,
               testProtocol: defaultProtocol,
               priority: s.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT',
               shift: 'Morning Shift (08:00 - 16:00)',
@@ -691,7 +796,7 @@ function TaskAssignmentPageInner() {
                   ? 'IN_PROGRESS'
                   : 'ASSIGNED',
               instructions: `Auto-allocated QC task generated from Sample Record (${s.lotNumber || s.batchLotNumber || 'Batch Verified'}).`,
-              accessionNo: s.accessionNo || s.sampleCode || `A-${String(prevTasks.length + newlyGeneratedTasks.length + 1).padStart(4, '0')}`,
+              accessionNo: s.accessionNo || s.sampleCode || `A-${String(updatedTasks.length + newlyGeneratedTasks.length + 1).padStart(4, '0')}`,
               samplingDate: s.samplingDate || s.createdAt || new Date().toISOString(),
               stageType: s.stageType || s.sampleType || (sampleSec === 'semi-base' ? 'Raw Material' : 'Finished Product'),
               sampleQty: s.sampleQty || s.quantity || 100,
@@ -710,8 +815,8 @@ function TaskAssignmentPageInner() {
         }
       }
 
-      if (newlyGeneratedTasks.length > 0) {
-        const merged = [...newlyGeneratedTasks, ...prevTasks];
+      if (newlyGeneratedTasks.length > 0 || updatedExisting) {
+        const merged = newlyGeneratedTasks.length > 0 ? [...newlyGeneratedTasks, ...updatedTasks] : updatedTasks;
         if (typeof window !== 'undefined') {
           localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(merged));
         }
@@ -858,7 +963,7 @@ function TaskAssignmentPageInner() {
 
   // Tasks belonging specifically to the active laboratory
   const labTasks = useMemo(() => {
-    return tasks.filter((t) => t.laboratory === activeLabKey);
+    return tasks.filter((t) => normalizeLabKey(t.laboratory) === activeLabKey);
   }, [tasks, activeLabKey]);
 
   // Section breakdown for active laboratory
@@ -877,7 +982,7 @@ function TaskAssignmentPageInner() {
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       // 1. Strict Laboratory Isolation: only show tasks of the active lab
-      if (t.laboratory !== activeLabKey) {
+      if (normalizeLabKey(t.laboratory) !== activeLabKey) {
         return false;
       }
 
@@ -952,6 +1057,98 @@ function TaskAssignmentPageInner() {
         >
           <span>&larr; Back to Portal</span>
         </Link>
+      </div>
+
+      {/* 3-Laboratory Facility Selector Banner */}
+      <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/70 px-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+              Select Analytical Facility (3 Laboratories)
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              3 Units
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Switch facility to assign samples across labs
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {LAB_FACILITIES.map((facility) => {
+            const FacilityIcon = facility.icon;
+            const isFacilityActive = activeLabKey === facility.key;
+            const facilityTasksCount = tasks.filter(
+              (t) => normalizeLabKey(t.laboratory) === facility.key
+            ).length;
+            const facilityUrgentCount = tasks.filter(
+              (t) =>
+                normalizeLabKey(t.laboratory) === facility.key &&
+                (t.priority === 'URGENT' || (t.priority as any) === 'STAT')
+            ).length;
+
+            return (
+              <button
+                key={facility.id}
+                type="button"
+                onClick={() => selectLab(facility.id as any)}
+                className={cn(
+                  'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+                  isFacilityActive
+                    ? `${facility.activeBg} ${facility.activeBorder}`
+                    : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={cn(
+                      'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                      isFacilityActive
+                        ? facility.iconBgActive
+                        : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                    )}
+                  >
+                    <FacilityIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                        {facility.name}
+                      </h4>
+                      <span
+                        className={cn(
+                          'text-[11px] font-bold px-2 py-0.5 rounded-full border',
+                          isFacilityActive
+                            ? facility.badgeActive
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        )}
+                      >
+                        {facilityTasksCount} Tasks
+                      </span>
+                      {facilityUrgentCount > 0 && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                          <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                          <span>{facilityUrgentCount} Urgent</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-medium mt-0.5">
+                      {isFacilityActive ? 'Currently active assignment board' : 'Click to manage sample allocation'}
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  {isFacilityActive ? (
+                    <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Active Laboratory Header Banner (Strict Laboratory Isolation) */}
@@ -1302,7 +1499,7 @@ function TaskAssignmentPageInner() {
                 <th className="py-3 px-3.5">Task ID</th>
                 <th className="py-3 px-3.5">A. No.</th>
                 <th className="py-3 px-3.5">Date & Time</th>
-                <th className="py-3 px-3.5 min-w-[200px]">Nomenclature</th>
+                <th className="py-3 px-3.5 min-w-[200px]">Product Title</th>
                 <th className="py-3 px-3.5">Sample ID</th>
                 <th className="py-3 px-3.5">Stage / Type</th>
                 <th className="py-3 px-3.5">Qty. of Sample</th>

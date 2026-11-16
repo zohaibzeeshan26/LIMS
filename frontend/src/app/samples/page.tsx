@@ -899,7 +899,7 @@ function SamplesPageInner() {
         <div className="relative">
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
             <Search className="h-3 w-3 text-blue-600" />
-            <span>Universal Instant Search (Batch #, MFG Date, Expiry Date, Category, Sample ID, Nomenclature)</span>
+            <span>Universal Instant Search (Batch #, MFG Date, Expiry Date, Category, Sample ID, Product Title)</span>
           </label>
           <div className="relative">
             <input
@@ -955,11 +955,11 @@ function SamplesPageInner() {
             </div>
           </div>
 
-          {/* Search by Nomenclature */}
+          {/* Search by Product Title */}
           <div className="relative">
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <FileText className="h-3 w-3 text-slate-400" />
-              <span>Search Nomenclature</span>
+              <span>Search Product Title</span>
             </label>
             <div className="relative">
               <input
@@ -1176,13 +1176,13 @@ function SamplesPageInner() {
                   </div>
                 </th>
 
-                {/* 3. Nomenclature */}
+                {/* 3. Product Title */}
                 <th
                   onClick={() => handleSort('nomenclature')}
                   className="py-3 px-3.5 min-w-[220px] max-w-xs cursor-pointer hover:bg-slate-100/80 transition-colors group"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Nomenclature</span>
+                    <span>Product Title</span>
                     {renderSortIcon('nomenclature')}
                   </div>
                 </th>
@@ -1642,7 +1642,7 @@ function SamplesPageInner() {
                   </div>
 
                   <div className="p-2.5 rounded-lg bg-white border border-slate-200 col-span-2">
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Nomenclature</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Product Title</span>
                     <span className="font-bold text-navy-950 line-clamp-1">{activeDossier.nomenclature || activeDossier.materialName}</span>
                   </div>
 

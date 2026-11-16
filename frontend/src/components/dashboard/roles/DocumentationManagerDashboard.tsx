@@ -104,7 +104,7 @@ export function DocumentationManagerDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
             <span>Commercial Products</span>
@@ -130,15 +130,6 @@ export function DocumentationManagerDashboard() {
           </div>
           <div className="text-2xl font-black text-slate-900">3</div>
           <p className="text-[11px] text-slate-400">General, Penicillin, Cephalosporin</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Analyst Live Sync</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-2xl font-black text-emerald-700">Active</div>
-          <p className="text-[11px] text-slate-400">Instantly delivered to Testing Panel</p>
         </div>
       </div>
 
@@ -238,7 +229,6 @@ export function DocumentationManagerDashboard() {
             <thead>
               <tr className="border-b border-slate-200 text-slate-500 font-bold bg-slate-50/80">
                 <th className="py-2.5 px-3">Product Name</th>
-                <th className="py-2.5 px-3">ATM Code</th>
                 <th className="py-2.5 px-3">Laboratory</th>
                 <th className="py-2.5 px-3">Attached Documents</th>
                 <th className="py-2.5 px-3">Latest Document</th>
@@ -256,7 +246,6 @@ export function DocumentationManagerDashboard() {
                       <div className="font-bold text-slate-900">{p.brandName}</div>
                       <div className="text-[11px] text-slate-500">{p.genericName}</div>
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-teal-800">{p.atmCode}</td>
                     <td className="py-3 px-3">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                         {p.laboratory} LAB
