@@ -57,7 +57,7 @@ export function ManagerDashboard() {
   const [assigningSample, setAssigningSample] = useState<Sample | null>(null);
   const [assignAnalystId, setAssignAnalystId] = useState<string>('');
   const [assignProtocol, setAssignProtocol] = useState<string>('Full Compendial Testing (Assay, Dissolution, Related Substances)');
-  const [assignPriority, setAssignPriority] = useState<'ROUTINE' | 'URGENT' | 'STAT'>('ROUTINE');
+  const [assignPriority, setAssignPriority] = useState<'ROUTINE' | 'URGENT'>('ROUTINE');
   const [assignShift, setAssignShift] = useState<string>('Morning (Shift A)');
   const [assignInstructions, setAssignInstructions] = useState<string>('Conduct testing per approved STP monograph in duplicate.');
 
@@ -551,11 +551,7 @@ export function ManagerDashboard() {
                         </td>
 
                         <td className="py-3 px-3.5">
-                          {s.priority === 'STAT' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                              STAT IMMEDIATE
-                            </span>
-                          ) : s.priority === 'URGENT' ? (
+                          {s.priority === 'URGENT' || s.priority === 'STAT' ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
                               URGENT
                             </span>

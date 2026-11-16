@@ -1319,14 +1319,12 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                       <td className="py-3 px-3">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            s.priority === 'STAT'
-                              ? 'bg-rose-100 text-rose-800'
-                              : s.priority === 'URGENT'
+                            s.priority === 'URGENT' || s.priority === 'STAT'
                               ? 'bg-amber-100 text-amber-800'
                               : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {s.priority}
+                          {s.priority === 'STAT' ? 'URGENT' : s.priority}
                         </span>
                       </td>
                       <td className="py-3 px-3">

@@ -649,7 +649,7 @@ function SamplesPageInner() {
       allowedRoles={[
         'SUPER_ADMIN',
         'ADMIN',
-        'DEPUTY_MANAGER',
+        'HOD',
         'LAB_TECHNICIAN',
       ]}
       moduleName="Sample Registration & Accessioning"

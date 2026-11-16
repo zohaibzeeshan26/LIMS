@@ -702,6 +702,32 @@ function TestingPageContent() {
       queryClient.invalidateQueries({ queryKey: ['samples-for-testing'] });
       queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
       queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });
+
+      // Automatically update corresponding task in task allocation registry to COMPLETED
+      try {
+        const raw = localStorage.getItem('city_pharma_lims_tasks');
+        if (raw && activeTest) {
+          const list = JSON.parse(raw);
+          const testCode = (activeTest.sampleCode || activeTest.sampleId || '').trim().toUpperCase();
+          const testTaskCode = (activeTest.taskCode || '').trim().toUpperCase();
+          const testId = (activeTest.id || '').trim();
+          const updatedList = list.map((t: any) => {
+            const tSampleCode = (t.sampleId || t.accessionNo || '').trim().toUpperCase();
+            const tTaskCode = (t.taskCode || '').trim().toUpperCase();
+            if (
+              (testId && t.id === testId) ||
+              (testTaskCode && tTaskCode === testTaskCode) ||
+              (testCode && tSampleCode === testCode)
+            ) {
+              return { ...t, status: 'COMPLETED' as const, isAssignedByManager: true, resultStatus: 'PASSED' };
+            }
+            return t;
+          });
+          localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updatedList));
+          window.dispatchEvent(new Event('lims-tasks-updated'));
+        }
+      } catch (err) {}
+
       setActiveTest(null);
       setNumericResult('');
       setTextResult('');
@@ -744,11 +770,22 @@ function TestingPageContent() {
       const status = 'COMPLETED';
       const resultStatus = isPass ? 'PASSED' : 'FAILED';
 
+      const testCode = (activeTest.sampleCode || activeTest.sampleId || '').trim().toUpperCase();
+      const testTaskCode = (activeTest.taskCode || '').trim().toUpperCase();
+      const testId = (activeTest.id || '').trim();
+
       const updated = storedTasks.map((t) => {
-        if (t.id === activeTest.id || t.taskCode === activeTest.taskCode || t.sampleId === activeTest.sampleCode) {
+        const tSampleCode = (t.sampleId || t.accessionNo || '').trim().toUpperCase();
+        const tTaskCode = (t.taskCode || '').trim().toUpperCase();
+        if (
+          (testId && t.id === testId) ||
+          (testTaskCode && tTaskCode === testTaskCode) ||
+          (testCode && tSampleCode === testCode)
+        ) {
           return {
             ...t,
-            status,
+            status: 'COMPLETED' as const,
+            isAssignedByManager: true,
             resultStatus,
             numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
             textResult: textResult || undefined,
@@ -767,7 +804,8 @@ function TestingPageContent() {
           taskCode: activeTest.testSpecification?.testCode || 'TASK-QC-01',
           sampleId: activeTest.sampleCode,
           sampleName: activeTest.materialName,
-          status,
+          status: 'COMPLETED' as const,
+          isAssignedByManager: true,
           resultStatus,
           numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
           textResult: textResult || undefined,
@@ -781,6 +819,17 @@ function TestingPageContent() {
       setStoredTasks(updated);
       localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
       window.dispatchEvent(new Event('lims-tasks-updated'));
+
+      // Automatically sync sample in database to REVIEW_PENDING if matched
+      const matchedDbSample = allLabSamples.find((s) => {
+        const sCode = (s.sampleCode || s.accessionNo || s.sampleId || s.id || '').trim().toUpperCase();
+        return sCode === testCode;
+      });
+      if (matchedDbSample?.id) {
+        samplingService.update(matchedDbSample.id, {
+          status: 'REVIEW_PENDING' as any,
+        }).catch((err) => console.warn('Could not update sample status to REVIEW_PENDING:', err));
+      }
 
       // 21 CFR Part 11 Audit Trail
       auditService.logActivity({

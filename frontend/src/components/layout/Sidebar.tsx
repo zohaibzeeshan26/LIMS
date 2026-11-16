@@ -221,7 +221,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Sample Registration',
         href: '/samples',
         icon: FileText,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER', 'LAB_TECHNICIAN'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'LAB_TECHNICIAN'],
         badge: labBadgeLabel,
       },
       {

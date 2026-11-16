@@ -54,6 +54,7 @@ export interface TaskItem {
   assignedDate: string;
   status: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED';
   instructions?: string;
+  isAssignedByManager?: boolean;
   // All Sampling fields matching /samples
   accessionNo?: string;
   samplingDate?: string;
@@ -175,7 +176,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
     status: 'IN_PROGRESS',
-    instructions: 'Follow Monograph BP 2024 Vol II. Run 5 replicate injections.',
+    instructions: '',
     accessionNo: 'A-0001',
     samplingDate: '2026-10-28T09:30:00.000Z',
     stageType: 'Raw Material',
@@ -202,7 +203,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
     status: 'ASSIGNED',
-    instructions: 'Aseptic cleanroom isolation mandatory. Verify laminar flow cabinet velocity.',
+    instructions: '',
     accessionNo: 'A-0002',
     samplingDate: '2026-10-28T10:15:00.000Z',
     stageType: 'Raw Material',
@@ -229,7 +230,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-30',
     assignedDate: '2026-10-28',
     status: 'ASSIGNED',
-    instructions: 'Perform in dedicated penicillin HVAC containment suite.',
+    instructions: '',
     accessionNo: 'A-0003',
     samplingDate: '2026-10-28T11:00:00.000Z',
     stageType: 'Raw Material',
@@ -256,7 +257,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-31',
     assignedDate: '2026-10-27',
     status: 'COMPLETED',
-    instructions: 'Batch # BTH-2026-091 release testing. Results verified within spec.',
+    instructions: '',
     accessionNo: 'A-0004',
     samplingDate: '2026-10-27T14:00:00.000Z',
     stageType: 'Finished Product',
@@ -283,7 +284,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-30',
     assignedDate: '2026-10-28',
     status: 'IN_PROGRESS',
-    instructions: 'Light obscuration particle counter inspection required.',
+    instructions: '',
     accessionNo: 'A-0005',
     samplingDate: '2026-10-28T15:20:00.000Z',
     stageType: 'Finished Product',
@@ -310,7 +311,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
     status: 'IN_PROGRESS',
-    instructions: 'Dedicated Penicillin suite operations required.',
+    instructions: '',
     accessionNo: 'A-0006',
     samplingDate: '2026-10-28T12:45:00.000Z',
     stageType: 'Finished Product',
@@ -337,7 +338,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-30',
     assignedDate: '2026-10-28',
     status: 'ASSIGNED',
-    instructions: 'Verify moisture content below 0.5% w/w.',
+    instructions: '',
     accessionNo: 'A-0007',
     samplingDate: '2026-10-28T08:15:00.000Z',
     stageType: 'Raw Material',
@@ -364,7 +365,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-29',
     assignedDate: '2026-10-28',
     status: 'IN_PROGRESS',
-    instructions: 'Check density, active concentration, and refractive index.',
+    instructions: '',
     accessionNo: 'A-0008',
     samplingDate: '2026-10-28T13:10:00.000Z',
     stageType: 'Finished Product',
@@ -391,7 +392,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-31',
     assignedDate: '2026-10-28',
     status: 'ASSIGNED',
-    instructions: 'QC Raw Material acceptance inspection per USP monograph.',
+    instructions: '',
     accessionNo: 'A-0009',
     samplingDate: '2026-10-28T09:00:00.000Z',
     stageType: 'Raw Material',
@@ -418,7 +419,7 @@ const DEFAULT_INITIAL_TASKS: TaskItem[] = [
     dueDate: '2026-10-30',
     assignedDate: '2026-10-28',
     status: 'ASSIGNED',
-    instructions: '6-vessel dissolution testing at 100 rpm in phosphate buffer pH 6.8.',
+    instructions: '',
     accessionNo: 'A-0010',
     samplingDate: '2026-10-28T16:00:00.000Z',
     stageType: 'Finished Product',
@@ -566,7 +567,9 @@ function TaskAssignmentPageInner() {
     setSelectedPriorityVal(task.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT');
     setSelectedShiftVal(task.shift || 'Morning Shift (08:00 - 16:00)');
     setSelectedDueDateVal(task.dueDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
-    setSelectedInstructionsVal(task.instructions || '');
+    
+    // Special Instructions should NEVER auto-fill on Assign click — always start blank for manual input
+    setSelectedInstructionsVal('');
     setIsRowAssignModalOpen(true);
   };
 
@@ -583,12 +586,13 @@ function TaskAssignmentPageInner() {
           assignedAnalystId: chosen.id,
           assignedAnalystName: chosen.name,
           assignedAnalystUsername: chosen.username,
-          testProtocol: selectedProtocol,
+          testProtocol: selectedProtocol || t.testProtocol || 'Standard QC Verification Protocol',
           priority: selectedPriorityVal,
           shift: selectedShiftVal,
           dueDate: selectedDueDateVal,
           instructions: selectedInstructionsVal,
-          status: 'ASSIGNED' as const,
+          status: 'IN_PROGRESS' as const,
+          isAssignedByManager: true,
         };
       }
       return t;
@@ -607,7 +611,7 @@ function TaskAssignmentPageInner() {
     if (matchingSample?.id) {
       samplingService.update(matchingSample.id, {
         assignedToId: chosen.id,
-        status: 'ASSIGNED_FOR_TESTING' as any,
+        status: 'IN_PROGRESS' as any,
       }).catch((err) => console.warn('Could not update sample assignedToId in db:', err));
     }
 
@@ -667,10 +671,41 @@ function TaskAssignmentPageInner() {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const enriched = parsed.map((item: any) => ({
-              ...item,
-              section: item.section || getTaskSection(item),
-            }));
+            const seedInstructions = new Set([
+              'Follow Monograph BP 2024 Vol II. Run 5 replicate injections.',
+              'Aseptic cleanroom isolation mandatory. Verify laminar flow cabinet velocity.',
+              'Perform in dedicated penicillin HVAC containment suite.',
+              'Batch # BTH-2026-091 release testing. Results verified within spec.',
+              'Light obscuration particle counter inspection required.',
+              'Dedicated Penicillin suite operations required.',
+              'Verify moisture content below 0.5% w/w.',
+              'Check density, active concentration, and refractive index.',
+              'QC Raw Material acceptance inspection per USP monograph.',
+              '6-vessel dissolution testing at 100 rpm in phosphate buffer pH 6.8.',
+            ]);
+
+            const enriched = parsed.map((item: any) => {
+              const rawIns = (item.instructions || '').trim();
+              const isAuto =
+                seedInstructions.has(rawIns) ||
+                rawIns.toLowerCase().includes('auto-allocated') ||
+                rawIns.toLowerCase().includes('upon sample registration') ||
+                rawIns.toLowerCase().includes('batch verified');
+              const isAssigned =
+                item.isAssignedByManager === true ||
+                item.status === 'IN_PROGRESS' ||
+                item.status === 'COMPLETED' ||
+                (item.assignedAnalystName &&
+                  !item.assignedAnalystName.toLowerCase().includes('zubair raza') &&
+                  !item.assignedAnalystName.toLowerCase().includes('lab analyst'));
+              return {
+                ...item,
+                section: item.section || getTaskSection(item),
+                instructions: isAuto ? '' : item.instructions || '',
+                isAssignedByManager: isAssigned ? true : false,
+                status: isAssigned && item.status === 'ASSIGNED' ? ('IN_PROGRESS' as const) : item.status,
+              };
+            });
             const existingCodes = new Set(enriched.map((x: any) => x.taskCode));
             const missingDefaults = DEFAULT_INITIAL_TASKS.filter((d) => !existingCodes.has(d.taskCode));
             const merged = [...enriched, ...missingDefaults];
@@ -713,12 +748,39 @@ function TaskAssignmentPageInner() {
           const submitted = matched.submittedBy || matched.submittedByUser?.fullName || t.submittedBy;
           const received = matched.accessionedBy?.fullName || matched.receivedByUser?.fullName || t.receivedBy;
 
-          if (
+          const isTestsCompleted =
+            Array.isArray(matched.tests) &&
+            matched.tests.length > 0 &&
+            matched.tests.every((testItem: any) => testItem.status === 'COMPLETED' || testItem.status === 'VERIFIED');
+
+          const isSampleCompleted =
+            matched.status === 'COMPLETED' ||
+            matched.status === 'REVIEW_PENDING' ||
+            matched.status === 'APPROVED' ||
+            isTestsCompleted;
+
+          const isSampleInProgress =
+            matched.status === 'TESTING' ||
+            matched.status === 'IN_PROGRESS' ||
+            matched.status === 'TESTING_IN_PROGRESS' ||
+            matched.status === 'ASSIGNED_FOR_TESTING' ||
+            Boolean(matched.assignedToId);
+
+          const targetStatus: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' =
+            isSampleCompleted || t.status === 'COMPLETED'
+              ? 'COMPLETED'
+              : isSampleInProgress || t.isAssignedByManager
+              ? 'IN_PROGRESS'
+              : t.status;
+
+          const shouldUpdate =
             t.laboratory !== sampleLab ||
             t.section !== sampleSec ||
             t.sampleName !== sampleName ||
-            t.lotNumber !== lotNum
-          ) {
+            t.lotNumber !== lotNum ||
+            t.status !== targetStatus;
+
+          if (shouldUpdate) {
             updatedExisting = true;
             return {
               ...t,
@@ -733,6 +795,8 @@ function TaskAssignmentPageInner() {
               expDate: exp,
               submittedBy: submitted,
               receivedBy: received,
+              status: targetStatus,
+              isAssignedByManager: targetStatus === 'IN_PROGRESS' || targetStatus === 'COMPLETED',
             };
           }
         }
@@ -790,12 +854,28 @@ function TaskAssignmentPageInner() {
                 ? new Date(s.samplingDate).toISOString().split('T')[0]
                 : new Date().toISOString().split('T')[0],
               status:
-                s.status === 'COMPLETED'
+                s.status === 'COMPLETED' ||
+                s.status === 'REVIEW_PENDING' ||
+                s.status === 'APPROVED' ||
+                (Array.isArray(s.tests) && s.tests.length > 0 && s.tests.every((testItem: any) => testItem.status === 'COMPLETED' || testItem.status === 'VERIFIED'))
                   ? 'COMPLETED'
-                  : s.status === 'TESTING' || s.status === 'IN_PROGRESS'
+                  : s.status === 'TESTING' ||
+                    s.status === 'IN_PROGRESS' ||
+                    s.status === 'TESTING_IN_PROGRESS' ||
+                    s.status === 'ASSIGNED_FOR_TESTING' ||
+                    Boolean(s.assignedToId)
                   ? 'IN_PROGRESS'
                   : 'ASSIGNED',
-              instructions: `Auto-allocated QC task generated from Sample Record (${s.lotNumber || s.batchLotNumber || 'Batch Verified'}).`,
+              isAssignedByManager:
+                s.status === 'COMPLETED' ||
+                s.status === 'REVIEW_PENDING' ||
+                s.status === 'APPROVED' ||
+                s.status === 'TESTING' ||
+                s.status === 'IN_PROGRESS' ||
+                s.status === 'TESTING_IN_PROGRESS' ||
+                s.status === 'ASSIGNED_FOR_TESTING' ||
+                Boolean(s.assignedToId),
+              instructions: '',
               accessionNo: s.accessionNo || s.sampleCode || `A-${String(updatedTasks.length + newlyGeneratedTasks.length + 1).padStart(4, '0')}`,
               samplingDate: s.samplingDate || s.createdAt || new Date().toISOString(),
               stageType: s.stageType || s.sampleType || (sampleSec === 'semi-base' ? 'Raw Material' : 'Finished Product'),
@@ -833,7 +913,25 @@ function TaskAssignmentPageInner() {
       const saved = localStorage.getItem('city_pharma_lims_tasks');
       if (saved) {
         try {
-          setTasks(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const normalized = parsed.map((item: any) => {
+              const isAssigned =
+                item.isAssignedByManager === true ||
+                item.status === 'IN_PROGRESS' ||
+                item.status === 'COMPLETED' ||
+                (item.assignedAnalystName &&
+                  !item.assignedAnalystName.toLowerCase().includes('zubair raza') &&
+                  !item.assignedAnalystName.toLowerCase().includes('lab analyst'));
+              return {
+                ...item,
+                isAssignedByManager: isAssigned ? true : false,
+                status: isAssigned && item.status === 'ASSIGNED' ? ('IN_PROGRESS' as const) : item.status,
+              };
+            });
+            setTasks(normalized);
+            return;
+          }
         } catch (e) {}
       }
     };
@@ -938,7 +1036,12 @@ function TaskAssignmentPageInner() {
 
   const handleStatusChange = (taskId: string, newStatus: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED') => {
     const targetTask = tasks.find((t) => t.id === taskId);
-    const updated = tasks.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t));
+    const isAssigned = newStatus === 'IN_PROGRESS' || newStatus === 'COMPLETED';
+    const updated = tasks.map((t) => (t.id === taskId ? {
+      ...t,
+      status: newStatus,
+      isAssignedByManager: isAssigned ? true : false,
+    } : t));
     saveTasks(updated);
 
     if (targetTask) {
@@ -1349,19 +1452,11 @@ function TaskAssignmentPageInner() {
           </p>
         </div>
 
-        {isHOD ? (
+        {isHOD && (
           <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs shrink-0 self-start md:self-auto">
             <Lock className="w-3.5 h-3.5 text-amber-600" />
             <span>HOD Read-Only Mode &bull; Assignment Restricted</span>
           </div>
-        ) : (
-          <button
-            onClick={() => setIsNewTaskModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer shrink-0 self-start md:self-auto hover:shadow-md"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Assign New Task</span>
-          </button>
         )}
       </div>
 
@@ -1489,7 +1584,6 @@ function TaskAssignmentPageInner() {
               {filteredTasks.length} {filteredTasks.length === 1 ? 'Task' : 'Tasks'}
             </span>
           </div>
-          <span className="text-[11px] text-slate-400">Click status to update progress</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -1524,7 +1618,7 @@ function TaskAssignmentPageInner() {
                       <UserCheck className="h-5 w-5" />
                     </div>
                     <p className="font-semibold text-slate-600 text-xs">No assigned tasks found.</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Click &ldquo;Assign New Task&rdquo; to allocate testing work.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Use the &ldquo;Assign&rdquo; button in the table to allocate testing work.</p>
                   </td>
                 </tr>
               ) : (
@@ -1683,37 +1777,51 @@ function TaskAssignmentPageInner() {
                         <div className="text-[10px] text-slate-400 truncate max-w-[120px]">{t.shift}</div>
                       </td>
 
-                      {/* 17. Task Status */}
+                      {/* 17. Task Status (Automated Life-Cycle: Pending Start -> In Progress -> Completed) */}
                       <td className="py-3 px-3.5 whitespace-nowrap">
-                        <select
-                          value={t.status}
-                          onChange={(e) => handleStatusChange(t.id, e.target.value as any)}
-                          className={cn(
-                            'text-[11px] font-bold px-2.5 py-1 rounded-lg border focus:outline-none cursor-pointer',
-                            t.status === 'COMPLETED' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                            t.status === 'IN_PROGRESS' && 'bg-blue-50 text-blue-700 border-blue-200',
-                            t.status === 'ASSIGNED' && 'bg-amber-50 text-amber-800 border-amber-200'
-                          )}
-                        >
-                          <option value="ASSIGNED">Pending Start</option>
-                          <option value="IN_PROGRESS">In Progress</option>
-                          <option value="COMPLETED">Completed</option>
-                        </select>
+                        {t.status === 'COMPLETED' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            <span>Completed</span>
+                          </span>
+                        ) : (t.status === 'IN_PROGRESS' || t.isAssignedByManager) ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            <span>In Progress</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            <span>Pending Start</span>
+                          </span>
+                        )}
                       </td>
 
                       {/* 18. Action */}
                       <td className="py-3 px-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           {canAssign && (
-                            <button
-                              type="button"
-                              onClick={() => openRowAssignModal(t)}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                              title="Assign this sample to a testing analyst"
-                            >
-                              <UserCheck className="h-3 w-3" />
-                              <span>Assign</span>
-                            </button>
+                            (t.isAssignedByManager || t.status === 'IN_PROGRESS' || t.status === 'COMPLETED') ? (
+                              <button
+                                type="button"
+                                onClick={() => openRowAssignModal(t)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                title={`Assigned to ${t.assignedAnalystName}. Click to modify or re-assign.`}
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>Assigned</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openRowAssignModal(t)}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                title="Assign this sample to a testing analyst"
+                              >
+                                <UserCheck className="h-3 w-3" />
+                                <span>Assign</span>
+                              </button>
+                            )
                           )}
                           <button
                             type="button"
@@ -1892,38 +2000,19 @@ function TaskAssignmentPageInner() {
             </div>
           </div>
 
-          {/* Protocol & Priority */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Testing Protocol / Worksheet *
-              </label>
-              <select
-                value={newProtocol}
-                onChange={(e) => setNewProtocol(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-              >
-                {TEST_PROTOCOLS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Priority Level *
-              </label>
-              <select
-                value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value as any)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-              >
-                <option value="URGENT">URGENT (48h Standard)</option>
-                <option value="ROUTINE">ROUTINE (5-Day Turnaround)</option>
-              </select>
-            </div>
+          {/* Priority */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Priority Level *
+            </label>
+            <select
+              value={newPriority}
+              onChange={(e) => setNewPriority(e.target.value as any)}
+              className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+            >
+              <option value="URGENT">URGENT (48h Standard)</option>
+              <option value="ROUTINE">ROUTINE (5-Day Turnaround)</option>
+            </select>
           </div>
 
           {/* Shift & Due Date */}
@@ -1966,7 +2055,6 @@ function TaskAssignmentPageInner() {
               rows={2}
               value={newInstructions}
               onChange={(e) => setNewInstructions(e.target.value)}
-              placeholder="e.g. Clean room isolation required. Run 5 replicate injections on HPLC Unit 02."
               className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             />
           </div>
@@ -2054,56 +2142,36 @@ function TaskAssignmentPageInner() {
               </p>
             </div>
 
-            {/* Protocol & Priority */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Testing Protocol / Monograph *
-                </label>
-                <select
-                  value={selectedProtocol}
-                  onChange={(e) => setSelectedProtocol(e.target.value)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  required
+            {/* Workflow Priority */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Workflow Priority *
+              </label>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPriorityVal('ROUTINE')}
+                  className={cn(
+                    'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
+                    selectedPriorityVal === 'ROUTINE'
+                      ? 'bg-slate-100 border-slate-400 text-slate-800 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  )}
                 >
-                  {TEST_PROTOCOLS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Workflow Priority *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPriorityVal('ROUTINE')}
-                    className={cn(
-                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center',
-                      selectedPriorityVal === 'ROUTINE'
-                        ? 'bg-slate-100 border-slate-400 text-slate-800 shadow-2xs'
-                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                    )}
-                  >
-                    Routine (5-Day Turnaround)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPriorityVal('URGENT')}
-                    className={cn(
-                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center',
-                      selectedPriorityVal === 'URGENT'
-                        ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-2xs'
-                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                    )}
-                  >
-                    Urgent (48h Priority)
-                  </button>
-                </div>
+                  <span>Routine (5-Day Turnaround)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPriorityVal('URGENT')}
+                  className={cn(
+                    'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
+                    selectedPriorityVal === 'URGENT'
+                      ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  )}
+                >
+                  <span>Urgent (48h Priority)</span>
+                </button>
               </div>
             </div>
 
@@ -2147,7 +2215,6 @@ function TaskAssignmentPageInner() {
                 rows={2}
                 value={selectedInstructionsVal}
                 onChange={(e) => setSelectedInstructionsVal(e.target.value)}
-                placeholder="e.g. Clean room isolation required. Run 5 replicate injections on HPLC Unit 02."
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>

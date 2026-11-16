@@ -42,7 +42,7 @@ export function DeputyManagerDashboard() {
   // Assign Modal
   const [assigningSample, setAssigningSample] = useState<Sample | null>(null);
   const [assignAnalystId, setAssignAnalystId] = useState<string>('');
-  const [assignPriority, setAssignPriority] = useState<'ROUTINE' | 'URGENT' | 'STAT'>('ROUTINE');
+  const [assignPriority, setAssignPriority] = useState<'ROUTINE' | 'URGENT'>('ROUTINE');
   const [assignShift, setAssignShift] = useState<string>('Morning (Shift A)');
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 

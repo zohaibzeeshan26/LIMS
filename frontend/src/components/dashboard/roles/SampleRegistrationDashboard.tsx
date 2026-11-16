@@ -266,11 +266,7 @@ export function SampleRegistrationDashboard() {
                       </td>
 
                       <td className="py-3 px-3.5">
-                        {s.priority === 'STAT' ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
-                            STAT (24h)
-                          </span>
-                        ) : s.priority === 'URGENT' ? (
+                        {s.priority === 'URGENT' || s.priority === 'STAT' ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
                             URGENT
                           </span>

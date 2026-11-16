@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { samplingService } from '@/services/sampling.service';
 import { useAuth } from '@/context/AuthContext';
-import { getUserLabAccess } from '@/types/lims';
+import { getUserLabAccess, getSampleSection } from '@/types/lims';
 import { cn } from '@/lib/utils';
 import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
@@ -28,6 +28,64 @@ import {
   Layers,
 } from 'lucide-react';
 
+function determineSampleSection(s: any): 'SEMI_BASIC' | 'FORMULATION' {
+  if (s.section) {
+    const sec = String(s.section).toLowerCase();
+    if (sec.includes('form') || sec === 'formulation') return 'FORMULATION';
+    if (sec.includes('semi') || sec === 'semi-base' || sec === 'semi_basic') return 'SEMI_BASIC';
+  }
+
+  const code = (s.sampleCode || s.sampleId || s.accessionNo || s.id || '').toUpperCase();
+  if (code.includes('/F-') || code.includes('/F/') || code.includes('GL/F') || code.includes('CEPH/F') || code.includes('PEN/F')) {
+    return 'FORMULATION';
+  }
+  if (code.includes('/SB-') || code.includes('/SB/') || code.includes('GL/SB') || code.includes('CEPH/SB') || code.includes('PEN/SB')) {
+    return 'SEMI_BASIC';
+  }
+
+  const baseSec = getSampleSection({
+    sampleCode: s.sampleCode || s.sampleId || s.accessionNo,
+    sampleId: s.sampleId || s.id,
+    stageType: s.stageType,
+    sampleType: s.sampleType,
+    remarks: s.remarks,
+  });
+
+  if (baseSec === 'formulation') {
+    return 'FORMULATION';
+  }
+
+  // Check product title, nomenclature and pharmaceutical dosage forms
+  const name = (s.nomenclature || s.materialName || s.product || '').toLowerCase();
+  const stage = (s.stageType || '').toLowerCase();
+  const type = (s.sampleType || '').toLowerCase();
+
+  if (
+    stage.includes('finish') ||
+    stage.includes('coat') ||
+    stage.includes('packag') ||
+    stage.includes('tablet') ||
+    stage.includes('capsule') ||
+    stage.includes('syrup') ||
+    stage.includes('suspension') ||
+    type.includes('finish') ||
+    name.includes('tablet') ||
+    name.includes('capsule') ||
+    name.includes('suspension') ||
+    name.includes('syrup') ||
+    name.includes('coated') ||
+    name.includes('drop') ||
+    name.includes('injection') ||
+    name.includes('panadol') ||
+    name.includes('brufen') ||
+    name.includes('ansaid')
+  ) {
+    return 'FORMULATION';
+  }
+
+  return 'SEMI_BASIC';
+}
+
 export default function PriorityNoticePage() {
   const { user } = useAuth();
   const userAccess = getUserLabAccess(user);
@@ -42,21 +100,20 @@ export default function PriorityNoticePage() {
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLab, setSelectedLab] = useState<'ALL' | 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN'>('ALL');
-  const [selectedPriority, setSelectedPriority] = useState<'ALL' | 'STAT' | 'URGENT'>('ALL');
+  const [selectedPriority, setSelectedPriority] = useState<'ALL' | 'URGENT' | 'ROUTINE'>('ALL');
   const [selectedSection, setSelectedSection] = useState<'ALL' | 'SEMI_BASIC' | 'FORMULATION'>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
-  // Dedicated query to fetch ALL active expedited (Immediate / STAT & Urgent) samples
+  // Dedicated query to fetch active samples for priority tracking
   const {
     data: expeditedSamplesData,
     isLoading,
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['active-expedited-urgent-samples'],
+    queryKey: ['active-priority-samples-queue'],
     queryFn: () =>
       samplingService.getAll({
-        priority: 'STAT,URGENT',
         limit: 100,
         sortBy: 'samplingDate',
         sortOrder: 'desc',
@@ -64,30 +121,31 @@ export default function PriorityNoticePage() {
     refetchInterval: 5000,
   });
 
-  // Map and deduplicate expedited samples
+  // Map and deduplicate samples with system priorities (Urgent and Routine ONLY)
   const allExpeditedSamples = useMemo(() => {
     const list = Array.isArray(expeditedSamplesData)
       ? expeditedSamplesData
       : (expeditedSamplesData as any)?.data || [];
 
-    const urgentList = list.filter(
+    const activeList = list.filter(
       (s: any) =>
-        (s.priority === 'STAT' || s.priority === 'URGENT') &&
         s.status !== 'APPROVED' &&
         s.status !== 'REJECTED' &&
         s.status !== 'ARCHIVED'
     );
 
-    // Sort: STAT (Immediate 24h) first, then URGENT (2d), then latest date
-    urgentList.sort((a: any, b: any) => {
-      if (a.priority === 'STAT' && b.priority !== 'STAT') return -1;
-      if (b.priority === 'STAT' && a.priority !== 'STAT') return 1;
+    // Sort: Urgent samples first, then latest date
+    activeList.sort((a: any, b: any) => {
+      const aUrgent = a.priority === 'URGENT' || a.priority === 'STAT';
+      const bUrgent = b.priority === 'URGENT' || b.priority === 'STAT';
+      if (aUrgent && !bUrgent) return -1;
+      if (!aUrgent && bUrgent) return 1;
       const aTime = new Date(a.samplingDate || a.createdAt || 0).getTime();
       const bTime = new Date(b.samplingDate || b.createdAt || 0).getTime();
       return bTime - aTime;
     });
 
-    return urgentList.map((s: any) => {
+    return activeList.map((s: any) => {
       let labId = 'general';
       let labName = 'General Lab';
       let labBadge = 'GL';
@@ -107,15 +165,18 @@ export default function PriorityNoticePage() {
         labPillClass = 'text-emerald-700 bg-emerald-50/70 border-emerald-200/70';
       }
 
+      const isUrgent = s.priority === 'URGENT' || s.priority === 'STAT';
+      const sectionKey = determineSampleSection(s);
+
       return {
         uuid: s.id,
         id: s.sampleCode || s.sampleId || s.accessionNo || s.id,
         product: s.nomenclature || s.materialName || 'Pharmaceutical Sample',
         batchNumber: s.lotNumber || s.batchLotNumber || s.batch?.batchNumber || 'N/A',
-        section: s.section === 'FORMULATION' ? 'Formulation' : 'Semi Basics',
-        rawSection: s.section || 'SEMI_BASIC',
-        sampleType: s.sampleType || 'Raw Material',
-        priority: (s.priority || 'URGENT') as 'STAT' | 'URGENT',
+        section: sectionKey === 'FORMULATION' ? 'Formulation' : 'Semi Basics',
+        rawSection: sectionKey,
+        sampleType: s.sampleType || (sectionKey === 'FORMULATION' ? 'Finished Product' : 'Raw Material'),
+        priority: isUrgent ? ('URGENT' as const) : ('ROUTINE' as const),
         status: s.status || 'RECEIVED',
         samplingDate: s.samplingDate || s.createdAt || new Date().toISOString(),
         labId,
@@ -126,9 +187,11 @@ export default function PriorityNoticePage() {
     });
   }, [expeditedSamplesData]);
 
-  // Compute counts
-  const statCount = useMemo(() => allExpeditedSamples.filter((s) => s.priority === 'STAT').length, [allExpeditedSamples]);
+  // Compute counts strictly for Urgent, Routine, and Sections
   const urgentCount = useMemo(() => allExpeditedSamples.filter((s) => s.priority === 'URGENT').length, [allExpeditedSamples]);
+  const routineCount = useMemo(() => allExpeditedSamples.filter((s) => s.priority === 'ROUTINE').length, [allExpeditedSamples]);
+  const semiBasicCount = useMemo(() => allExpeditedSamples.filter((s) => s.rawSection === 'SEMI_BASIC').length, [allExpeditedSamples]);
+  const formulationCount = useMemo(() => allExpeditedSamples.filter((s) => s.rawSection === 'FORMULATION').length, [allExpeditedSamples]);
   const generalCount = useMemo(() => allExpeditedSamples.filter((s) => s.labId === 'general').length, [allExpeditedSamples]);
   const cephCount = useMemo(() => allExpeditedSamples.filter((s) => s.labId === 'cephalosporin').length, [allExpeditedSamples]);
   const penCount = useMemo(() => allExpeditedSamples.filter((s) => s.labId === 'penicillin').length, [allExpeditedSamples]);
@@ -141,12 +204,12 @@ export default function PriorityNoticePage() {
       if (selectedLab === 'CEPHALOSPORIN' && s.labId !== 'cephalosporin') return false;
       if (selectedLab === 'PENICILLIN' && s.labId !== 'penicillin') return false;
 
-      // Priority filter
-      if (selectedPriority === 'STAT' && s.priority !== 'STAT') return false;
+      // Priority filter (Urgent vs Routine only)
       if (selectedPriority === 'URGENT' && s.priority !== 'URGENT') return false;
+      if (selectedPriority === 'ROUTINE' && s.priority !== 'ROUTINE') return false;
 
       // Section filter
-      if (selectedSection === 'SEMI_BASIC' && s.rawSection === 'FORMULATION') return false;
+      if (selectedSection === 'SEMI_BASIC' && s.rawSection !== 'SEMI_BASIC') return false;
       if (selectedSection === 'FORMULATION' && s.rawSection !== 'FORMULATION') return false;
 
       // Search query
@@ -184,20 +247,9 @@ export default function PriorityNoticePage() {
               <Clock className="h-5 w-5 stroke-[2]" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Priority Notice
-                </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                  Expedited Queue
-                </span>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-medium text-slate-500 bg-white border border-slate-200">
-                  21 CFR Part 11
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Expedited testing schedule for active STAT (24h) and Urgent (2d) samples awaiting QC release.
-              </p>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                Priority Notice
+              </h1>
             </div>
           </div>
         </div>
@@ -214,7 +266,7 @@ export default function PriorityNoticePage() {
             onClick={() => refetch()}
             disabled={isFetching}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl shadow-2xs text-xs font-semibold text-slate-700 transition-colors cursor-pointer disabled:opacity-50"
-            title="Refresh expedited samples queue"
+            title="Refresh priority samples queue"
           >
             <RefreshCw className={cn('h-3.5 w-3.5 text-blue-600', isFetching && 'animate-spin')} />
             <span>{isFetching ? 'Syncing...' : 'Sync Queue'}</span>
@@ -225,10 +277,10 @@ export default function PriorityNoticePage() {
       {/* 4 Compact Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
         
-        {/* Card 1: Total Expedited */}
+        {/* Card 1: Total Queue */}
         <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total Expedited</span>
+            <span className="text-xs font-semibold text-slate-500">Total Samples</span>
             <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 border border-slate-200/60">
               Active
             </span>
@@ -241,53 +293,53 @@ export default function PriorityNoticePage() {
           </div>
         </div>
 
-        {/* Card 2: STAT Immediate (24 Hours SLA) */}
-        <div
-          onClick={() => setSelectedPriority(selectedPriority === 'STAT' ? 'ALL' : 'STAT')}
-          className={cn(
-            'bg-white rounded-xl p-2.5 sm:p-3 border shadow-2xs cursor-pointer transition-all hover:border-slate-300 flex flex-col justify-between',
-            selectedPriority === 'STAT'
-              ? 'border-blue-500 ring-2 ring-blue-500/10 bg-blue-50/20'
-              : 'border-slate-200/80'
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">STAT Immediate</span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-              24h SLA
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <p className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              {statCount}
-            </p>
-            <span className="text-[11px] text-slate-400">Immediate</span>
-          </div>
-        </div>
-
-        {/* Card 3: Urgent Priority (2 Days SLA) */}
+        {/* Card 2: Urgent Priority (48h SLA) */}
         <div
           onClick={() => setSelectedPriority(selectedPriority === 'URGENT' ? 'ALL' : 'URGENT')}
           className={cn(
             'bg-white rounded-xl p-2.5 sm:p-3 border shadow-2xs cursor-pointer transition-all hover:border-slate-300 flex flex-col justify-between',
             selectedPriority === 'URGENT'
+              ? 'border-amber-500 ring-2 ring-amber-500/10 bg-amber-50/20'
+              : 'border-slate-200/80'
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">Urgent Priority</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 border border-amber-200/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              48h SLA
+            </span>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between">
+            <p className="text-xl sm:text-2xl font-bold text-amber-700 tracking-tight">
+              {urgentCount}
+            </p>
+            <span className="text-[11px] text-slate-400">Expedited</span>
+          </div>
+        </div>
+
+        {/* Card 3: Routine Priority (Standard SLA) */}
+        <div
+          onClick={() => setSelectedPriority(selectedPriority === 'ROUTINE' ? 'ALL' : 'ROUTINE')}
+          className={cn(
+            'bg-white rounded-xl p-2.5 sm:p-3 border shadow-2xs cursor-pointer transition-all hover:border-slate-300 flex flex-col justify-between',
+            selectedPriority === 'ROUTINE'
               ? 'border-blue-500 ring-2 ring-blue-500/10 bg-blue-50/20'
               : 'border-slate-200/80'
           )}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Urgent Testing</span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 border border-amber-200/70">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              2d SLA
+            <span className="text-xs font-semibold text-slate-500">Routine Priority</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 border border-slate-200/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+              Standard SLA
             </span>
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <p className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              {urgentCount}
+              {routineCount}
             </p>
-            <span className="text-[11px] text-slate-400">2-day SLA</span>
+            <span className="text-[11px] text-slate-400">Routine</span>
           </div>
         </div>
 
@@ -383,7 +435,7 @@ export default function PriorityNoticePage() {
             </button>
           </div>
 
-          {/* Priority Filter */}
+          {/* Priority Filter (Urgent & Routine Only) */}
           <div className="flex items-center p-0.5 bg-slate-100/90 rounded-xl">
             <button
               type="button"
@@ -397,17 +449,6 @@ export default function PriorityNoticePage() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedPriority('STAT')}
-              className={cn(
-                'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1',
-                selectedPriority === 'STAT' ? 'bg-white text-rose-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-              <span>STAT (24h)</span>
-            </button>
-            <button
-              type="button"
               onClick={() => setSelectedPriority('URGENT')}
               className={cn(
                 'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1',
@@ -415,7 +456,18 @@ export default function PriorityNoticePage() {
               )}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              <span>Urgent (2d)</span>
+              <span>Urgent ({urgentCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedPriority('ROUTINE')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1',
+                selectedPriority === 'ROUTINE' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              )}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              <span>Routine ({routineCount})</span>
             </button>
           </div>
 
@@ -426,7 +478,7 @@ export default function PriorityNoticePage() {
               onClick={() => setSelectedSection('ALL')}
               className={cn(
                 'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer',
-                selectedSection === 'ALL' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                selectedSection === 'ALL' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
               All Sections
@@ -436,20 +488,20 @@ export default function PriorityNoticePage() {
               onClick={() => setSelectedSection('SEMI_BASIC')}
               className={cn(
                 'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer',
-                selectedSection === 'SEMI_BASIC' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                selectedSection === 'SEMI_BASIC' ? 'bg-white text-indigo-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
-              Semi Basics
+              Semi Basics ({semiBasicCount})
             </button>
             <button
               type="button"
               onClick={() => setSelectedSection('FORMULATION')}
               className={cn(
                 'px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer',
-                selectedSection === 'FORMULATION' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                selectedSection === 'FORMULATION' ? 'bg-white text-indigo-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
               )}
             >
-              Formulation
+              Formulation ({formulationCount})
             </button>
           </div>
         </div>
@@ -556,7 +608,7 @@ export default function PriorityNoticePage() {
               </div>
 
               <Link
-                href="/samples?priority=STAT,URGENT"
+                href="/samples"
                 className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
               >
                 <span>Full Registry</span>
@@ -567,7 +619,7 @@ export default function PriorityNoticePage() {
             {/* Clean Pill Badges (Gentle, elegant, highly readable) */}
             <div className="flex flex-wrap items-center gap-2">
               {filteredSamples.map((s) => {
-                const isStat = s.priority === 'STAT';
+                const isUrgent = s.priority === 'URGENT';
                 return (
                   <Link
                     key={s.id}
@@ -575,15 +627,15 @@ export default function PriorityNoticePage() {
                     className="group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-50 hover:bg-white border border-slate-200 hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer text-slate-800"
                     title={`Open ${s.id} in ${s.labName}`}
                   >
-                    <span className={cn('h-1.5 w-1.5 rounded-full', isStat ? 'bg-rose-500' : 'bg-amber-500')} />
+                    <span className={cn('h-1.5 w-1.5 rounded-full', isUrgent ? 'bg-amber-500' : 'bg-blue-500')} />
                     <span className="font-mono font-semibold text-slate-900">{s.id}</span>
                     <span
                       className={cn(
-                        'text-[10px] font-medium px-1.5 py-0.2 rounded',
-                        isStat ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
+                        'text-[10px] font-semibold px-1.5 py-0.2 rounded',
+                        isUrgent ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'
                       )}
                     >
-                      {isStat ? '24h' : '2d'}
+                      {isUrgent ? 'Urgent' : 'Routine'}
                     </span>
                     <span className="text-[11px] text-slate-500 max-w-[150px] truncate hidden sm:inline">
                       {s.product}
@@ -598,7 +650,7 @@ export default function PriorityNoticePage() {
           {/* Detailed Responsive Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {filteredSamples.map((s) => {
-              const isStat = s.priority === 'STAT';
+              const isUrgent = s.priority === 'URGENT';
               return (
                 <Link
                   key={s.id}
@@ -610,13 +662,13 @@ export default function PriorityNoticePage() {
                       <span
                         className={cn(
                           'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border',
-                          isStat
-                            ? 'bg-rose-50 text-rose-700 border-rose-200/70'
-                            : 'bg-amber-50 text-amber-700 border-amber-200/70'
+                          isUrgent
+                            ? 'bg-amber-50 text-amber-700 border-amber-200/70'
+                            : 'bg-blue-50 text-blue-700 border-blue-200/70'
                         )}
                       >
-                        <span className={cn('h-1.5 w-1.5 rounded-full', isStat ? 'bg-rose-500' : 'bg-amber-500')} />
-                        {isStat ? 'STAT (24h)' : 'Urgent (2d)'}
+                        <span className={cn('h-1.5 w-1.5 rounded-full', isUrgent ? 'bg-amber-500' : 'bg-blue-500')} />
+                        {isUrgent ? 'Urgent (48h)' : 'Routine'}
                       </span>
 
                       <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border', s.labPillClass)}>
@@ -684,20 +736,20 @@ export default function PriorityNoticePage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredSamples.map((s) => {
-                  const isStat = s.priority === 'STAT';
+                  const isUrgent = s.priority === 'URGENT';
                   return (
                     <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border',
-                            isStat
-                              ? 'bg-rose-50 text-rose-700 border-rose-200/70'
-                              : 'bg-amber-50 text-amber-700 border-amber-200/70'
+                            isUrgent
+                              ? 'bg-amber-50 text-amber-700 border-amber-200/70'
+                              : 'bg-blue-50 text-blue-700 border-blue-200/70'
                           )}
                         >
-                          <span className={cn('h-1.5 w-1.5 rounded-full', isStat ? 'bg-rose-500' : 'bg-amber-500')} />
-                          {isStat ? 'STAT (24h)' : 'Urgent (2d)'}
+                          <span className={cn('h-1.5 w-1.5 rounded-full', isUrgent ? 'bg-amber-500' : 'bg-blue-500')} />
+                          {isUrgent ? 'Urgent (48h)' : 'Routine'}
                         </span>
                       </td>
 
