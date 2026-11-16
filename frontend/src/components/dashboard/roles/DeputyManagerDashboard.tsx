@@ -230,10 +230,6 @@ export function DeputyManagerDashboard() {
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Section Workflow, Sample Allocation &amp; Tester Supervision
             </h1>
-            <p className="text-xs sm:text-sm text-slate-200/90 max-w-2xl leading-relaxed">
-              Supervise registered incoming batches, assign testing analysts according to authorized section permissions,
-              and monitor turnaround velocity.
-            </p>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap shrink-0">
