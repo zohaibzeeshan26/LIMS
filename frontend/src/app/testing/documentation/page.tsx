@@ -340,30 +340,6 @@ export default function TestingDocumentationRepositoryPage() {
               <FolderOpen className="h-7 w-7 text-teal-700" />
               <span>Product Documentation Repository</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-3xl">
-              Centralized library of approved Standard Testing Procedures (STP), Finished Product Specifications,
-              Working Sheets, and Pharmacopeial Monographs uploaded by the Documentation Manager.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => refetch()}
-              disabled={isRefetching}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-50"
-              title="Refresh repository"
-            >
-              <RefreshCw className={cn('w-3.5 h-3.5 text-teal-600', isRefetching && 'animate-spin')} />
-              <span>{isRefetching ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
-
-            <Link
-              href="/documentation-manager"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-navy-950 hover:bg-navy-900 text-white text-xs font-bold shadow-xs transition-all"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-teal-400" />
-              <span>Upload / Manage Dossiers</span>
-            </Link>
           </div>
         </div>
 
@@ -419,7 +395,6 @@ export default function TestingDocumentationRepositoryPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products by brand, generic, ATM code, or search documents by title / filename..."
                 className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-600 transition-all text-slate-800 placeholder-slate-400"
               />
               {searchQuery && (

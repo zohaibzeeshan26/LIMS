@@ -73,17 +73,8 @@ function DashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'overview' | 'lab-operations'>(
-    tabParam === 'lab-operations' ? 'lab-operations' : 'overview'
-  );
-
-  useEffect(() => {
-    if (tabParam === 'lab-operations') {
-      setActiveTab('lab-operations');
-    } else if (tabParam === 'overview') {
-      setActiveTab('overview');
-    }
-  }, [tabParam]);
+  const activeTab: 'overview' | 'lab-operations' =
+    tabParam === 'lab-operations' ? 'lab-operations' : 'overview';
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading } = useAuth();
@@ -947,7 +938,17 @@ function DashboardInner() {
           </Link>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-              {activeTab === 'lab-operations' ? 'Lab Operations Dashboard' : 'QC Executive Dashboard'}
+              {activeTab === 'lab-operations'
+                ? 'Lab Operations Dashboard'
+                : effectiveRole === 'DEPUTY_MANAGER'
+                ? 'Dashboard'
+                : effectiveRole === 'SUPER_ADMIN'
+                ? 'Super Admin Hub'
+                : effectiveRole === 'ADMIN' || effectiveRole === 'HOD'
+                ? 'HOD Executive Dashboard'
+                : effectiveRole === 'DOCUMENTATION_MANAGER'
+                ? 'Documentation Hub'
+                : 'QC Executive Dashboard'}
             </h1>
           </div>
         </div>
@@ -1028,8 +1029,7 @@ function DashboardInner() {
       {activeTab === 'lab-operations' ? (
         <LabOperationsView
           onBackToOverview={() => {
-            setActiveTab('overview');
-            router.replace('/dashboard', { scroll: false });
+            router.push('/dashboard');
           }}
         />
       ) : (

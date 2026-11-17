@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 import { getSampleSection } from '@/types/lims';
 import { formatDateTime } from '@/lib/date';
-import { AnalystUserOption } from '@/lib/analysts';
+import { AnalystUserOption, isAnalystRole } from '@/lib/analysts';
 import { auditService } from '@/services/audit.service';
 import { RoleRouteGuard } from '@/components/auth/RoleRouteGuard';
 import {
@@ -161,33 +161,6 @@ function getTaskSection(task: Partial<TaskItem>): 'semi-base' | 'formulation' {
 }
 
 const DEFAULT_INITIAL_TASKS: TaskItem[] = [
-  {
-    id: 'tsk-001',
-    taskCode: 'TSK-2026-001',
-    sampleId: 'GL/SB-1',
-    sampleName: 'Paracetamol BP (Active Raw Material)',
-    laboratory: 'GENERAL',
-    section: 'semi-base',
-    assignedAnalystName: 'Zubair Raza',
-    assignedAnalystId: 'EMP-003',
-    testProtocol: 'HPLC Potency Assay & Chromatographic Purity',
-    priority: 'URGENT',
-    shift: 'Morning Shift (08:00 - 16:00)',
-    dueDate: '2026-10-29',
-    assignedDate: '2026-10-28',
-    status: 'IN_PROGRESS',
-    instructions: '',
-    accessionNo: 'A-0001',
-    samplingDate: '2026-10-28T09:30:00.000Z',
-    stageType: 'Raw Material',
-    sampleQty: 500,
-    unit: 'g',
-    lotNumber: 'BTH-RM-2026-01',
-    mfgDate: '2026-09-15T00:00:00.000Z',
-    expDate: '2028-09-15T00:00:00.000Z',
-    submittedBy: 'Warehouse Intake',
-    receivedBy: 'Zubair Raza',
-  },
   {
     id: 'tsk-002',
     taskCode: 'TSK-2026-002',
@@ -535,11 +508,11 @@ function TaskAssignmentPageInner() {
   const allPersonnelList = useMemo<AnalystUserOption[]>(() => {
     if (!dbPersonnelData || !Array.isArray(dbPersonnelData)) return [];
     return dbPersonnelData
-      .filter((u: any) => u.isActive !== false)
+      .filter((u: any) => u.isActive !== false && isAnalystRole(u.role))
       .map((u: any) => ({
         id: u.employeeId || u.id,
         name: u.fullName,
-        username: u.username || u.employeeId.toLowerCase(),
+        username: u.username || u.employeeId?.toLowerCase() || '',
         email: u.email,
         role: u.role,
         department: u.department || 'Analytical QC',
@@ -1447,9 +1420,6 @@ function TaskAssignmentPageInner() {
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             Task Assignment Gateway
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 font-normal mt-1 max-w-2xl">
-            Assign analytical testing protocols, electronic worksheets, and sample verification duties to qualified analysts across General, Cephalosporin, and Penicillin laboratories.
-          </p>
         </div>
 
         {isHOD && (
@@ -1471,7 +1441,6 @@ function TaskAssignmentPageInner() {
             </span>
           </div>
           <div className="text-2xl font-black text-slate-900">{stats.total}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Assigned analytical workloads</p>
         </div>
 
         {/* Card 2: Queued & Pending */}
@@ -1483,7 +1452,6 @@ function TaskAssignmentPageInner() {
             </span>
           </div>
           <div className="text-2xl font-black text-amber-700">{stats.assigned}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Awaiting analyst pickup</p>
         </div>
 
         {/* Card 3: In Progress */}
@@ -1495,7 +1463,6 @@ function TaskAssignmentPageInner() {
             </span>
           </div>
           <div className="text-2xl font-black text-blue-700">{stats.inProgress}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Active analysis in cleanrooms</p>
         </div>
 
         {/* Card 4: Urgent Priority */}
@@ -1507,7 +1474,6 @@ function TaskAssignmentPageInner() {
             </span>
           </div>
           <div className="text-2xl font-black text-amber-700">{stats.urgentCount}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Expedited 48-hour testing</p>
         </div>
       </div>
 
@@ -1522,7 +1488,6 @@ function TaskAssignmentPageInner() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by task code, sample ID, drug name, or analyst..."
             className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
           />
         </div>
@@ -2121,7 +2086,7 @@ function TaskAssignmentPageInner() {
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <UserCheck className="h-3.5 w-3.5 text-indigo-600" />
-                  <span>Select Testing Analyst (10 Dedicated Accounts) *</span>
+                  <span>Select Testing Analyst ({allPersonnelList.length} Qualified Analysts) *</span>
                 </label>
                 <span className="text-[10px] text-slate-400 font-medium">Assignee receives isolated work</span>
               </div>

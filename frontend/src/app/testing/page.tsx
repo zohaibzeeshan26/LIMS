@@ -20,7 +20,6 @@ import { productService } from '@/services/product.service';
 import {
   FileSpreadsheet,
   CheckCircle2,
-  AlertOctagon,
   AlertTriangle,
   FlaskConical,
   Search,
@@ -29,11 +28,10 @@ import {
   ShieldCheck,
   Beaker,
   Play,
+  Loader2,
   FileText,
   Download,
   Eye,
-  ChevronDown,
-  ChevronUp,
   RotateCcw,
   Clock,
   Sparkles,
@@ -43,6 +41,7 @@ import {
   Folder,
   ExternalLink,
   X,
+  UserCheck,
   AlertCircle,
 } from 'lucide-react';
 import {
@@ -123,176 +122,7 @@ function isSampleInLab(s: Sample, labKey: 'GENERAL' | 'PENICILLIN' | 'CEPHALOSPO
   return true;
 }
 
-interface SampleExecutionWorkstationProps {
-  sample: Sample;
-  onClose: () => void;
-  openRecordModal: (test: any) => void;
-  getTestsForSample: (sample: Sample) => any[];
-  getProductForTest: (testOrSample: any) => Product | null;
-  setFolderModalOpen: (open: boolean) => void;
-  setSelectedFolderProduct: (prod: Product | null) => void;
-  executionViewingDoc: ProductDocument | null;
-  setExecutionViewingDoc: React.Dispatch<React.SetStateAction<ProductDocument | null>>;
-}
 
-function SampleExecutionWorkstation({
-  sample,
-  onClose,
-  openRecordModal,
-  getTestsForSample,
-  getProductForTest,
-  setFolderModalOpen,
-  setSelectedFolderProduct,
-  executionViewingDoc,
-  setExecutionViewingDoc,
-}: SampleExecutionWorkstationProps) {
-  const matchedProd = useMemo(() => getProductForTest(sample), [sample, getProductForTest]);
-  const targetProductId = (sample as any)?.productId || matchedProd?.id || sample.sampleCode || '';
-
-  // Dynamic real-time query for product documents
-  const {
-    data: liveProduct,
-    isLoading: isProductLoading,
-    isFetching: isProductFetching,
-    refetch: refetchLiveDocs,
-  } = useQuery({
-    queryKey: ['sample-execution-live-product-docs', targetProductId],
-    queryFn: async () => {
-      if (!targetProductId) return null;
-      try {
-        return await productService.getById(targetProductId);
-      } catch (e) {
-        return null;
-      }
-    },
-    enabled: !!targetProductId,
-    refetchInterval: 3000, // Dynamic polling ensures newly uploaded documents automatically become available
-  });
-
-  const effectiveProduct = liveProduct || matchedProd;
-
-  return (
-    <div className="space-y-4">
-      {/* 1. Sample Summary Information with Dynamic Live Sync status */}
-      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Sample ID</span>
-            <span className="font-mono font-bold text-teal-800">{sample.sampleCode}</span>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Product / Material</span>
-            <span className="font-bold text-slate-900 truncate block" title={sample.nomenclature || sample.materialName}>
-              {sample.nomenclature || sample.materialName}
-            </span>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Stage / Type</span>
-            <span className="font-semibold text-slate-700">{sample.stageType || sample.sampleType}</span>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Batch / Lot No</span>
-            <span className="font-mono font-semibold text-slate-800">{sample.lotNumber || sample.batch?.batchNumber || '—'}</span>
-          </div>
-        </div>
-
-        {/* Dynamic Product ID & Live Status Bar */}
-        <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-2 text-[11px]">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-medium">Linked Product ID:</span>
-            <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
-              {effectiveProduct?.id || targetProductId || 'Not Linked'}
-            </span>
-            {effectiveProduct?.brandName && (
-              <span className="font-semibold text-slate-700">
-                ({effectiveProduct.brandName} &bull; {effectiveProduct.laboratory} Lab)
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live Synced with Doc Manager</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => refetchLiveDocs()}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-teal-700 px-2 py-0.5 rounded hover:bg-slate-200/70 transition-colors cursor-pointer"
-              title="Refresh documentation from Documentation Manager"
-            >
-              <RotateCcw className={cn("w-3 h-3 text-slate-500", isProductFetching && "animate-spin text-teal-600")} />
-              <span>Refresh Docs</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Analytical Test Protocols List & Result Entry */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
-            Analytical Test Protocols ({getTestsForSample(sample).length})
-          </span>
-          <span className="text-[11px] text-slate-500">
-            Enter measured values and check pharmacopeial compliance
-          </span>
-        </div>
-
-        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-          {getTestsForSample(sample).map((t: any) => (
-            <div key={t.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
-              <div>
-                <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                  <span>{t.testSpecification?.name || 'Assay Protocol'}</span>
-                  {t.testSpecification?.testCode && (
-                    <span className="font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
-                      {t.testSpecification.testCode}
-                    </span>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                  Limits: <strong className="text-slate-800">{t.minLimit !== null && t.minLimit !== undefined ? `${t.minLimit} - ${t.maxLimit} ${t.unit}` : 'Qualitative'}</strong> &bull; Method: {t.testSpecification?.pharmacopeiaMethod || 'USP / BP Compendial'}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {t.numericResult !== null && t.numericResult !== undefined ? (
-                  <div className="text-right mr-2">
-                    <span className="font-mono font-bold text-xs text-slate-900">{t.numericResult} {t.unit}</span>
-                    <div><StatusBadge status={t.resultStatus || 'PASSED'} /></div>
-                  </div>
-                ) : t.textResult ? (
-                  <div className="text-right mr-2">
-                    <span className="font-mono font-semibold text-xs text-slate-800">{t.textResult}</span>
-                    <div><StatusBadge status={t.resultStatus || 'PASSED'} /></div>
-                  </div>
-                ) : (
-                  <span className="text-slate-400 text-xs italic mr-2">Pending Execution</span>
-                )}
-
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => openRecordModal(t)}
-                  className="h-8 text-xs font-bold bg-[#0B1A30] hover:bg-slate-800 text-white cursor-pointer"
-                >
-                  {t.numericResult !== null || t.textResult ? 'Edit Result' : 'Input Result'}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex justify-end pt-3 border-t border-slate-100">
-        <Button type="button" variant="outline" onClick={onClose}>
-          Close Workstation
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function TestingPageContent() {
   const { user } = useAuth();
@@ -301,7 +131,7 @@ function TestingPageContent() {
   const searchParams = useSearchParams();
   const { analysts: allAnalystsList } = useAllAnalysts();
 
-  const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN';
+  const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN' || (user?.role as string) === 'HOD';
   const isManager = isSuperAdmin || user?.role === 'DEPUTY_MANAGER';
   const isAnalyst = !isManager;
 
@@ -334,19 +164,11 @@ function TestingPageContent() {
 
   const [statusFilter, setStatusFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
-  const [selectedAnalystFilter, setSelectedAnalystFilter] = useState<string>('ALL');
+  const [selectedAnalystFilter, setSelectedAnalystFilter] = useState<string>(() => {
+    return isManager ? 'ALL' : 'MY_WORK';
+  });
 
-  // Expanded rows to inspect nested test worksheets directly
-  const [expandedSampleIds, setExpandedSampleIds] = useState<Set<string>>(new Set());
 
-  const toggleExpandSample = (id: string) => {
-    setExpandedSampleIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   // Stored tasks synchronization from localStorage (assigned from /tasks)
   const [storedTasks, setStoredTasks] = useState<any[]>([]);
@@ -357,7 +179,19 @@ function TestingPageContent() {
         const raw = localStorage.getItem('city_pharma_lims_tasks');
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) setStoredTasks(parsed);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter(
+              (t: any) =>
+                t.id !== 'tsk-001' &&
+                !t.testProtocol?.includes('HPLC Potency Assay & Chromatographic Purity') &&
+                !(t.sampleId === 'GL/SB-1' && (t.numericResult === 3 || t.numericResult === '3'))
+            );
+            if (cleaned.length !== parsed.length) {
+              localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(cleaned));
+            }
+            setStoredTasks(cleaned);
+            return;
+          }
         }
       } catch (e) {}
     };
@@ -370,17 +204,8 @@ function TestingPageContent() {
     };
   }, []);
 
-  // Selected test for recording results in modal
-  const [activeTest, setActiveTest] = useState<any | null>(null);
-  const [numericResult, setNumericResult] = useState<string>('');
-  const [textResult, setTextResult] = useState<string>('');
-  const [selectedInstrumentId, setSelectedInstrumentId] = useState<string>('');
-  const [rawDataReference, setRawDataReference] = useState<string>('');
-  const [comments, setComments] = useState<string>('');
-
-  // Selected sample for full execution drawer/modal
-  const [selectedSampleForExecution, setSelectedSampleForExecution] = useState<Sample | null>(null);
-  const [executionViewingDoc, setExecutionViewingDoc] = useState<ProductDocument | null>(null);
+  // Track in-progress execution triggers
+  const [executingSampleId, setExecutingSampleId] = useState<string | null>(null);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -446,7 +271,8 @@ function TestingPageContent() {
 
   // Extract samples array safely with analyst filtration
   const samplesList: Sample[] = useMemo(() => {
-    if (selectedAnalystFilter === 'MY_WORK') {
+    // STRICT ANALYST ISOLATION: Analysts must ONLY ever see samples assigned directly to them!
+    if (isAnalyst || selectedAnalystFilter === 'MY_WORK') {
       return allLabSamples.filter((s) => {
         return (
           isAssignedToUser(s, user) ||
@@ -478,19 +304,17 @@ function TestingPageContent() {
     }
 
     return allLabSamples;
-  }, [allLabSamples, selectedAnalystFilter, user, storedTasks]);
+  }, [allLabSamples, selectedAnalystFilter, user, storedTasks, isAnalyst]);
 
   const meta = useMemo(() => {
-    if (responseData && (responseData as any).meta) {
-      return (responseData as any).meta;
-    }
+    const effectiveTotal = samplesList.length;
     return {
-      total: samplesList.length,
+      total: effectiveTotal,
       page,
       limit,
-      totalPages: Math.ceil(samplesList.length / limit) || 1,
+      totalPages: Math.ceil(effectiveTotal / limit) || 1,
     };
-  }, [responseData, samplesList.length, page, limit]);
+  }, [samplesList.length, page, limit]);
 
   // Load available instruments
   const { data: instrumentsResponse } = useQuery({
@@ -601,7 +425,9 @@ function TestingPageContent() {
       // Merged tasks from task assignment board
       const matchingTasks = storedTasks.filter((t) => {
         const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
-        return tCode === sCode;
+        if (tCode !== sCode) return false;
+        if (t.id === 'tsk-001' || (t.testProtocol && t.testProtocol.includes('HPLC Potency Assay & Chromatographic Purity'))) return false;
+        return true;
       });
 
       const taskWorksheets = matchingTasks.map((t: any) => ({
@@ -695,193 +521,59 @@ function TestingPageContent() {
     [storedTasks]
   );
 
-  // Mutation to record result on backend
-  const recordResultMutation = useMutation({
-    mutationFn: (data: any) => api.patch(`/tests/${activeTest.id}/record-result`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['samples-for-testing'] });
-      queryClient.invalidateQueries({ queryKey: ['samples-paginated'] });
-      queryClient.invalidateQueries({ queryKey: ['sampling-metrics'] });
+  const handleExecuteAnalysis = async (sample: Sample) => {
+    if (!sample || !sample.id) return;
+    setExecutingSampleId(sample.id);
 
-      // Automatically update corresponding task in task allocation registry to COMPLETED
+    try {
+      // 1. Update backend sample status to TESTING_IN_PROGRESS
+      await samplingService.update(sample.id, {
+        status: 'TESTING_IN_PROGRESS',
+        reasonForChange: `Analysis execution started by ${user?.fullName || 'Analyst'}`,
+      });
+
+      // 2. Update local stored tasks if any match this sample
       try {
         const raw = localStorage.getItem('city_pharma_lims_tasks');
-        if (raw && activeTest) {
+        if (raw) {
           const list = JSON.parse(raw);
-          const testCode = (activeTest.sampleCode || activeTest.sampleId || '').trim().toUpperCase();
-          const testTaskCode = (activeTest.taskCode || '').trim().toUpperCase();
-          const testId = (activeTest.id || '').trim();
-          const updatedList = list.map((t: any) => {
-            const tSampleCode = (t.sampleId || t.accessionNo || '').trim().toUpperCase();
-            const tTaskCode = (t.taskCode || '').trim().toUpperCase();
-            if (
-              (testId && t.id === testId) ||
-              (testTaskCode && tTaskCode === testTaskCode) ||
-              (testCode && tSampleCode === testCode)
-            ) {
-              return { ...t, status: 'COMPLETED' as const, isAssignedByManager: true, resultStatus: 'PASSED' };
+          const sCode = (sample.sampleCode || sample.accessionNo || sample.sampleId || '').toUpperCase();
+          const updated = list.map((t: any) => {
+            const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
+            if (tCode === sCode) {
+              return { ...t, status: 'IN_PROGRESS' as const };
             }
             return t;
           });
-          localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updatedList));
+          localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
           window.dispatchEvent(new Event('lims-tasks-updated'));
         }
-      } catch (err) {}
+      } catch (e) {}
 
-      setActiveTest(null);
-      setNumericResult('');
-      setTextResult('');
-      setRawDataReference('');
-      setComments('');
-    },
-  });
-
-  const openRecordModal = (test: any) => {
-    setActiveTest(test);
-    setNumericResult(test.numericResult !== null && test.numericResult !== undefined ? String(test.numericResult) : '');
-    setTextResult(test.textResult || '');
-    setSelectedInstrumentId(test.instrumentId || '');
-    setRawDataReference(test.rawDataReference || '');
-    setComments(test.comments || '');
-  };
-
-  // Instant Real-Time Specification Limit Auto-Evaluation
-  const evaluatedStatus = React.useMemo(() => {
-    if (!activeTest || numericResult === '') return null;
-    const num = parseFloat(numericResult);
-    if (isNaN(num)) return null;
-
-    const min = activeTest.minLimit ?? activeTest.testSpecification?.defaultMinLimit ?? 95.0;
-    const max = activeTest.maxLimit ?? activeTest.testSpecification?.defaultMaxLimit ?? 105.0;
-
-    if (min !== null && min !== undefined && num < min) return 'OUT_OF_SPEC';
-    if (max !== null && max !== undefined && num > max) return 'OUT_OF_SPEC';
-    return 'WITHIN_SPEC';
-  }, [activeTest, numericResult]);
-
-  const handleSubmitResult = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeTest) return;
-
-    const isPass = evaluatedStatus === 'WITHIN_SPEC';
-    const statusOutcome = isPass ? 'PASSED' : evaluatedStatus === 'OUT_OF_SPEC' ? 'OUT_OF_SPEC' : 'RECORDED';
-
-    if (activeTest.isTaskItem || activeTest.isDefault) {
-      const status = 'COMPLETED';
-      const resultStatus = isPass ? 'PASSED' : 'FAILED';
-
-      const testCode = (activeTest.sampleCode || activeTest.sampleId || '').trim().toUpperCase();
-      const testTaskCode = (activeTest.taskCode || '').trim().toUpperCase();
-      const testId = (activeTest.id || '').trim();
-
-      const updated = storedTasks.map((t) => {
-        const tSampleCode = (t.sampleId || t.accessionNo || '').trim().toUpperCase();
-        const tTaskCode = (t.taskCode || '').trim().toUpperCase();
-        if (
-          (testId && t.id === testId) ||
-          (testTaskCode && tTaskCode === testTaskCode) ||
-          (testCode && tSampleCode === testCode)
-        ) {
-          return {
-            ...t,
-            status: 'COMPLETED' as const,
-            isAssignedByManager: true,
-            resultStatus,
-            numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
-            textResult: textResult || undefined,
-            instrumentId: selectedInstrumentId || undefined,
-            rawDataReference,
-            instructions: comments || t.instructions,
-          };
-        }
-        return t;
-      });
-
-      // If test was a clean default, add it to stored tasks
-      if (activeTest.isDefault && !storedTasks.some((t) => t.id === activeTest.id)) {
-        updated.push({
-          id: activeTest.id,
-          taskCode: activeTest.testSpecification?.testCode || 'TASK-QC-01',
-          sampleId: activeTest.sampleCode,
-          sampleName: activeTest.materialName,
-          status: 'COMPLETED' as const,
-          isAssignedByManager: true,
-          resultStatus,
-          numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
-          textResult: textResult || undefined,
-          instrumentId: selectedInstrumentId || undefined,
-          rawDataReference,
-          instructions: comments,
-          testProtocol: activeTest.testSpecification?.name,
-        });
-      }
-
-      setStoredTasks(updated);
-      localStorage.setItem('city_pharma_lims_tasks', JSON.stringify(updated));
-      window.dispatchEvent(new Event('lims-tasks-updated'));
-
-      // Automatically sync sample in database to REVIEW_PENDING if matched
-      const matchedDbSample = allLabSamples.find((s) => {
-        const sCode = (s.sampleCode || s.accessionNo || s.sampleId || s.id || '').trim().toUpperCase();
-        return sCode === testCode;
-      });
-      if (matchedDbSample?.id) {
-        samplingService.update(matchedDbSample.id, {
-          status: 'REVIEW_PENDING' as any,
-        }).catch((err) => console.warn('Could not update sample status to REVIEW_PENDING:', err));
-      }
-
-      // 21 CFR Part 11 Audit Trail
+      // 3. Log 21 CFR Part 11 Audit Trail
       auditService.logActivity({
-        action: 'TEST_RESULT_RECORDED',
-        entityName: 'TestWorksheet',
-        entityId: activeTest.id || activeTest.sampleCode,
+        action: 'ANALYSIS_STARTED',
+        entityName: 'Sample',
+        entityId: sample.sampleCode || sample.id,
         performedByName: user?.fullName || 'Analyst',
         role: user?.role || 'QC_ANALYST',
-        reasonForChange: `Recorded analytical result for ${activeTest.sampleCode} (${activeTest.testSpecification?.name || 'Assay'}): ${numericResult || textResult} (${statusOutcome})`,
+        reasonForChange: `Analysis started for sample ${sample.sampleCode || sample.id}`,
         diffPayload: {
-          details: `${user?.fullName || 'Analyst'} logged analytical result for ${activeTest.sampleCode}: ${numericResult !== '' ? numericResult + ' %' : textResult} [${statusOutcome}]`,
-          sampleCode: activeTest.sampleCode,
-          testName: activeTest.testSpecification?.name,
-          result: numericResult || textResult,
-          status: statusOutcome,
-          rawDataReference,
+          sampleCode: sample.sampleCode,
+          previousStatus: sample.status,
+          newStatus: 'TESTING_IN_PROGRESS',
         },
       });
 
-      setActiveTest(null);
-      setNumericResult('');
-      setTextResult('');
-      setRawDataReference('');
-      setComments('');
-      return;
+      await queryClient.invalidateQueries({ queryKey: ['samples-for-testing'] });
+      await refetch();
+    } catch (err: any) {
+      console.error('Error starting analysis execution:', err);
+      await queryClient.invalidateQueries({ queryKey: ['samples-for-testing'] });
+      await refetch();
+    } finally {
+      setExecutingSampleId(null);
     }
-
-    // Backend database test update
-    auditService.logActivity({
-      action: 'TEST_RESULT_RECORDED',
-      entityName: 'TestWorksheet',
-      entityId: activeTest.id || activeTest.sampleCode,
-      performedByName: user?.fullName || 'Analyst',
-      role: user?.role || 'QC_ANALYST',
-      reasonForChange: `Recorded analytical test results for sample ${activeTest.sampleCode} (${activeTest.testSpecification?.name || 'Assay'}): ${numericResult || textResult}`,
-      diffPayload: {
-        details: `${user?.fullName || 'Analyst'} logged analytical result for ${activeTest.sampleCode}: ${numericResult !== '' ? numericResult + ' %' : textResult} [${statusOutcome}]`,
-        sampleCode: activeTest.sampleCode,
-        testName: activeTest.testSpecification?.name,
-        result: numericResult || textResult,
-        status: statusOutcome,
-        rawDataReference,
-      },
-    });
-
-    recordResultMutation.mutate({
-      numericResult: numericResult !== '' ? parseFloat(numericResult) : undefined,
-      textResult: textResult || undefined,
-      instrumentId: selectedInstrumentId || undefined,
-      rawDataReference,
-      comments,
-    });
   };
 
   const handleLabChange = (labId: string) => {
@@ -912,9 +604,6 @@ function TestingPageContent() {
             <FileSpreadsheet className="h-6 w-6 text-teal-700" />
             <span>Analyst Execution &amp; Testing Worksheets</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Registered analytical samples, live compendial calculations, raw data file linkages, and pharmacopeial limits
-          </p>
         </div>
 
         {/* Documentation Repository Action Button */}
@@ -933,43 +622,41 @@ function TestingPageContent() {
         </div>
       </div>
 
-      {/* Laboratory Tabs (General Lab, Penicillin Lab, Cephalosporin Lab, All Labs) */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
-            {LAB_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = !isAllLabs && activeLab.id === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleLabChange(tab.id)}
-                  className={cn(
-                    'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer',
-                    isActive
-                      ? 'bg-navy-950 text-white border-navy-950 shadow-sm'
-                      : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
-                  )}
-                >
-                  <Icon className={cn('h-3.5 w-3.5', isActive ? 'text-teal-400' : 'text-slate-400')} />
-                  <span>{tab.name}</span>
-                </button>
-              );
-            })}
+      {/* Laboratory Tabs (All Labs, General Lab, Penicillin Lab, Cephalosporin Lab) */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+        <button
+          onClick={() => handleLabChange('all')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer',
+            isAllLabs
+              ? 'bg-navy-950 text-white border-navy-950 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+          )}
+        >
+          <Layers className={cn('h-3.5 w-3.5', isAllLabs ? 'text-teal-400' : 'text-slate-400')} />
+          <span>All Labs</span>
+        </button>
 
-            {isSuperAdmin && (
-              <button
-                onClick={() => handleLabChange('all')}
-                className={cn(
-                  'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer',
-                  isAllLabs
-                    ? 'bg-navy-950 text-white border-navy-950 shadow-sm'
-                    : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
-                )}
-              >
-                <Layers className={cn('h-3.5 w-3.5', isAllLabs ? 'text-teal-400' : 'text-slate-400')} />
-                <span>All Laboratories (Facility-wide)</span>
-              </button>
-            )}
-          </div>
+        {LAB_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = !isAllLabs && activeLab.id === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleLabChange(tab.id)}
+              className={cn(
+                'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer',
+                isActive
+                  ? 'bg-navy-950 text-white border-navy-950 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900'
+              )}
+            >
+              <Icon className={cn('h-3.5 w-3.5', isActive ? 'text-teal-400' : 'text-slate-400')} />
+              <span>{tab.name}</span>
+            </button>
+          );
+        })}
+      </div>
 
           {/* Section Sub-Tabs (All, Semi Basics, Formulation) */}
           <div className="flex flex-wrap items-center gap-2">
@@ -995,67 +682,81 @@ function TestingPageContent() {
           </div>
 
           {/* Work Assignment & View Mode Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Assignment:</span>
-              <button
-                type="button"
-                onClick={() => setSelectedAnalystFilter('ALL')}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border inline-flex items-center gap-1.5',
-                  selectedAnalystFilter === 'ALL'
-                    ? 'bg-navy-950 text-white border-navy-950 font-bold shadow-2xs'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                )}
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>All Samples</span>
-                <span className={cn(
-                  'text-[10px] px-1.5 py-0.2 rounded-full font-mono',
-                  selectedAnalystFilter === 'ALL' ? 'bg-teal-500/30 text-teal-200 font-bold' : 'bg-slate-100 text-slate-600'
-                )}>
-                  {allLabSamples.length}
-                </span>
-              </button>
+          {isManager ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Assignment:</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAnalystFilter('ALL')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border inline-flex items-center gap-1.5',
+                    selectedAnalystFilter === 'ALL'
+                      ? 'bg-navy-950 text-white border-navy-950 font-bold shadow-2xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>All Samples</span>
+                  <span className={cn(
+                    'text-[10px] px-1.5 py-0.2 rounded-full font-mono',
+                    selectedAnalystFilter === 'ALL' ? 'bg-teal-500/30 text-teal-200 font-bold' : 'bg-slate-100 text-slate-600'
+                  )}>
+                    {allLabSamples.length}
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setSelectedAnalystFilter('MY_WORK')}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border inline-flex items-center gap-1.5',
-                  selectedAnalystFilter === 'MY_WORK'
-                    ? 'bg-teal-700 text-white border-teal-700 font-bold shadow-2xs ring-2 ring-teal-200'
-                    : 'bg-white text-teal-800 border-teal-200 hover:bg-teal-50'
-                )}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
-                <span>Assigned to Me</span>
-                <span className={cn(
-                  'text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold',
-                  selectedAnalystFilter === 'MY_WORK' ? 'bg-white text-teal-900' : 'bg-teal-100 text-teal-900'
-                )}>
-                  {myAssignedCount}
-                </span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAnalystFilter('MY_WORK')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border inline-flex items-center gap-1.5',
+                    selectedAnalystFilter === 'MY_WORK'
+                      ? 'bg-teal-700 text-white border-teal-700 font-bold shadow-2xs ring-2 ring-teal-200'
+                      : 'bg-white text-teal-800 border-teal-200 hover:bg-teal-50'
+                  )}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Assigned to Me</span>
+                  <span className={cn(
+                    'text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold',
+                    selectedAnalystFilter === 'MY_WORK' ? 'bg-white text-teal-900' : 'bg-teal-100 text-teal-900'
+                  )}>
+                    {myAssignedCount}
+                  </span>
+                </button>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500 font-medium">Filter by Analyst:</span>
-              <select
-                value={selectedAnalystFilter}
-                onChange={(e) => setSelectedAnalystFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none bg-white font-medium text-slate-700 cursor-pointer"
-              >
-                <option value="ALL">All Analysts (Facility)</option>
-                <option value="MY_WORK">★ Assigned to Me ({myAssignedCount})</option>
-                {allAnalystsList.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.lab})
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-medium">Filter by Analyst:</span>
+                <select
+                  value={selectedAnalystFilter}
+                  onChange={(e) => setSelectedAnalystFilter(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none bg-white font-medium text-slate-700 cursor-pointer"
+                >
+                  <option value="ALL">All Analysts (Facility)</option>
+                  <option value="MY_WORK">★ Assigned to Me ({myAssignedCount})</option>
+                  {allAnalystsList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.lab})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 bg-teal-50/70 p-3 rounded-xl border border-teal-200/80 shadow-2xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-700 text-white inline-flex items-center gap-1.5 shadow-2xs">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>My Assigned Testing Queue</span>
+                </span>
+              </div>
+              <div className="text-xs font-bold text-teal-900 bg-white px-3 py-1 rounded-lg border border-teal-200 shadow-2xs">
+                {samplesList.length} {samplesList.length === 1 ? 'Assigned Sample' : 'Assigned Samples'}
+              </div>
+            </div>
+          )}
 
           {/* Universal Search & Quick Filters Toolbar */}
           <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-2xs space-y-3">
@@ -1066,8 +767,7 @@ function TestingPageContent() {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search A. No, Sample ID, Nomenclature, Lot..."
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-slate-900 bg-white placeholder:text-slate-400 font-medium"
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-slate-900 bg-white font-medium"
                 />
               </div>
 
@@ -1232,16 +932,20 @@ function TestingPageContent() {
                           <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto shadow-2xs">
                             <FlaskConical className="h-6 w-6 text-slate-400" />
                           </div>
-                          <h4 className="text-sm font-bold text-navy-950">No Sampling Records Found</h4>
+                          <h4 className="text-sm font-bold text-navy-950">No Assigned Samples in Queue</h4>
                           <p className="text-xs text-slate-500 leading-relaxed">
-                            No analytical samples have been registered for {isAllLabs ? 'any laboratory' : activeLab.name} yet. Samples accessioned in Sample Registration will appear here automatically.
+                            {isAnalyst
+                              ? `No active samples are currently assigned to you (${(user?.fullName || 'Zubair Raza').replace(/\s*\([^)]*\)/g, '').trim()}) for ${isAllLabs ? 'any laboratory' : activeLab.name}.`
+                              : `No analytical samples have been registered for ${isAllLabs ? 'any laboratory' : activeLab.name} yet.`}
                           </p>
-                          <Link href="/samples">
-                            <Button size="sm" variant="primary" className="bg-navy-900 text-white text-xs font-semibold">
-                              <PlusCircle className="h-3.5 w-3.5 text-teal-400 mr-1" />
-                              <span>Go to Sample Registration</span>
-                            </Button>
-                          </Link>
+                          {isManager && (
+                            <Link href="/samples">
+                              <Button size="sm" variant="primary" className="bg-navy-900 text-white text-xs font-semibold">
+                                <PlusCircle className="h-3.5 w-3.5 text-teal-400 mr-1" />
+                                <span>Go to Sample Registration</span>
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1264,7 +968,6 @@ function TestingPageContent() {
                       const receivedText = sample.accessionedBy?.fullName || sample.assignedTo?.fullName || 'QC Intake Officer';
 
                       const sampleTests = getTestsForSample(sample);
-                      const isExpanded = expandedSampleIds.has(sample.id);
 
                       const isAskprolItem =
                         (sample.sampleCode || '').toUpperCase().includes('ASK') ||
@@ -1276,17 +979,7 @@ function TestingPageContent() {
                           <tr className="hover:bg-slate-50/90 transition-colors group">
                             {/* 1. A. No. */}
                             <td className="py-3 px-3.5 font-mono font-bold text-navy-950 group-hover:text-teal-700 text-xs">
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpandSample(sample.id)}
-                                  className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                                  title={isExpanded ? 'Collapse test protocols' : 'Expand test protocols'}
-                                >
-                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                </button>
-                                <span>{sample.accessionNo || 'A-0001'}</span>
-                              </div>
+                              <span>{sample.accessionNo || 'A-0001'}</span>
                             </td>
 
                             {/* 2. Date & Time */}
@@ -1432,15 +1125,46 @@ function TestingPageContent() {
                                   );
                                 })()}
 
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => setSelectedSampleForExecution(sample)}
-                                  className="h-7 text-xs bg-navy-900 hover:bg-navy-800 text-white font-semibold inline-flex items-center gap-1 cursor-pointer shadow-2xs"
-                                >
-                                  <Play className="h-3 w-3 text-teal-400" />
-                                  <span>Execute Analysis</span>
-                                </Button>
+                                {(() => {
+                                  const statusStr = String(sample.status || '');
+                                  const isDone = statusStr === 'COMPLETED' || statusStr === 'APPROVED' || statusStr === 'REVIEW_PENDING';
+                                  const isInProgress = statusStr === 'TESTING_IN_PROGRESS' || statusStr === 'IN_PROGRESS' || statusStr === 'IN_ANALYSIS';
+
+                                  if (isDone) {
+                                    return (
+                                      <span className="h-7 px-2.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 shadow-2xs">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Completed</span>
+                                      </span>
+                                    );
+                                  }
+
+                                  if (isInProgress) {
+                                    return (
+                                      <span className="h-7 px-2.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-1.5 shadow-2xs">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                        <span>In Progress</span>
+                                      </span>
+                                    );
+                                  }
+
+                                  return (
+                                    <Button
+                                      size="sm"
+                                      variant="primary"
+                                      onClick={() => handleExecuteAnalysis(sample)}
+                                      disabled={executingSampleId === sample.id}
+                                      className="h-7 text-xs bg-navy-900 hover:bg-navy-800 text-white font-semibold inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                                    >
+                                      {executingSampleId === sample.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin text-teal-300" />
+                                      ) : (
+                                        <Play className="h-3 w-3 text-teal-400" />
+                                      )}
+                                      <span>Execute Analysis</span>
+                                    </Button>
+                                  );
+                                })()}
 
                                 {isAskprolItem && (
                                   <Link
@@ -1452,104 +1176,9 @@ function TestingPageContent() {
                                     <span>ATM-003</span>
                                   </Link>
                                 )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpandSample(sample.id)}
-                                  className="h-7 px-2 rounded-lg text-xs font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 inline-flex items-center gap-1 transition-colors"
-                                  title="View individual tests"
-                                >
-                                  <span>{sampleTests.length} Tests</span>
-                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                </button>
                               </div>
                             </td>
                           </tr>
-
-                          {/* EXPANDABLE SUB-ROW: Analytical Test Protocols & Worksheets for this Sample */}
-                          {isExpanded && (
-                            <tr className="bg-slate-50/70 border-b border-slate-200">
-                              <td colSpan={12} className="py-3 px-4 sm:px-8">
-                                <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2.5">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                                      <FileSpreadsheet className="h-3.5 w-3.5 text-teal-600" />
-                                      <span>Assigned Analytical Worksheets for Sample: {sample.sampleCode}</span>
-                                    </span>
-                                    <span className="text-[10px] text-slate-400 font-mono">
-                                      {sampleTests.length} Protocols Configured
-                                    </span>
-                                  </div>
-
-                                  <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse text-xs">
-                                      <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50/80 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                                          <th className="py-2 px-3">Test Monograph</th>
-                                          <th className="py-2 px-3">Compendial Limits</th>
-                                          <th className="py-2 px-3">Assigned Analyst</th>
-                                          <th className="py-2 px-3">Observed Result</th>
-                                          <th className="py-2 px-3">Status</th>
-                                          <th className="py-2 px-3">Instrument</th>
-                                          <th className="py-2 px-3 text-right">Actions</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100 text-xs">
-                                        {sampleTests.map((t: any) => {
-                                          const spec = t.testSpecification;
-                                          return (
-                                            <tr key={t.id} className="hover:bg-slate-50/60">
-                                              <td className="py-2.5 px-3">
-                                                <div className="font-semibold text-slate-900">{spec?.name || 'Assay Protocol'}</div>
-                                                <div className="text-[10px] text-slate-400 font-mono">
-                                                  {spec?.testCode} &bull; {spec?.pharmacopeiaMethod}
-                                                </div>
-                                              </td>
-                                              <td className="py-2.5 px-3 font-mono text-[11px]">
-                                                {t.minLimit !== null && t.minLimit !== undefined ? (
-                                                  <span>{t.minLimit} - {t.maxLimit} {t.unit}</span>
-                                                ) : (
-                                                  <span className="text-slate-400 italic">Qualitative</span>
-                                                )}
-                                              </td>
-                                              <td className="py-2.5 px-3">
-                                                <span className="font-medium text-slate-700">{t.assignedAnalystName || 'QC Analyst'}</span>
-                                              </td>
-                                              <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
-                                                {t.numericResult !== null && t.numericResult !== undefined ? (
-                                                  <span>{t.numericResult} {t.unit}</span>
-                                                ) : t.textResult ? (
-                                                  <span>{t.textResult}</span>
-                                                ) : (
-                                                  <span className="text-slate-400 font-normal italic">Not entered</span>
-                                                )}
-                                              </td>
-                                              <td className="py-2.5 px-3">
-                                                <StatusBadge status={t.resultStatus || t.status || 'PENDING'} />
-                                              </td>
-                                              <td className="py-2.5 px-3 text-[11px] text-slate-600 font-mono">
-                                                {t.instrument?.equipmentCode || t.instrumentId || 'HPLC-01'}
-                                              </td>
-                                              <td className="py-2.5 px-3 text-right">
-                                                <Button
-                                                  size="sm"
-                                                  variant="primary"
-                                                  onClick={() => openRecordModal(t)}
-                                                  className="h-6 px-2.5 text-[11px]"
-                                                >
-                                                  {t.numericResult !== null || t.textResult ? 'Edit Result' : 'Input Result'}
-                                                </Button>
-                                              </td>
-                                            </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
                         </React.Fragment>
                       );
                     })
@@ -1602,288 +1231,11 @@ function TestingPageContent() {
             </div>
           </div>
 
-      {/* SAMPLE ANALYSIS EXECUTION MODAL (Full Workstation with Product Documentation & Live In-App SOP Reader) */}
-      {selectedSampleForExecution && (
-        <Modal
-          isOpen={!!selectedSampleForExecution}
-          onClose={() => {
-            setSelectedSampleForExecution(null);
-            setExecutionViewingDoc(null);
-          }}
-          title={`Analyst Execution: ${selectedSampleForExecution.sampleCode}`}
-          subtitle={`Accession No: ${selectedSampleForExecution.accessionNo} • ${selectedSampleForExecution.nomenclature || selectedSampleForExecution.materialName}`}
-          maxWidth="4xl"
-        >
-          <SampleExecutionWorkstation
-            sample={selectedSampleForExecution}
-            onClose={() => {
-              setSelectedSampleForExecution(null);
-              setExecutionViewingDoc(null);
-            }}
-            openRecordModal={openRecordModal}
-            getTestsForSample={getTestsForSample}
-            getProductForTest={getProductForTest}
-            setFolderModalOpen={setFolderModalOpen}
-            setSelectedFolderProduct={setSelectedFolderProduct}
-            executionViewingDoc={executionViewingDoc}
-            setExecutionViewingDoc={setExecutionViewingDoc}
-          />
-        </Modal>
-      )}
 
-      {/* RECORD TEST RESULT MODAL WITH REAL-TIME EVALUATION */}
-      {activeTest && (
-        <Modal
-          isOpen={!!activeTest}
-          onClose={() => setActiveTest(null)}
-          title={`Analytical Result Input: ${activeTest.testSpecification?.name || 'Test Worksheet'}`}
-          subtitle={`Sample: ${activeTest.sampleCode} • ${activeTest.materialName}`}
-          maxWidth="xl"
-        >
-          <form onSubmit={handleSubmitResult} className="space-y-4">
-            {/* Compendial Specification Reference Card */}
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="font-semibold text-slate-700">Pharmacopeial Specification:</span>
-                <span className="font-mono text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {activeTest.testSpecification?.pharmacopeiaMethod || 'USP 44 / BP 2024'}
-                </span>
-              </div>
-              <div className="flex items-baseline gap-4 mt-2">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Min Limit</span>
-                  <span className="font-mono font-bold text-slate-900 text-sm">
-                    {activeTest.minLimit ?? 'N/A'} {activeTest.unit}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Target</span>
-                  <span className="font-mono font-bold text-slate-900 text-sm">
-                    {activeTest.targetValue ?? 'N/A'} {activeTest.unit}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Max Limit</span>
-                  <span className="font-mono font-bold text-slate-900 text-sm">
-                    {activeTest.maxLimit ?? 'N/A'} {activeTest.unit}
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            {/* Official Product Documentation Dossier Folder (5 Categorized Files) */}
-            {(() => {
-              const matchedProd = getProductForTest(activeTest);
-              const activeDoc = getProductDocForTest(activeTest);
-              if (!matchedProd && !activeDoc) return null;
 
-              const activeDocs = (matchedProd?.documents || []).filter((d) => d.isCurrent !== false);
-              const totalDocs = activeDocs.length || (activeDoc ? 1 : 0);
 
-              return (
-                <div className="p-3.5 rounded-xl bg-teal-50/80 border border-teal-200 space-y-2.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2.5 overflow-hidden">
-                      <div className="p-2 rounded-lg bg-teal-100 text-teal-800 shrink-0">
-                        <Folder className="w-4 h-4" />
-                      </div>
-                      <div className="overflow-hidden">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 text-xs">
-                            {matchedProd?.brandName || 'Product'} Folder
-                          </span>
-                          <span className="font-mono text-[10px] font-bold bg-teal-200 text-teal-900 px-1.5 py-0.5 rounded shrink-0">
-                            {totalDocs} {totalDocs === 1 ? 'File' : 'Files'} Available
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-teal-800 mt-0.5">
-                          Method, specifications, calculations &amp; laboratory reference documents
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {matchedProd && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedFolderProduct(matchedProd);
-                            setFolderModalOpen(true);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-700 hover:bg-teal-800 text-white shadow-2xs shrink-0 cursor-pointer"
-                          title="Open product documents folder"
-                        >
-                          <Folder className="w-3.5 h-3.5" />
-                          <span>Folder</span>
-                        </button>
-                      )}
-                      {activeDoc && (
-                        <a
-                          href={productService.getDocumentViewUrl(activeDoc.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 border border-teal-300 text-teal-900 shadow-2xs shrink-0"
-                          title="Quick view primary document PDF"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-teal-700" />
-                          <span>Quick View</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Documents Direct View Link Chips */}
-                  {matchedProd && activeDocs.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-teal-200/60">
-                      {activeDocs.map((docItem) => {
-                        const isWord = docItem.fileName.toLowerCase().endsWith('.docx') || docItem.fileName.toLowerCase().endsWith('.doc');
-                        const isExcel = docItem.fileName.toLowerCase().endsWith('.xlsx') || docItem.fileName.toLowerCase().endsWith('.xls') || docItem.fileName.toLowerCase().endsWith('.csv');
-                        const isPdf = docItem.fileName.toLowerCase().endsWith('.pdf');
-                        const fileIcon = isWord ? '📝' : isExcel ? '📊' : isPdf ? '📕' : '📄';
-
-                        return (
-                          <a
-                            key={docItem.id}
-                            href={productService.getDocumentViewUrl(docItem.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Click to read ${docItem.fileName} in new tab`}
-                            className="text-[11px] px-2.5 py-1 rounded-lg border border-teal-300 bg-white hover:bg-teal-50 text-teal-900 font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                          >
-                            <span>{fileIcon}</span>
-                            <span className="truncate max-w-[150px]">{docItem.fileName}</span>
-                            <ExternalLink className="w-3 h-3 text-teal-600" />
-                          </a>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Qualitative vs Quantitative Input */}
-            {(activeTest.unit === 'Qualitative' || activeTest.unit === 'Text' || (activeTest.minLimit === null && activeTest.maxLimit === null)) ? (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Qualitative Observed Result / Physical Appearance *
-                </label>
-                <input
-                  type="text"
-                  value={textResult}
-                  onChange={(e) => setTextResult(e.target.value)}
-                  placeholder="e.g. Complies / Clear yellowish liquid free from particulate matter"
-                  className="w-full text-sm px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
-                  required
-                />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Quantitative Numeric Result ({activeTest.unit || 'units'}) *
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={numericResult}
-                  onChange={(e) => setNumericResult(e.target.value)}
-                  placeholder="Enter observed numerical assay value..."
-                  className="w-full text-sm font-mono px-3.5 py-2.5 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
-                  required
-                />
-              </div>
-            )}
-
-            {/* LIVE DYNAMIC EVALUATION BANNER */}
-            {evaluatedStatus === 'WITHIN_SPEC' && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 font-medium animate-in fade-in duration-150">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="font-bold">WITHIN SPECIFICATION (PASS)</p>
-                  <p className="text-[11px] text-emerald-700">
-                    Result {numericResult} {activeTest.unit} satisfies compendial limits ({activeTest.minLimit} - {activeTest.maxLimit}).
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {evaluatedStatus === 'OUT_OF_SPEC' && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs flex items-start gap-2.5 font-medium animate-in fade-in duration-150">
-                <AlertOctagon className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-rose-700">OUT OF SPECIFICATION (OOS DETECTED)</p>
-                  <p className="text-[11px] text-rose-800 mt-0.5">
-                    Result <strong>{numericResult} {activeTest.unit}</strong> falls outside acceptable limits (
-                    {activeTest.minLimit} - {activeTest.maxLimit}).
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Instrument Selection */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Analytical Instrument Used *
-              </label>
-              <select
-                value={selectedInstrumentId}
-                onChange={(e) => setSelectedInstrumentId(e.target.value)}
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none bg-white font-medium"
-              >
-                <option value="">Select calibrated lab instrument...</option>
-                {instruments?.map((inst) => (
-                  <option key={inst.id} value={inst.id}>
-                    {inst.equipmentCode} — {inst.name} ({inst.status})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Raw Data Reference */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Raw Data File / Chromatogram Sequence Ref *
-              </label>
-              <input
-                type="text"
-                value={rawDataReference}
-                onChange={(e) => setRawDataReference(e.target.value)}
-                placeholder="e.g. Agilent OpenLab Sequence #2026-SEQ-044; Vial 12"
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none font-mono"
-                required
-              />
-            </div>
-
-            {/* Qualitative Notes / Comments */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Analyst Notes / System Suitability Verification
-              </label>
-              <textarea
-                rows={2}
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                placeholder="System suitability passed (RSD < 1.0%, theoretical plates > 2000)..."
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none"
-              />
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
-              <Button type="button" variant="outline" onClick={() => setActiveTest(null)}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant={evaluatedStatus === 'OUT_OF_SPEC' ? 'danger' : 'primary'}
-                isLoading={recordResultMutation.isPending}
-              >
-                <span>Save Result &amp; Sign Electronically</span>
-              </Button>
-            </div>
-          </form>
-        </Modal>
-      )}
 
       {/* Product Folder Dossier Modal for Analysts */}
       <ProductFolderViewerModal
@@ -1893,6 +1245,7 @@ function TestingPageContent() {
           setSelectedFolderProduct(null);
         }}
         product={selectedFolderProduct}
+        readOnly={true}
       />
     </div>
     </RoleRouteGuard>

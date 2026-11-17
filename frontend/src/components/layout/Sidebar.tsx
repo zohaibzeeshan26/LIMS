@@ -170,7 +170,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
       : userRole === 'DOCUMENTATION_MANAGER'
       ? 'Dashboard'
       : userRole === 'DEPUTY_MANAGER'
-      ? 'Deputy Manager Hub'
+      ? 'Dashboard'
       : userRole === 'LAB_TECHNICIAN'
       ? 'Intake Terminal'
       : 'Testing Workstation';
@@ -401,11 +401,12 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
             );
           })}
 
-          {/* Dedicated Analytical Laboratories Section (Hidden for Documentation Manager and Testing Analysts) */}
+          {/* Dedicated Analytical Laboratories Section (Hidden for Documentation Manager, Testing Analysts, and Deputy Manager) */}
           {userRole !== 'DOCUMENTATION_MANAGER' &&
             userRole !== 'QC_ANALYST' &&
             userRole !== 'ANALYST' &&
-            userRole !== 'TESTING_ANALYST' && (
+            userRole !== 'TESTING_ANALYST' &&
+            userRole !== 'DEPUTY_MANAGER' && (
             <>
               <div className="pt-4 pb-1.5 px-3">
                 <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center justify-between">

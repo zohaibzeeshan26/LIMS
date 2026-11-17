@@ -20,6 +20,7 @@ import {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [isAccessionOpen, setIsAccessionOpen] = useState(false);
 
   const isPortalPage = pathname === '/';
@@ -27,58 +28,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isDashboardPage = pathname.startsWith('/dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Auto-redirect if unauthenticated on protected routes
   useEffect(() => {
+    if (!mounted) return;
     if (pathname === '/login') return;
     if (!user && !isLoading) {
-      const timer = setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.replace('/login');
-        }
-      }, 1000);
-      return () => clearTimeout(timer);
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
     }
-  }, [user, isLoading, pathname]);
+  }, [user, isLoading, pathname, mounted]);
 
   // If on login route, render bare layout without header or sidebar
   if (pathname === '/login') {
     return <>{children}</>;
   }
 
-  // If session is still resolving or user is unauthenticated, show clinical loading screen with direct login option
-  if (isLoading || !user) {
+  // During SSR or initial client hydration, render matching minimal placeholder
+  if (!mounted || isLoading || !user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <div className="flex flex-col items-center max-w-sm text-center">
-          <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-[#0B1A30] to-blue-700 flex items-center justify-center text-white shadow-lg shadow-blue-900/20 mb-4 animate-pulse">
-            <FlaskConical className="h-7 w-7" />
-          </div>
-          <h2 className="text-lg font-black text-slate-900 tracking-tight">CITY PHARMA LIMS</h2>
-          <p className="text-xs text-slate-500 mt-1 mb-5">
-            Verifying authorized cGMP laboratory credentials...
-          </p>
-          <div className="flex items-center gap-2 text-xs text-blue-700 font-semibold bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            <span>Establishing Secure Session</span>
-          </div>
-
-          {/* Action button if automatic transition takes more than a moment */}
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1A30] hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
-            >
-              <span>Sign In to Laboratory Portal</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <span className="text-[11px] text-slate-400">Click if not redirected automatically</span>
-          </div>
-
-          <div className="mt-8 flex items-center gap-1.5 text-[11px] text-slate-400">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Secure Access Gateway • 21 CFR Part 11 Compliant</span>
-          </div>
-        </div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
       </div>
     );
   }

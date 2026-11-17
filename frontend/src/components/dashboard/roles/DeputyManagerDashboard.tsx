@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { samplingService } from '@/services/sampling.service';
 import { useAuth } from '@/context/AuthContext';
-import { useAllAnalysts } from '@/lib/analysts';
+import { useAllAnalysts, AnalystUserOption } from '@/lib/analysts';
 import {
   UserCheck,
   Layers,
@@ -22,6 +22,12 @@ import {
   Check,
   RotateCcw,
   AlertTriangle,
+  ShieldAlert,
+  Calendar,
+  X,
+  FileText,
+  Filter,
+  CheckCircle,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/Badge';
 import { formatDateTime } from '@/lib/date';
@@ -31,19 +37,26 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { auditService } from '@/services/audit.service';
 
+type LabKey = 'ALL' | 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN';
+type WorkflowTab = 'all' | 'in_progress' | 'unassigned';
+
 export function DeputyManagerDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { analysts: allAnalysts } = useAllAnalysts();
 
-  const [activeTab, setActiveTab] = useState<'unassigned' | 'in_progress' | 'all'>('unassigned');
+  // Filters
+  const [selectedLab, setSelectedLab] = useState<LabKey>('ALL');
+  const [activeTab, setActiveTab] = useState<WorkflowTab>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Assign Modal
+  // Assign / Re-assign Modal state
   const [assigningSample, setAssigningSample] = useState<Sample | null>(null);
   const [assignAnalystId, setAssignAnalystId] = useState<string>('');
   const [assignPriority, setAssignPriority] = useState<'ROUTINE' | 'URGENT'>('ROUTINE');
   const [assignShift, setAssignShift] = useState<string>('Morning (Shift A)');
+  const [assignNotes, setAssignNotes] = useState<string>('Section Compendial Verification');
+  const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', text: string) => {
@@ -53,14 +66,15 @@ export function DeputyManagerDashboard() {
 
   const authorizedLab = getUserLabAccess(user); // 'GENERAL' | 'PENICILLIN' | 'CEPHALOSPORIN' | 'ALL'
 
-  // Load samples
+  // Load samples with real-time polling
   const {
     data: samplesData,
     refetch: refetchSamples,
+    isRefetching,
     isLoading,
   } = useQuery({
     queryKey: ['deputy-manager-samples'],
-    queryFn: () => samplingService.getAll({ limit: 80, sortBy: 'samplingDate', sortOrder: 'desc' }),
+    queryFn: () => samplingService.getAll({ limit: 100, sortBy: 'samplingDate', sortOrder: 'desc' }),
     refetchInterval: 5000,
   });
 
@@ -70,18 +84,7 @@ export function DeputyManagerDashboard() {
     return [];
   }, [samplesData]);
 
-  // Enforce Section / Lab Boundary
-  const labSamples = useMemo(() => {
-    return allSamples.filter((s: any) => {
-      const sampleLab = (s.laboratoryType || s.laboratory?.code || s.laboratory || '').toUpperCase();
-      if (authorizedLab === 'GENERAL') return sampleLab === 'GENERAL' || sampleLab === 'GL' || sampleLab === '';
-      if (authorizedLab === 'PENICILLIN') return sampleLab.includes('PEN');
-      if (authorizedLab === 'CEPHALOSPORIN') return sampleLab.includes('CEPH');
-      return true;
-    });
-  }, [allSamples, authorizedLab]);
-
-  // Tasks from localStorage
+  // Tasks from localStorage for sync with Tasks module
   const [storedTasks, setStoredTasks] = useState<any[]>([]);
   const loadStoredTasks = () => {
     try {
@@ -101,6 +104,26 @@ export function DeputyManagerDashboard() {
     };
   }, []);
 
+  // Helper to normalize laboratory key for any sample
+  const getSampleLabKey = (s: any): 'GENERAL' | 'PENICILLIN' | 'CEPHALOSPORIN' => {
+    const labStr = (s.laboratoryType || s.laboratory?.code || s.laboratory?.name || s.laboratory || '').toUpperCase();
+    if (labStr.includes('PEN')) return 'PENICILLIN';
+    if (labStr.includes('CEPH')) return 'CEPHALOSPORIN';
+    return 'GENERAL';
+  };
+
+  // Enforce Section / Lab Boundary for Deputy Manager (defaults to ALL)
+  const labSamples = useMemo(() => {
+    return allSamples.filter((s: any) => {
+      const sampleLab = getSampleLabKey(s);
+      if (authorizedLab === 'GENERAL') return sampleLab === 'GENERAL';
+      if (authorizedLab === 'PENICILLIN') return sampleLab === 'PENICILLIN';
+      if (authorizedLab === 'CEPHALOSPORIN') return sampleLab === 'CEPHALOSPORIN';
+      return true;
+    });
+  }, [allSamples, authorizedLab]);
+
+  // Qualified analysts roster
   const qualifiedAnalysts = useMemo(() => {
     return allAnalysts.filter((a) => {
       if (authorizedLab === 'GENERAL') return a.lab === 'GENERAL' || a.lab === 'ALL';
@@ -110,31 +133,104 @@ export function DeputyManagerDashboard() {
     });
   }, [allAnalysts, authorizedLab]);
 
-  // Unassigned samples
-  const unassignedSamples = useMemo(() => {
-    return labSamples.filter((s: any) => {
-      const hasDbAssign = !!s.assignedToId || !!s.assignedTo?.fullName;
-      const hasTaskAssign = storedTasks.some((t: any) => {
-        const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
-        const sCode = (s.sampleCode || s.accessionNo || s.sampleId || '').toUpperCase();
-        return tCode === sCode && t.assignedAnalystName;
-      });
-      return !hasDbAssign && !hasTaskAssign && s.status !== 'APPROVED' && s.status !== 'ARCHIVED';
-    });
-  }, [labSamples, storedTasks]);
+  // Determine assigned analyst name for a sample
+  const getSampleAssignment = (s: any): string | null => {
+    if (s.assignedTo?.fullName) return s.assignedTo.fullName;
+    if (s.assignedToId) {
+      const matched = qualifiedAnalysts.find((a) => a.id === s.assignedToId || (a as any).dbId === s.assignedToId);
+      if (matched) return matched.name;
+    }
 
-  // In-progress samples
-  const inProgressSamples = useMemo(() => {
-    return labSamples.filter((s: any) => {
-      const hasDbAssign = !!s.assignedToId || !!s.assignedTo?.fullName;
-      const hasTaskAssign = storedTasks.some((t: any) => {
-        const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
-        const sCode = (s.sampleCode || s.accessionNo || s.sampleId || '').toUpperCase();
-        return tCode === sCode && t.assignedAnalystName;
-      });
-      return (hasDbAssign || hasTaskAssign) && s.status !== 'APPROVED';
+    const task = storedTasks.find((t: any) => {
+      const tCode = (t.sampleId || t.accessionNo || '').toUpperCase();
+      const sCode = (s.sampleCode || s.accessionNo || s.sampleId || '').toUpperCase();
+      return tCode === sCode;
     });
-  }, [labSamples, storedTasks]);
+
+    if (task && task.assignedAnalystName && (task.isAssignedByManager || task.status === 'IN_PROGRESS' || task.status === 'ASSIGNED')) {
+      return task.assignedAnalystName;
+    }
+
+    if (s.status === 'ASSIGNED_FOR_TESTING' || s.status === 'TESTING_IN_PROGRESS') {
+      return 'QC Analyst';
+    }
+
+    return null;
+  };
+
+  // Counts per laboratory
+  const labCounts = useMemo(() => {
+    let general = 0;
+    let cephalosporin = 0;
+    let penicillin = 0;
+    for (const s of labSamples) {
+      const k = getSampleLabKey(s);
+      if (k === 'PENICILLIN') penicillin++;
+      else if (k === 'CEPHALOSPORIN') cephalosporin++;
+      else general++;
+    }
+    return {
+      all: labSamples.length,
+      general,
+      cephalosporin,
+      penicillin,
+    };
+  }, [labSamples]);
+
+  // Filter samples by selected laboratory
+  const labScopedSamples = useMemo(() => {
+    if (selectedLab === 'ALL') return labSamples;
+    return labSamples.filter((s) => getSampleLabKey(s) === selectedLab);
+  }, [labSamples, selectedLab]);
+
+  // Unassigned in current lab scope
+  const unassignedScoped = useMemo(() => {
+    return labScopedSamples.filter((s: any) => {
+      const assigned = !!getSampleAssignment(s);
+      return !assigned && s.status !== 'APPROVED' && s.status !== 'ARCHIVED';
+    });
+  }, [labScopedSamples, storedTasks, qualifiedAnalysts]);
+
+  // In-progress in current lab scope
+  const inProgressScoped = useMemo(() => {
+    return labScopedSamples.filter((s: any) => {
+      const assigned = !!getSampleAssignment(s);
+      return (assigned || s.status === 'TESTING_IN_PROGRESS' || s.status === 'ASSIGNED_FOR_TESTING') && s.status !== 'APPROVED';
+    });
+  }, [labScopedSamples, storedTasks, qualifiedAnalysts]);
+
+  // Displayed samples based on lab filter, status filter, and live search
+  const displayedSamples = useMemo(() => {
+    let list: Sample[] = [];
+    if (activeTab === 'unassigned') {
+      list = unassignedScoped;
+    } else if (activeTab === 'in_progress') {
+      list = inProgressScoped;
+    } else {
+      list = labScopedSamples;
+    }
+
+    if (!searchTerm.trim()) return list;
+    const q = searchTerm.toLowerCase().trim();
+    return list.filter((s: any) => {
+      const code = (s.sampleCode || '').toLowerCase();
+      const accession = (s.accessionNo || '').toLowerCase();
+      const name = (s.nomenclature || s.materialName || '').toLowerCase();
+      const batch = (s.lotNumber || s.batchLotNumber || s.batchNumber || '').toLowerCase();
+      const lab = getSampleLabKey(s).toLowerCase();
+      const analyst = (getSampleAssignment(s) || '').toLowerCase();
+      const status = (s.status || '').toLowerCase();
+      return (
+        code.includes(q) ||
+        accession.includes(q) ||
+        name.includes(q) ||
+        batch.includes(q) ||
+        lab.includes(q) ||
+        analyst.includes(q) ||
+        status.includes(q)
+      );
+    });
+  }, [activeTab, unassignedScoped, inProgressScoped, labScopedSamples, searchTerm, storedTasks, qualifiedAnalysts]);
 
   // Handle Deputy Manager Assignment
   const handleAssignTester = async (e: React.FormEvent) => {
@@ -148,6 +244,7 @@ export function DeputyManagerDashboard() {
     }
 
     try {
+      setIsSubmittingAssign(true);
       await samplingService.update(assigningSample.id, {
         assignedToId: chosenAnalyst.id,
         status: 'ASSIGNED_FOR_TESTING' as any,
@@ -158,15 +255,16 @@ export function DeputyManagerDashboard() {
         taskCode: `TSK-DEP-${String(Date.now()).slice(-4)}`,
         sampleId: assigningSample.sampleCode || assigningSample.id,
         sampleName: assigningSample.nomenclature || (assigningSample as any).materialName,
-        laboratory: assigningSample.laboratoryType || 'GENERAL',
+        laboratory: getSampleLabKey(assigningSample),
         assignedAnalystName: chosenAnalyst.name,
         assignedAnalystId: chosenAnalyst.id,
-        testProtocol: 'Section Compendial Verification',
+        testProtocol: assignNotes || 'Section Compendial Verification',
         priority: assignPriority,
         shift: assignShift,
         assignedDate: new Date().toISOString().split('T')[0],
         status: 'ASSIGNED',
         accessionNo: assigningSample.accessionNo,
+        isAssignedByManager: true,
       };
 
       const updated = [newTask, ...storedTasks.filter((t) => t.sampleId !== assigningSample.sampleCode)];
@@ -177,263 +275,620 @@ export function DeputyManagerDashboard() {
         action: 'SAMPLE_ASSIGNED',
         entityName: 'Sample',
         entityId: assigningSample.sampleCode,
-        performedByName: user?.fullName || 'Deputy Manager',
+        performedByName: user?.fullName || 'Azaz',
         role: user?.role || 'DEPUTY_MANAGER',
-        reasonForChange: `Deputy Manager assigned ${assigningSample.sampleCode} to ${chosenAnalyst.name}`,
+        reasonForChange: `Deputy Manager Azaz allocated sample ${assigningSample.sampleCode} to analyst ${chosenAnalyst.name} (${assignShift}, ${assignPriority})`,
       });
 
       setAssigningSample(null);
       refetchSamples();
       queryClient.invalidateQueries({ queryKey: ['samples'] });
-      showToast('success', `Assigned ${assigningSample.sampleCode} to ${chosenAnalyst.name}.`);
+      queryClient.invalidateQueries({ queryKey: ['deputy-manager-samples'] });
+      showToast('success', `Allocated sample ${assigningSample.sampleCode} to ${chosenAnalyst.name} successfully.`);
     } catch (err: any) {
-      showToast('error', err.message || 'Error assigning tester');
+      showToast('error', err.message || 'Error allocating sample to tester');
+    } finally {
+      setIsSubmittingAssign(false);
     }
+  };
+
+  // Quick initial open for assignment modal
+  const openAssignModal = (sample: Sample) => {
+    setAssigningSample(sample);
+    const existingAnalystId = (sample as any).assignedToId;
+    if (existingAnalystId && qualifiedAnalysts.some((a) => a.id === existingAnalystId)) {
+      setAssignAnalystId(existingAnalystId);
+    } else {
+      setAssignAnalystId(qualifiedAnalysts[0]?.id || '');
+    }
+    setAssignPriority((sample as any).priority === 'URGENT' ? 'URGENT' : 'ROUTINE');
+    setAssignShift('Morning (Shift A)');
+    setAssignNotes('Section Compendial Verification');
   };
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
-      {/* Toast */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div
           className={cn(
-            'p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-md',
+            'p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-md transition-all',
             toastMessage.type === 'success'
               ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
               : 'bg-rose-50 border-rose-300 text-rose-900'
           )}
         >
-          <span>{toastMessage.text}</span>
-          <button onClick={() => setToastMessage(null)} className="font-bold px-2">
+          <div className="flex items-center gap-2">
+            {toastMessage.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{toastMessage.text}</span>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-slate-700 text-xs font-bold px-2 py-0.5 cursor-pointer"
+          >
             &times;
           </button>
         </div>
       )}
 
-      {/* Banner */}
-      <div className="rounded-3xl bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-6 sm:p-8 shadow-xl relative overflow-hidden border border-purple-800/40">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* ========================================================================= */}
+      {/* 1. PROFESSIONAL EXECUTIVE HEADER CARD                                      */}
+      {/* ========================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-600 text-white shadow-sm flex items-center gap-1.5">
+              <span className="px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-xs flex items-center gap-1.5">
                 <UserCheck className="w-3.5 h-3.5" />
-                <span>Deputy Manager Section Operations</span>
+                <span>Deputy Manager Operations</span>
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/10 text-purple-200 border border-white/20">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                Supervisor: <span className="text-slate-900 font-extrabold">{user?.fullName || 'Azaz'}</span>
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200">
                 @{user?.username || 'deputy.manager'} &bull; {user?.employeeId || 'DMGR-001'}
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-400/30">
-                Scope: {authorizedLab}
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Scope: 3 Laboratories (GL, CEPH, PEN)</span>
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Section Workflow, Sample Allocation &amp; Tester Supervision
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+              Laboratory Section Workflow &amp; Sample Delegation
             </h1>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
+              Real-time oversight of incoming batch samples, analyst allocation, active bench testing worksheets,
+              and laboratory turnaround times across General, Cephalosporin, and Penicillin facilities.
+            </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             <button
+              type="button"
               onClick={() => refetchSamples()}
-              className="p-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all cursor-pointer"
+              className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+              title="Refresh samples list"
             >
-              <RotateCcw className="w-4 h-4 text-purple-300" />
+              <RotateCcw className={cn('w-4 h-4 text-blue-600', isRefetching && 'animate-spin text-blue-700')} />
             </button>
             <Link
+              href="/dashboard?tab=lab-operations"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs hover:shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Activity className="w-3.5 h-3.5 text-blue-600" />
+              <span>Lab Operations</span>
+            </Link>
+            <Link
               href="/tasks"
-              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md inline-flex items-center gap-1.5 transition-all"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5" />
               <span>Assignment Board</span>
             </Link>
           </div>
         </div>
-
-        {/* Sub-Tabs */}
-        <div className="mt-8 pt-4 border-t border-white/15 flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setActiveTab('unassigned')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer',
-              activeTab === 'unassigned'
-                ? 'bg-white text-slate-900 shadow-md'
-                : 'text-slate-200 hover:bg-white/10 hover:text-white'
-            )}
-          >
-            <Clock className="w-4 h-4 text-amber-600" />
-            <span>1. Registered Queue to Assign ({unassignedSamples.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('in_progress')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer',
-              activeTab === 'in_progress'
-                ? 'bg-white text-slate-900 shadow-md'
-                : 'text-slate-200 hover:bg-white/10 hover:text-white'
-            )}
-          >
-            <Microscope className="w-4 h-4 text-blue-600" />
-            <span>2. In-Testing Progress ({inProgressSamples.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('all')}
-            className={cn(
-              'px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer',
-              activeTab === 'all'
-                ? 'bg-white text-slate-900 shadow-md'
-                : 'text-slate-200 hover:bg-white/10 hover:text-white'
-            )}
-          >
-            <Layers className="w-4 h-4 text-purple-600" />
-            <span>3. All Section Samples ({labSamples.length})</span>
-          </button>
-        </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* ========================================================================= */}
+      {/* 2. SUMMARY KPI METRIC CARDS                                              */}
+      {/* ========================================================================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Awaiting Tester Assignment</span>
-            <Clock className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-700">{unassignedSamples.length}</div>
-          <p className="text-[11px] text-slate-400">Intake samples ready to allocate</p>
-        </div>
-
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Active Testing Worksheets</span>
-            <Microscope className="w-4 h-4 text-blue-600" />
-          </div>
-          <div className="text-2xl sm:text-3xl font-black text-blue-700">{inProgressSamples.length}</div>
-          <p className="text-[11px] text-slate-400">Executing on analyst benches</p>
-        </div>
-
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Section Samples</span>
-            <Layers className="w-4 h-4 text-purple-600" />
+        {/* Total Section Samples */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+            <span>Total Section Samples</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Layers className="w-4 h-4" />
+            </div>
           </div>
           <div className="text-2xl sm:text-3xl font-black text-slate-900">{labSamples.length}</div>
-          <p className="text-[11px] text-slate-400">Within authorized laboratory</p>
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[11px] text-slate-500 font-medium">
+            <span className="font-bold text-blue-700">GL: {labCounts.general}</span>
+            <span>&bull;</span>
+            <span className="font-bold text-purple-700">CEPH: {labCounts.cephalosporin}</span>
+            <span>&bull;</span>
+            <span className="font-bold text-teal-700">PEN: {labCounts.penicillin}</span>
+          </div>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Section Analysts</span>
-            <Users className="w-4 h-4 text-emerald-600" />
+        {/* Active Under Testing */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+            <span>Under Active Testing</span>
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+              <Microscope className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-blue-700">{inProgressScoped.length}</div>
+          <p className="text-[11px] text-slate-400">Executing on analyst workstations</p>
+        </div>
+
+        {/* Awaiting Tester Allocation */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+            <span>Awaiting Tester Allocation</span>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl sm:text-3xl font-black text-amber-700">{unassignedScoped.length}</div>
+          <p className="text-[11px] text-slate-400">Intake queue ready for delegation</p>
+        </div>
+
+        {/* Qualified Testing Analysts */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+            <span>Qualified Section Analysts</span>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <Users className="w-4 h-4" />
+            </div>
           </div>
           <div className="text-2xl sm:text-3xl font-black text-emerald-700">{qualifiedAnalysts.length}</div>
-          <p className="text-[11px] text-slate-400">Qualified testers on roster</p>
+          <p className="text-[11px] text-slate-400">Certified testing personnel on roster</p>
         </div>
       </div>
 
-      {/* Main Table */}
+      {/* ========================================================================= */}
+      {/* 3. LABORATORY SELECTION TABS                                              */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3 overflow-x-auto">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs font-bold text-slate-500 mr-1 hidden sm:inline">Laboratory:</span>
+
+          {/* All Labs */}
+          <button
+            type="button"
+            onClick={() => setSelectedLab('ALL')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              selectedLab === 'ALL'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Activity className="h-3.5 w-3.5" />
+            <span>All Laboratories</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                selectedLab === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+              }`}
+            >
+              {labCounts.all}
+            </span>
+          </button>
+
+          {/* General Lab */}
+          <button
+            type="button"
+            onClick={() => setSelectedLab('GENERAL')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              selectedLab === 'GENERAL'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FlaskConical className="h-3.5 w-3.5" />
+            <span>General Lab</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                selectedLab === 'GENERAL' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+              }`}
+            >
+              {labCounts.general}
+            </span>
+          </button>
+
+          {/* Cephalosporin Lab */}
+          <button
+            type="button"
+            onClick={() => setSelectedLab('CEPHALOSPORIN')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              selectedLab === 'CEPHALOSPORIN'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            <span>Cephalosporin Lab</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                selectedLab === 'CEPHALOSPORIN' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+              }`}
+            >
+              {labCounts.cephalosporin}
+            </span>
+          </button>
+
+          {/* Penicillin Lab */}
+          <button
+            type="button"
+            onClick={() => setSelectedLab('PENICILLIN')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              selectedLab === 'PENICILLIN'
+                ? 'bg-teal-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Microscope className="h-3.5 w-3.5" />
+            <span>Penicillin Lab</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                selectedLab === 'PENICILLIN' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
+              }`}
+            >
+              {labCounts.penicillin}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. WORKFLOW TABS & SAMPLE ALLOCATION TABLE                                */}
+      {/* ========================================================================= */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-        <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+        {/* Sub-Tabs & Live Search Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          {/* Status Workflow Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto shrink-0">
+            {/* All Samples */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('all')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                activeTab === 'all'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5 text-blue-600" />
+              <span>All Section Samples</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                {labScopedSamples.length}
+              </span>
+            </button>
+
+            {/* Under Active Testing */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('in_progress')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                activeTab === 'in_progress'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Microscope className="h-3.5 w-3.5 text-blue-600" />
+              <span>Under Active Testing</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                {inProgressScoped.length}
+              </span>
+            </button>
+
+            {/* Awaiting Allocation */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('unassigned')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                activeTab === 'unassigned'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5 text-amber-600" />
+              <span>Awaiting Allocation</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                {unassignedScoped.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Live Search */}
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search code, material, batch, tester..."
+              className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-blue-500 bg-slate-50/50"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-0.5 cursor-pointer"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Samples Table */}
+        <div className="overflow-x-auto border border-slate-200 rounded-xl">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-500 font-bold bg-slate-50/80">
-                <th className="py-3 px-3.5">Accession / Code</th>
-                <th className="py-3 px-3.5">Material Name</th>
-                <th className="py-3 px-3.5">Lab</th>
-                <th className="py-3 px-3.5">Assigned Analyst</th>
-                <th className="py-3 px-3.5">Status</th>
-                <th className="py-3 px-3.5 text-right">Action</th>
+              <tr className="border-b border-slate-200 text-slate-600 font-bold bg-slate-50/90">
+                <th className="py-3 px-3.5">SAMPLE &amp; ACCESSION</th>
+                <th className="py-3 px-3.5">MATERIAL &amp; BATCH</th>
+                <th className="py-3 px-3.5">LABORATORY</th>
+                <th className="py-3 px-3.5">PRIORITY</th>
+                <th className="py-3 px-3.5">ASSIGNED ANALYST</th>
+                <th className="py-3 px-3.5">WORKFLOW STATUS</th>
+                <th className="py-3 px-3.5 text-right">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(activeTab === 'unassigned' ? unassignedSamples : inProgressSamples).map((s: any) => (
-                <tr key={s.id} className="hover:bg-purple-50/20 transition-colors">
-                  <td className="py-3 px-3.5">
-                    <div className="font-mono font-bold text-purple-950">{s.sampleCode}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">{s.accessionNo}</div>
-                  </td>
-                  <td className="py-3 px-3.5 font-semibold text-slate-800">{s.nomenclature || s.materialName}</td>
-                  <td className="py-3 px-3.5">{s.laboratoryType || s.laboratory || 'GL'}</td>
-                  <td className="py-3 px-3.5 text-slate-700 font-medium">
-                    {s.assignedTo?.fullName || (
-                      <span className="text-amber-700 italic font-bold">Awaiting Tester</span>
-                    )}
-                  </td>
-                  <td className="py-3 px-3.5">
-                    <StatusBadge status={s.status} />
-                  </td>
-                  <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAssigningSample(s);
-                          setAssignAnalystId(qualifiedAnalysts[0]?.id || '');
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-2xs hover:shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>Assign</span>
-                      </button>
-                      <Link
-                        href={`/tasks?lab=${(s.laboratoryType || s.laboratory?.name || s.laboratory?.code || s.laboratory || 'general').toString().toLowerCase().includes('pen') ? 'penicillin' : (s.laboratoryType || s.laboratory?.name || s.laboratory?.code || s.laboratory || 'general').toString().toLowerCase().includes('ceph') ? 'cephalosporin' : 'general'}&section=${(s.sampleCode || s.accessionNo || '').includes('/SB') ? 'semi-base' : 'formulation'}`}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50 text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Details</span>
-                      </Link>
+              {displayedSamples.map((s: any) => {
+                const assignedName = getSampleAssignment(s);
+                const labKey = getSampleLabKey(s);
+                const isUrgent = s.priority === 'URGENT' || s.priority === 'STAT';
+
+                return (
+                  <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
+                    {/* Sample Code & Accession */}
+                    <td className="py-3 px-3.5">
+                      <div className="font-mono font-bold text-slate-900">{s.sampleCode || s.sampleId}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{s.accessionNo}</div>
+                    </td>
+
+                    {/* Material & Batch */}
+                    <td className="py-3 px-3.5">
+                      <div className="font-semibold text-slate-900">{s.nomenclature || s.materialName}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 flex-wrap">
+                        <span className="font-mono font-medium bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                          Lot: {s.lotNumber || s.batchLotNumber || s.batchNumber || 'N/A'}
+                        </span>
+                        {s.stageType && (
+                          <span className="text-slate-400 truncate max-w-[130px]" title={s.stageType}>
+                            {s.stageType}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Laboratory Badge */}
+                    <td className="py-3 px-3.5">
+                      {labKey === 'GENERAL' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          <FlaskConical className="w-3 h-3 text-blue-600" />
+                          <span>General Lab</span>
+                        </span>
+                      )}
+                      {labKey === 'CEPHALOSPORIN' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                          <ShieldAlert className="w-3 h-3 text-purple-600" />
+                          <span>Cephalosporin</span>
+                        </span>
+                      )}
+                      {labKey === 'PENICILLIN' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                          <Microscope className="w-3 h-3 text-teal-600" />
+                          <span>Penicillin</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Priority */}
+                    <td className="py-3 px-3.5">
+                      {isUrgent ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertTriangle className="w-3 h-3 text-rose-600" />
+                          <span>URGENT</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
+                          <span>ROUTINE</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Assigned Analyst */}
+                    <td className="py-3 px-3.5">
+                      {assignedName ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-[10px] shrink-0 border border-blue-200">
+                            {assignedName.slice(0, 2).toUpperCase()}
+                          </div>
+                          <span className="font-semibold text-slate-800">{assignedName}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span>Awaiting Tester</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3 px-3.5">
+                      <StatusBadge status={s.status} />
+                    </td>
+
+                    {/* Action */}
+                    <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openAssignModal(s)}
+                          className={cn(
+                            'px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer',
+                            assignedName
+                              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                              : 'bg-blue-600 hover:bg-blue-500 text-white shadow-2xs hover:shadow-xs'
+                          )}
+                          title={assignedName ? 'Re-allocate to another tester' : 'Assign to testing analyst'}
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>{assignedName ? 'Re-assign' : 'Assign'}</span>
+                        </button>
+
+                        <Link
+                          href={`/tasks?lab=${labKey.toLowerCase()}&section=${(s.sampleCode || s.accessionNo || '').includes('/SB') ? 'semi-base' : 'formulation'}`}
+                          className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          title="View task execution details"
+                        >
+                          <span>Details</span>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {displayedSamples.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <div className="max-w-xs mx-auto space-y-2">
+                      <p className="font-semibold text-slate-600">No samples found matching criteria</p>
+                      <p className="text-xs text-slate-400">
+                        Try adjusting your laboratory filter, status filter, or search keywords.
+                      </p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Footer Info */}
+        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+          <span>Showing {displayedSamples.length} of {labScopedSamples.length} section samples</span>
+          <span className="font-mono text-[11px] text-slate-400">c-GMP Compliant Electronic Logbook</span>
+        </div>
       </div>
 
-      {/* Assign Modal */}
+      {/* ========================================================================= */}
+      {/* 5. SAMPLE ALLOCATION MODAL                                                */}
+      {/* ========================================================================= */}
       {assigningSample && (
         <Modal
           isOpen={!!assigningSample}
           onClose={() => setAssigningSample(null)}
-          title={`Assign Tester: ${assigningSample.sampleCode}`}
-          subtitle="Deputy Manager Section Allocation"
-          maxWidth="sm"
+          title={`Allocate Sample: ${assigningSample.sampleCode || assigningSample.id}`}
+          subtitle="Deputy Manager Section Task Delegation"
+          maxWidth="md"
         >
           <form onSubmit={handleAssignTester} className="space-y-4 text-xs">
+            {/* Sample Summary Banner */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+              <div className="flex items-center justify-between font-bold text-slate-900">
+                <span>{assigningSample.nomenclature || (assigningSample as any).materialName}</span>
+                <span className="font-mono text-blue-700">{assigningSample.sampleCode}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                <span>Accession: <span className="font-mono font-medium">{assigningSample.accessionNo}</span></span>
+                <span>&bull;</span>
+                <span>Lab: <span className="font-semibold">{getSampleLabKey(assigningSample)}</span></span>
+                <span>&bull;</span>
+                <span>Lot: <span className="font-mono">{assigningSample.lotNumber || (assigningSample as any).batchLotNumber || 'N/A'}</span></span>
+              </div>
+            </div>
+
+            {/* Select Analyst */}
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Select Testing Analyst</label>
+              <label className="font-bold text-slate-700 block mb-1">
+                Select Certified Testing Analyst <span className="text-rose-500">*</span>
+              </label>
               <select
                 required
                 value={assignAnalystId}
                 onChange={(e) => setAssignAnalystId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 focus:outline-hidden focus:border-blue-500"
               >
                 {qualifiedAnalysts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} [{a.lab}]
+                    {a.name} [{a.lab}] &bull; {a.department}
                   </option>
                 ))}
               </select>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Only qualified testing analysts active in the personnel registry are listed.
+              </p>
             </div>
 
+            {/* Priority & Shift Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Testing Priority</label>
+                <select
+                  value={assignPriority}
+                  onChange={(e) => setAssignPriority(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 focus:outline-hidden focus:border-blue-500"
+                >
+                  <option value="ROUTINE">Routine Standard</option>
+                  <option value="URGENT">Urgent Expedited</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Assigned Shift</label>
+                <select
+                  value={assignShift}
+                  onChange={(e) => setAssignShift(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 focus:outline-hidden focus:border-blue-500"
+                >
+                  <option value="Morning (Shift A)">Morning (Shift A)</option>
+                  <option value="Evening (Shift B)">Evening (Shift B)</option>
+                  <option value="Night (Shift C)">Night (Shift C)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Notes / Special Instructions */}
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Priority</label>
-              <select
-                value={assignPriority}
-                onChange={(e) => setAssignPriority(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
-              >
-                <option value="ROUTINE">Routine Standard</option>
-                <option value="URGENT">Urgent Expedited</option>
-              </select>
+              <label className="font-bold text-slate-700 block mb-1">Special Testing Instructions / Protocol</label>
+              <input
+                type="text"
+                value={assignNotes}
+                onChange={(e) => setAssignNotes(e.target.value)}
+                placeholder="e.g. Section Compendial Verification, HPLC Potency"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-normal text-slate-800 focus:outline-hidden focus:border-blue-500"
+              />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button type="button" variant="outline" onClick={() => setAssigningSample(null)}>
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAssigningSample(null)}
+                disabled={isSubmittingAssign}
+              >
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" className="bg-purple-600 hover:bg-purple-500">
-                Confirm Assignment
+              <Button
+                type="submit"
+                variant="primary"
+                className="bg-blue-600 hover:bg-blue-500"
+                disabled={isSubmittingAssign}
+              >
+                {isSubmittingAssign ? 'Allocating...' : 'Confirm Allocation'}
               </Button>
             </div>
           </form>

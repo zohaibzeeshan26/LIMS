@@ -278,10 +278,31 @@ export default function PriorityNoticePage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
         
         {/* Card 1: Total Queue */}
-        <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        <div
+          onClick={() => {
+            setSelectedPriority('ALL');
+            setSelectedLab('ALL');
+            setSelectedSection('ALL');
+            setSearchQuery('');
+          }}
+          className={cn(
+            'bg-white rounded-xl p-2.5 sm:p-3 border shadow-2xs cursor-pointer transition-all hover:border-slate-300 flex flex-col justify-between select-none',
+            selectedPriority === 'ALL' && selectedLab === 'ALL' && selectedSection === 'ALL' && !searchQuery
+              ? 'border-indigo-600 ring-2 ring-indigo-500/10 bg-indigo-50/20'
+              : 'border-slate-200/80 hover:bg-slate-50/50'
+          )}
+          title="Click to view all total samples"
+        >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Total Samples</span>
-            <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 border border-slate-200/60">
+            <span
+              className={cn(
+                'text-[10px] font-medium px-1.5 py-0.2 rounded-full border transition-colors',
+                selectedPriority === 'ALL' && selectedLab === 'ALL' && selectedSection === 'ALL' && !searchQuery
+                  ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                  : 'bg-slate-100 text-slate-600 border-slate-200/60'
+              )}
+            >
               Active
             </span>
           </div>

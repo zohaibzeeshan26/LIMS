@@ -22,6 +22,7 @@ import {
   Building2,
   Tag,
   Eye,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -39,6 +40,7 @@ export function SampleRegistrationDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [labFilter, setLabFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'AWAITING' | 'ASSIGNED' | 'TESTING' | 'COMPLETED'>('ALL');
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
 
   // Fetch samples registered in the facility
@@ -74,9 +76,38 @@ export function SampleRegistrationDashboard() {
 
       const matchPriority = priorityFilter === 'ALL' || s.priority === priorityFilter;
 
-      return matchSearch && matchLab && matchPriority;
+      const matchStatus = (() => {
+        if (statusFilter === 'ALL') return true;
+        if (statusFilter === 'AWAITING') {
+          return (
+            s.status === 'RECEIVED' ||
+            s.status === 'LOGGED' ||
+            s.status === 'PENDING_SUPERVISOR_ASSIGNMENT'
+          );
+        }
+        if (statusFilter === 'ASSIGNED') {
+          return s.status === 'ASSIGNED_FOR_TESTING' || s.status === 'ASSIGNED';
+        }
+        if (statusFilter === 'TESTING') {
+          return (
+            s.status === 'TESTING_IN_PROGRESS' ||
+            s.status === 'IN_PROGRESS' ||
+            (s.status as any) === 'IN_ANALYSIS'
+          );
+        }
+        if (statusFilter === 'COMPLETED') {
+          return (
+            s.status === 'REVIEW_PENDING' ||
+            s.status === 'APPROVED' ||
+            (s.status as any) === 'COMPLETED'
+          );
+        }
+        return true;
+      })();
+
+      return matchSearch && matchLab && matchPriority && matchStatus;
     });
-  }, [samples, searchTerm, labFilter, priorityFilter]);
+  }, [samples, searchTerm, labFilter, priorityFilter, statusFilter]);
 
   // Intake Metrics
   const metrics = useMemo(() => {
@@ -91,8 +122,14 @@ export function SampleRegistrationDashboard() {
       (s) => s.status === 'ASSIGNED_FOR_TESTING' || s.status === 'ASSIGNED'
     ).length;
     const inTesting = samples.filter((s) => s.status === 'TESTING_IN_PROGRESS').length;
+    const completedReview = samples.filter(
+      (s) =>
+        s.status === 'REVIEW_PENDING' ||
+        s.status === 'APPROVED' ||
+        (s.status as any) === 'COMPLETED'
+    ).length;
 
-    return { total, awaitingAssignment, assigned, inTesting };
+    return { total, awaitingAssignment, assigned, inTesting, completedReview };
   }, [samples]);
 
   return (
@@ -124,50 +161,172 @@ export function SampleRegistrationDashboard() {
         </div>
       </div>
 
-      {/* 2. Key Sample Intake Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Total Accessioned</span>
-            <Layers className="w-4 h-4 text-teal-600" />
+      {/* 2. Key Sample Intake Metrics (Interactive Stage Filtering) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {/* 1. Total Accessioned */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter('ALL')}
+          className={cn(
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
+            statusFilter === 'ALL'
+              ? 'bg-slate-900 text-white border-slate-900 ring-2 ring-slate-900/30 shadow-md -translate-y-0.5'
+              : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-900 hover:border-slate-300'
+          )}
+        >
+          <div className="flex items-center justify-between text-xs font-medium">
+            <span className={statusFilter === 'ALL' ? 'text-slate-300' : 'text-slate-500'}>
+              Total Accessioned
+            </span>
+            <Layers className={cn('w-4 h-4', statusFilter === 'ALL' ? 'text-teal-400' : 'text-teal-600')} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900">{metrics.total}</div>
-        </div>
+          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'ALL' ? 'text-white' : 'text-slate-900')}>
+            {metrics.total}
+          </div>
+          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'ALL' ? 'text-teal-300' : 'text-slate-400')}>
+            {statusFilter === 'ALL' ? '● Showing all' : 'Click to view all'}
+          </div>
+        </button>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Awaiting Allocation</span>
-            <Clock className="w-4 h-4 text-amber-600" />
+        {/* 2. Awaiting Allocation */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'AWAITING' ? 'ALL' : 'AWAITING')}
+          className={cn(
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
+            statusFilter === 'AWAITING'
+              ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-500/30 shadow-md -translate-y-0.5'
+              : 'bg-white hover:bg-amber-50/50 border-slate-200/90 hover:border-amber-300'
+          )}
+        >
+          <div className="flex items-center justify-between text-xs font-medium">
+            <span className={statusFilter === 'AWAITING' ? 'text-amber-100' : 'text-slate-500'}>
+              Awaiting Allocation
+            </span>
+            <Clock className={cn('w-4 h-4', statusFilter === 'AWAITING' ? 'text-white' : 'text-amber-600')} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-700">{metrics.awaitingAssignment}</div>
-        </div>
+          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'AWAITING' ? 'text-white' : 'text-amber-700')}>
+            {metrics.awaitingAssignment}
+          </div>
+          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'AWAITING' ? 'text-amber-100' : 'text-slate-400')}>
+            {statusFilter === 'AWAITING' ? '● Filter active' : 'Click to filter'}
+          </div>
+        </button>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Assigned to Analysts</span>
-            <ShieldCheck className="w-4 h-4 text-blue-600" />
+        {/* 3. Assigned to Analysts */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'ASSIGNED' ? 'ALL' : 'ASSIGNED')}
+          className={cn(
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
+            statusFilter === 'ASSIGNED'
+              ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-600/30 shadow-md -translate-y-0.5'
+              : 'bg-white hover:bg-blue-50/50 border-slate-200/90 hover:border-blue-300'
+          )}
+        >
+          <div className="flex items-center justify-between text-xs font-medium">
+            <span className={statusFilter === 'ASSIGNED' ? 'text-blue-100' : 'text-slate-500'}>
+              Assigned to Analysts
+            </span>
+            <ShieldCheck className={cn('w-4 h-4', statusFilter === 'ASSIGNED' ? 'text-white' : 'text-blue-600')} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-blue-700">{metrics.assigned}</div>
-        </div>
+          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'ASSIGNED' ? 'text-white' : 'text-blue-700')}>
+            {metrics.assigned}
+          </div>
+          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'ASSIGNED' ? 'text-blue-100' : 'text-slate-400')}>
+            {statusFilter === 'ASSIGNED' ? '● Filter active' : 'Click to filter'}
+          </div>
+        </button>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Under Active Testing</span>
-            <FlaskConical className="w-4 h-4 text-emerald-600" />
+        {/* 4. Under Active Testing */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'TESTING' ? 'ALL' : 'TESTING')}
+          className={cn(
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
+            statusFilter === 'TESTING'
+              ? 'bg-teal-700 text-white border-teal-800 ring-2 ring-teal-700/30 shadow-md -translate-y-0.5'
+              : 'bg-white hover:bg-teal-50/50 border-slate-200/90 hover:border-teal-300'
+          )}
+        >
+          <div className="flex items-center justify-between text-xs font-medium">
+            <span className={statusFilter === 'TESTING' ? 'text-teal-100' : 'text-slate-500'}>
+              Under Active Testing
+            </span>
+            <FlaskConical className={cn('w-4 h-4', statusFilter === 'TESTING' ? 'text-white' : 'text-teal-600')} />
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-700">{metrics.inTesting}</div>
-        </div>
+          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'TESTING' ? 'text-white' : 'text-teal-700')}>
+            {metrics.inTesting}
+          </div>
+          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'TESTING' ? 'text-teal-100' : 'text-slate-400')}>
+            {statusFilter === 'TESTING' ? '● Filter active' : 'Click to filter'}
+          </div>
+        </button>
+
+        {/* 5. Completed / In Review */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? 'ALL' : 'COMPLETED')}
+          className={cn(
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 col-span-2 sm:col-span-1 group relative',
+            statusFilter === 'COMPLETED'
+              ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-600/30 shadow-md -translate-y-0.5'
+              : 'bg-white hover:bg-emerald-50/50 border-slate-200/90 hover:border-emerald-300'
+          )}
+        >
+          <div className="flex items-center justify-between text-xs font-medium">
+            <span className={statusFilter === 'COMPLETED' ? 'text-emerald-100' : 'text-slate-500'}>
+              Completed / In Review
+            </span>
+            <CheckCircle2 className={cn('w-4 h-4', statusFilter === 'COMPLETED' ? 'text-white' : 'text-emerald-600')} />
+          </div>
+          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'COMPLETED' ? 'text-white' : 'text-emerald-700')}>
+            {metrics.completedReview}
+          </div>
+          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'COMPLETED' ? 'text-emerald-100' : 'text-slate-400')}>
+            {statusFilter === 'COMPLETED' ? '● Filter active' : 'Click to filter'}
+          </div>
+        </button>
       </div>
 
       {/* 3. Registration History & Specimen Queue */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
+          <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <FileText className="w-5 h-5 text-teal-600" />
-              <span>Sample Registration History &amp; Specimen Logs</span>
+              <span>Sample Registration History &amp; Specimen Logs ({registeredSamples.length})</span>
             </h2>
+            {statusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 shadow-2xs animate-in fade-in">
+                <span>
+                  {statusFilter === 'AWAITING' && 'Filtered: Awaiting Allocation'}
+                  {statusFilter === 'ASSIGNED' && 'Filtered: Assigned to Analysts'}
+                  {statusFilter === 'TESTING' && 'Filtered: Under Active Testing'}
+                  {statusFilter === 'COMPLETED' && 'Filtered: Completed / In Review'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('ALL')}
+                  className="hover:text-red-600 transition ml-0.5 cursor-pointer"
+                  title="Clear filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
           </div>
+
+          {statusFilter !== 'ALL' && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              className="text-xs text-teal-700 hover:text-teal-900 font-semibold inline-flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Show All ({samples.length})</span>
+            </button>
+          )}
         </div>
 
         {/* Filters */}

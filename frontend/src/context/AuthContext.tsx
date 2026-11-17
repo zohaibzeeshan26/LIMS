@@ -66,9 +66,27 @@ function syncUserWithDemo(u: User | null): User | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredUser<User>();
+      return syncUserWithDemo(stored);
+    }
+    return null;
+  });
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return getStoredToken();
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const storedToken = getStoredToken();
+      const storedUser = getStoredUser<User>();
+      return !(storedToken && storedUser);
+    }
+    return true;
+  });
   const [rememberedIdentifier, setRememberedIdentifier] = useState<string | null>(null);
 
   const router = useRouter();
@@ -160,14 +178,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isLoginPage = pathname === '/login';
 
     if (!user && !isLoginPage) {
-      router.replace('/login');
-      // Hard fallback if client-side router transition is blocked
-      const fallbackTimer = setTimeout(() => {
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.replace('/login');
-        }
-      }, 400);
-      return () => clearTimeout(fallbackTimer);
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login');
+      } else {
+        router.replace('/login');
+      }
+      return;
     }
 
     if (user && isLoginPage) {
