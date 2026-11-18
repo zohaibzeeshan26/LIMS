@@ -632,9 +632,7 @@ export default function TestingDocumentationRepositoryPage() {
                                         >
                                           {doc.title}
                                         </span>
-                                        <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
-                                          v{doc.version}.0
-                                        </span>
+                                        
                                       </div>
 
                                       <p
@@ -738,9 +736,7 @@ export default function TestingDocumentationRepositoryPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs sm:text-sm font-bold text-navy-950 truncate">{doc.title}</span>
-                            <span className="text-[10px] font-mono font-bold bg-teal-50 text-teal-800 px-1.5 py-0.2 rounded border border-teal-200">
-                              v{doc.version}.0
-                            </span>
+                            
                             <span
                               className={cn(
                                 'text-[10px] font-semibold px-2 py-0.5 rounded-md border',
@@ -824,9 +820,7 @@ export default function TestingDocumentationRepositoryPage() {
                       <span className="text-xs sm:text-sm font-bold truncate text-white">
                         {activeViewingDoc.title}
                       </span>
-                      <span className="text-[10px] font-mono font-bold bg-teal-500/20 text-teal-300 px-1.5 py-0.5 rounded border border-teal-500/30">
-                        v{activeViewingDoc.version}.0
-                      </span>
+                      
                     </div>
                     <p className="text-[11px] text-slate-300 truncate mt-0.5">
                       {activeViewingDoc.productBrandName} • {activeViewingDoc.fileName} •{' '}
@@ -886,4 +880,5 @@ export default function TestingDocumentationRepositoryPage() {
     </RoleRouteGuard>
   );
 }
+
 

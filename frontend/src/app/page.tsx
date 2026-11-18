@@ -202,7 +202,7 @@ export default function WelcomePortalPage() {
             ...card,
             title: 'Dashboard',
             description: 'Commercial formulation catalog, active dossiers, and testing synchronization.',
-            badgeText: 'STP Dossiers',
+            badgeText: undefined,
           };
         }
         return card;
@@ -215,7 +215,7 @@ export default function WelcomePortalPage() {
       {/* Top Portal Navigation Header */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-200/90">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-xl bg-[#0B1A30] p-1 flex items-center justify-center border border-slate-200 shadow-xs">
+          <div className="h-11 w-11 rounded-xl bg-white p-1 flex items-center justify-center border border-slate-200 shadow-xs">
             <img
               src="/city-pharma-logo.png"
               alt="Citi Pharma Logo"
@@ -298,9 +298,11 @@ export default function WelcomePortalPage() {
                     <IconComponent className="h-6 w-6 stroke-[2.2]" />
                   </div>
 
-                  <span className="text-[10px] font-bold text-slate-500 bg-white/80 px-2.5 py-1 rounded-full border border-slate-200/60 shadow-2xs">
-                    {card.badgeText}
-                  </span>
+                  {card.badgeText && (
+                    <span className="text-[10px] font-bold text-slate-500 bg-white/80 px-2.5 py-1 rounded-full border border-slate-200/60 shadow-2xs">
+                      {card.badgeText}
+                    </span>
+                  )}
                 </div>
 
                 {/* Card Title & Navigation Arrow */}

@@ -745,8 +745,8 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
           </button>
 
           {/* Center: Citi Pharma Logo + LIMS Branding */}
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#0B1A30] p-1 flex items-center justify-center border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0B1A30] shadow-xs">
+            <div className="h-8 w-8 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-2xs shrink-0">
               <img
                 src="/city-pharma-logo.png"
                 alt="Citi Pharma Logo"
@@ -754,7 +754,7 @@ View Details: ${origin}/samples?sampleId=${encodeURIComponent(activeSampleCode)}
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-slate-900 tracking-tight text-lg leading-none">Citi Pharma</span>
+              <span className="font-black text-white tracking-tight text-base leading-none">Citi Pharma</span>
               <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#0066FF] text-white shadow-2xs">
                 LIMS
               </span>

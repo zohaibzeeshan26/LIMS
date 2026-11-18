@@ -287,7 +287,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         {/* Brand Header — Dark Navy with Citi Pharma Logo + LIMS */}
         <div className="h-20 flex items-center justify-between px-4 border-b border-white/10 shrink-0 bg-[#0B1A30]">
           <Link href={isAdmin ? '/' : '/samples'} className="flex items-center gap-3 group">
-            <div className="relative h-11 w-11 shrink-0 rounded-xl bg-white/10 p-1 flex items-center justify-center border border-white/15 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+            <div className="relative h-11 w-11 shrink-0 rounded-xl bg-white p-1 flex items-center justify-center border border-white/20 shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
               <img
                 src="/city-pharma-logo.png"
                 alt="Citi Pharma Logo"

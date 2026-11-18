@@ -117,15 +117,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <Link href="/" className="flex items-center gap-2 group">
-                <div className="h-8 w-8 rounded-lg bg-[#0B1A30] p-1 flex items-center justify-center border border-slate-200 shadow-xs">
-                  <img
-                    src="/city-pharma-logo.png"
-                    alt="Citi Pharma Logo"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-black text-slate-900 tracking-tight text-sm">Citi Pharma</span>
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-[#0B1A30] border border-slate-800 shadow-xs group-hover:bg-[#071324] transition-colors">
+                  <div className="h-7 w-7 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-2xs shrink-0">
+                    <img
+                      src="/city-pharma-logo.png"
+                      alt="Citi Pharma Logo"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <span className="font-black text-white tracking-tight text-sm">Citi Pharma</span>
                   <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0066FF] text-white">
                     LIMS
                   </span>

@@ -197,9 +197,6 @@ export function PendingDocumentDeletionsCard({
                     <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
                       {doc.fileName}
                     </span>
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                      v{doc.version}.0
-                    </span>
                     <span className="text-[10px] text-slate-500 font-mono">
                       ({(doc.fileSize / 1024).toFixed(1)} KB)
                     </span>

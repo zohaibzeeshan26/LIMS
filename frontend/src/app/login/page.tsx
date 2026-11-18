@@ -404,22 +404,22 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => handleDirectLogin('doc.manager', 'doc123')}
-                disabled={isSubmitting}
-                className="p-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/80 text-teal-950 transition-colors text-left cursor-pointer disabled:opacity-50"
-              >
-                <div className="font-bold text-[11px] text-teal-900">3. Doc Manager</div>
-                <div className="text-[10px] text-teal-600 font-mono">doc.manager</div>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => handleDirectLogin('deputy.manager', 'deputy123')}
                 disabled={isSubmitting}
                 className="p-2 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100/80 text-purple-950 transition-colors text-left cursor-pointer disabled:opacity-50"
               >
-                <div className="font-bold text-[11px] text-purple-900">4. Deputy Manager</div>
+                <div className="font-bold text-[11px] text-purple-900">3. Deputy Manager</div>
                 <div className="text-[10px] text-purple-600 font-mono">deputy.manager</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDirectLogin('doc.manager', 'doc123')}
+                disabled={isSubmitting}
+                className="p-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/80 text-teal-950 transition-colors text-left cursor-pointer disabled:opacity-50"
+              >
+                <div className="font-bold text-[11px] text-teal-900">4. Doc Manager</div>
+                <div className="text-[10px] text-teal-600 font-mono">doc.manager</div>
               </button>
 
               <button

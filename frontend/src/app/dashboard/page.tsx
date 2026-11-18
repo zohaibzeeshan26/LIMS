@@ -13,11 +13,15 @@ import { NewSampleModal } from '@/components/samples/NewSampleModal';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { productService } from '@/services/product.service';
 import {
   formatLiveDate,
   formatShortLiveDate,
   formatLiveClock,
   getRecentDays,
+  getSampleIsoDate,
+  matchesDateFilter,
+  matchesDateRangeFilter,
 } from '@/lib/date';
 import {
   FlaskConical,
@@ -68,6 +72,7 @@ import { DocumentationManagerDashboard } from '@/components/dashboard/roles/Docu
 import { DeputyManagerDashboard } from '@/components/dashboard/roles/DeputyManagerDashboard';
 import { AnalystDashboard } from '@/components/dashboard/roles/AnalystDashboard';
 import { SampleRegistrationDashboard } from '@/components/dashboard/roles/SampleRegistrationDashboard';
+import { MonthYearSearchPicker } from '@/components/dashboard/MonthYearSearchPicker';
 
 function DashboardInner() {
   const router = useRouter();
@@ -98,18 +103,48 @@ function DashboardInner() {
   function renderRoleDashboard(roleKey: string) {
     // SECURITY GUARD: Non-superadmin users can NEVER view SuperAdminDashboard
     if (roleKey === 'SUPER_ADMIN' && !isSuperAdminOnly) {
-      return <AdminDashboard />;
+      return (
+        <AdminDashboard
+          dateFilter={selectedDateFilter}
+          onSelectDateFilter={setSelectedDateFilter}
+        />
+      );
     }
     switch (roleKey) {
       case 'SUPER_ADMIN':
-        return isSuperAdminOnly ? <SuperAdminDashboard /> : <AdminDashboard />;
+        return isSuperAdminOnly ? (
+          <SuperAdminDashboard
+            dateFilter={selectedDateFilter}
+            onSelectDateFilter={setSelectedDateFilter}
+          />
+        ) : (
+          <AdminDashboard
+            dateFilter={selectedDateFilter}
+            onSelectDateFilter={setSelectedDateFilter}
+          />
+        );
       case 'ADMIN':
       case 'HOD':
-        return <AdminDashboard />;
+        return (
+          <AdminDashboard
+            dateFilter={selectedDateFilter}
+            onSelectDateFilter={setSelectedDateFilter}
+          />
+        );
       case 'DOCUMENTATION_MANAGER':
-        return <DocumentationManagerDashboard />;
+        return (
+          <DocumentationManagerDashboard
+            dateFilter={selectedDateFilter}
+            onSelectDateFilter={setSelectedDateFilter}
+          />
+        );
       case 'DEPUTY_MANAGER':
-        return <DeputyManagerDashboard />;
+        return (
+          <DeputyManagerDashboard
+            dateFilter={selectedDateFilter}
+            onSelectDateFilter={setSelectedDateFilter}
+          />
+        );
       case 'LAB_TECHNICIAN':
         return <SampleRegistrationDashboard />;
       case 'ANALYST':
@@ -260,11 +295,9 @@ function DashboardInner() {
   // Live real-time clock state (updates every second)
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
-  const [selectedRangeKey, setSelectedRangeKey] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
-  const [activeDateRange, setActiveDateRange] = useState<string>('');
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>('ALL');
 
   useEffect(() => {
-    setActiveDateRange(formatLiveDate(new Date()));
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
@@ -329,6 +362,9 @@ function DashboardInner() {
   // Dynamically compute the last 7 calendar days leading to today
   const recentDays = useMemo(() => getRecentDays(7), [currentTime]);
 
+  // Whether active view is Documentation Hub
+  const isDocManager = effectiveRole === 'DOCUMENTATION_MANAGER';
+
   // Real sample records list from API
   const realSamplesList = useMemo(() => {
     if (!recentSamplesData) return [];
@@ -337,11 +373,193 @@ function DashboardInner() {
       : (recentSamplesData as any)?.data || [];
   }, [recentSamplesData]);
 
-  // Total samples count across all registries
+  // Real products with documents query (used for Documentation Hub date filtering)
+  const { data: productsData } = useQuery({
+    queryKey: ['dashboard-products-with-documents'],
+    queryFn: () => productService.getAll(),
+  });
+
+  const allProductDocs = useMemo(() => {
+    if (!productsData || !Array.isArray(productsData)) return [];
+    return productsData.flatMap((p: any) =>
+      (p.documents || []).map((d: any) => ({
+        ...d,
+        productBrandName: p.brandName,
+        productId: p.id,
+      }))
+    );
+  }, [productsData]);
+
+  // Document counts mapped by YYYY-MM (for Documentation Hub)
+  const docCountsRecord = useMemo(() => {
+    const rec: Record<string, number> = {};
+    for (const d of allProductDocs) {
+      const iso = getSampleIsoDate((d as any).createdAt);
+      if (iso) {
+        const ym = iso.slice(0, 7);
+        rec[ym] = (rec[ym] || 0) + 1;
+      }
+    }
+    return rec;
+  }, [allProductDocs]);
+
+  // Timeline dates with exact counts (for docs if doc manager, else for samples)
+  const activeTimelineDates = useMemo(() => {
+    const map = new Map<string, number>();
+    const items = isDocManager ? allProductDocs : realSamplesList;
+    for (const item of items) {
+      const rawDate = isDocManager
+        ? (item as any).createdAt
+        : (item as any).samplingDate || (item as any).createdAt || (item as any).sampledAt;
+      const iso = getSampleIsoDate(rawDate);
+      if (iso) {
+        map.set(iso, (map.get(iso) || 0) + 1);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([dateIso, count]) => {
+        let label = dateIso;
+        try {
+          const [y, m, d] = dateIso.split('-').map(Number);
+          const dt = new Date(y, m - 1, d);
+          label = dt.toLocaleDateString('en-GB', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+        } catch {}
+        return { dateIso, count, label };
+      })
+      .sort((a, b) => b.dateIso.localeCompare(a.dateIso));
+  }, [isDocManager, allProductDocs, realSamplesList]);
+
+  // Month-wise options for Documentation Hub
+  const docMonthOptions = useMemo(() => {
+    const monthCounts = new Map<string, number>();
+    for (const d of allProductDocs) {
+      const iso = getSampleIsoDate((d as any).createdAt);
+      if (iso) {
+        const ym = iso.slice(0, 7);
+        monthCounts.set(ym, (monthCounts.get(ym) || 0) + 1);
+      }
+    }
+    const monthsSet = new Set<string>();
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      monthsSet.add(`${yyyy}-${mm}`);
+    }
+    monthCounts.forEach((_, ym) => {
+      if (/^\d{4}-\d{2}$/.test(ym)) monthsSet.add(ym);
+    });
+    return Array.from(monthsSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((monthKey) => {
+        let label = monthKey;
+        try {
+          const [year, month] = monthKey.split('-').map(Number);
+          const date = new Date(year, month - 1, 1);
+          label = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        } catch {}
+        const count = monthCounts.get(monthKey) || 0;
+        return { monthKey, label, count };
+      });
+  }, [allProductDocs]);
+
+  // Standard professional presets (All, Today, Yesterday, Week, Month, Year)
+  const presetOptions = useMemo(() => {
+    const items = isDocManager ? allProductDocs : realSamplesList;
+    const getDate = (item: any) =>
+      isDocManager ? item.createdAt : item.samplingDate || item.createdAt || item.sampledAt;
+
+    const countFor = (key: string) => {
+      if (key === 'ALL') return items.length;
+      return items.filter((item: any) => matchesDateRangeFilter(getDate(item), key, currentTime)).length;
+    };
+
+    return [
+      { key: 'ALL', label: isDocManager ? 'All Documents' : 'All Samples', count: countFor('ALL') },
+      { key: 'TODAY', label: 'Today', count: countFor('TODAY') },
+      { key: 'YESTERDAY', label: 'Yesterday', count: countFor('YESTERDAY') },
+      { key: 'WEEK', label: 'This Week', count: countFor('WEEK') },
+      { key: 'MONTH', label: 'This Month', count: countFor('MONTH') },
+      { key: 'YEAR', label: 'This Year', count: countFor('YEAR') },
+    ];
+  }, [isDocManager, allProductDocs, realSamplesList, currentTime]);
+
+  // Filtered samples list for executive overview based on date filter
+  const dateFilteredSamplesList = useMemo(() => {
+    if (selectedDateFilter === 'ALL') return realSamplesList;
+    return realSamplesList.filter((s: any) =>
+      matchesDateRangeFilter(s.samplingDate || s.createdAt || s.sampledAt, selectedDateFilter, currentTime)
+    );
+  }, [realSamplesList, selectedDateFilter, currentTime]);
+
+  // Label displayed on the top date filter button
+  const activeDateDisplayLabel = useMemo(() => {
+    if (selectedDateFilter === 'ALL') {
+      return isDocManager
+        ? `All Months (${allProductDocs.length})`
+        : `All Samples (${realSamplesList.length})`;
+    }
+    if (/^\d{4}-\d{2}$/.test(selectedDateFilter)) {
+      try {
+        const [y, m] = selectedDateFilter.split('-').map(Number);
+        const dt = new Date(y, m - 1, 1);
+        const label = dt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        const c = allProductDocs.filter((d: any) =>
+          matchesDateRangeFilter((d as any).createdAt, selectedDateFilter, currentTime)
+        ).length;
+        return `${label} (${c})`;
+      } catch {}
+    }
+    if (selectedDateFilter === 'TODAY') {
+      const c = presetOptions.find((p) => p.key === 'TODAY')?.count || 0;
+      return `Today (${c})`;
+    }
+    if (selectedDateFilter === 'YESTERDAY') {
+      const c = presetOptions.find((p) => p.key === 'YESTERDAY')?.count || 0;
+      return `Yesterday (${c})`;
+    }
+    if (selectedDateFilter === 'WEEK') {
+      const c = presetOptions.find((p) => p.key === 'WEEK')?.count || 0;
+      return `This Week (${c})`;
+    }
+    if (selectedDateFilter === 'MONTH') {
+      const c = presetOptions.find((p) => p.key === 'MONTH')?.count || 0;
+      return `This Month (${c})`;
+    }
+    if (selectedDateFilter === 'YEAR') {
+      const c = presetOptions.find((p) => p.key === 'YEAR')?.count || 0;
+      return `This Year (${c})`;
+    }
+    const matched = activeTimelineDates.find((d) => d.dateIso === selectedDateFilter);
+    if (matched) {
+      return `${matched.label} (${matched.count})`;
+    }
+    try {
+      const [y, m, d] = selectedDateFilter.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch {
+      return selectedDateFilter;
+    }
+  }, [selectedDateFilter, isDocManager, allProductDocs, realSamplesList.length, presetOptions, activeTimelineDates, currentTime]);
+
+  // Total samples count across all registries (adapts to date filter)
   const totalSamplesCount = useMemo(() => {
+    if (selectedDateFilter !== 'ALL') return dateFilteredSamplesList.length;
     if (metrics?.total !== undefined) return metrics.total;
     return realSamplesList.length;
-  }, [metrics?.total, realSamplesList.length]);
+  }, [metrics?.total, realSamplesList.length, selectedDateFilter, dateFilteredSamplesList.length]);
 
   // 7-day grouped bar chart data dynamically computed from real database samples
   const weeklyOverviewData = useMemo(() => {
@@ -547,9 +765,16 @@ function DashboardInner() {
 
   // Real database Pending Samples Table data with Laboratory mapping & Analyst Work Isolation
   const pendingSamples = useMemo<DashboardPendingSample[]>(() => {
-    const realList = Array.isArray(recentSamplesData)
+    const rawList = Array.isArray(recentSamplesData)
       ? recentSamplesData
       : (recentSamplesData as any)?.data || [];
+
+    const realList =
+      selectedDateFilter === 'ALL'
+        ? rawList
+        : rawList.filter((s: any) =>
+            matchesDateFilter(s.samplingDate || s.createdAt || s.sampledAt, selectedDateFilter)
+          );
 
     // Map database samples
     const mappedRealSamples: DashboardPendingSample[] = realList.map((s: any): DashboardPendingSample => {
@@ -732,7 +957,7 @@ function DashboardInner() {
       const bPending = b.rawStatus !== 'APPROVED' && b.rawStatus !== 'COMPLETED' ? 1 : 0;
       return bPending - aPending;
     });
-  }, [recentSamplesData, storedTasks, isAnalyst, user, selectedAnalystFilter]);
+  }, [recentSamplesData, storedTasks, isAnalyst, user, selectedAnalystFilter, selectedDateFilter]);
 
   // Analyst-tailored workload metrics
   const analystMetrics = useMemo(() => {
@@ -955,69 +1180,224 @@ function DashboardInner() {
 
         {/* Filters & Actions */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Calendar Date Range Filter Selector (Executive Overview tab) */}
+          {/* Calendar Date Filter Selector (All Dates + Specific Dates) */}
           {activeTab === 'overview' && (
-            <div className="relative">
+            <div className="relative flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
-                className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-slate-200 shadow-xs text-xs sm:text-sm font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
-                title="Current Live System Date"
+                className={cn(
+                  'flex items-center gap-2 px-3.5 py-2 rounded-xl border shadow-xs text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+                  selectedDateFilter === 'ALL'
+                    ? 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
+                    : 'bg-blue-50 border-blue-300 text-blue-900 hover:bg-blue-100'
+                )}
+                title="Filter Dashboard Data by Date"
               >
                 <Calendar className="h-4 w-4 text-blue-600 shrink-0" />
-                <span>{activeDateRange || formatLiveDate(currentTime)}</span>
-                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                <span>{activeDateDisplayLabel}</span>
+                <ChevronDown
+                  className={cn(
+                    'h-3.5 w-3.5 text-slate-400 transition-transform duration-200',
+                    isDateMenuOpen && 'rotate-180'
+                  )}
+                />
               </button>
+
+              {/* Reset to All quick button if a specific date is active */}
+              {selectedDateFilter !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDateFilter('ALL')}
+                  className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                  title="Clear date filter and show all dates"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Show All</span>
+                </button>
+              )}
 
               {isDateMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setIsDateMenuOpen(false)} />
-                  <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white shadow-xl border border-slate-200 p-2 z-40 animate-in fade-in zoom-in-95">
-                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Calendar Range Options
+                  <div className="absolute right-0 mt-2 top-full w-96 rounded-2xl bg-white shadow-2xl border border-slate-200 p-3.5 z-40 animate-in fade-in zoom-in-95 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 px-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                        {isDocManager ? 'Document Upload Timeline' : 'Sample Intake Timeline'}
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold">
+                        {selectedDateFilter === 'ALL' ? 'All Records' : selectedDateFilter}
+                      </span>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedRangeKey('today');
-                        setActiveDateRange(formatLiveDate(currentTime));
-                        setIsDateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center justify-between"
-                    >
-                      <span>Today ({formatShortLiveDate(currentTime)})</span>
-                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-mono font-bold">Active Live</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedRangeKey('yesterday');
-                        const y = new Date(currentTime);
-                        y.setDate(y.getDate() - 1);
-                        setActiveDateRange(`Yesterday (${formatShortLiveDate(y)})`);
-                        setIsDateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
-                    >
-                      <span>Yesterday</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedRangeKey('week');
-                        setActiveDateRange('Last 7 Days');
-                        setIsDateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
-                    >
-                      <span>Last 7 Days</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedRangeKey('month');
-                        setActiveDateRange('This Month');
-                        setIsDateMenuOpen(false);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium hover:bg-slate-50 text-slate-700 flex items-center justify-between"
-                    >
-                      <span>This Month</span>
-                    </button>
+
+                    {/* 1. PROFESSIONAL TIMELINE PRESETS (All, Today, Yesterday, Week, Month, Year) */}
+                    <div className="space-y-1">
+                      <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Timeline Presets
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {presetOptions.map((opt) => {
+                          const isSelected = selectedDateFilter === opt.key;
+                          return (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDateFilter(opt.key);
+                                setIsDateMenuOpen(false);
+                              }}
+                              className={cn(
+                                'p-2 rounded-xl text-left border transition-all cursor-pointer',
+                                isSelected
+                                  ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                              )}
+                            >
+                              <div className="text-[11px] font-bold truncate">{opt.label}</div>
+                              <div
+                                className={cn(
+                                  'text-[10px] font-mono mt-0.5 font-semibold',
+                                  isSelected ? 'text-white/80' : 'text-slate-500'
+                                )}
+                              >
+                                {opt.count}{' '}
+                                {isDocManager
+                                  ? opt.count === 1
+                                    ? 'doc'
+                                    : 'docs'
+                                  : opt.count === 1
+                                  ? 'sample'
+                                  : 'samples'}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 2. DATES / MONTHS BREAKDOWN */}
+                    {isDocManager ? (
+                      <div className="space-y-1 pt-1 border-t border-slate-100">
+                        <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Upload History by Month (Mahana Records)
+                        </div>
+                        <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                          {docMonthOptions.map(({ monthKey, count, label }) => {
+                            const isSelected = selectedDateFilter === monthKey;
+                            return (
+                              <button
+                                key={monthKey}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDateFilter(monthKey);
+                                  setIsDateMenuOpen(false);
+                                }}
+                                className={cn(
+                                  'w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer',
+                                  isSelected
+                                    ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                    : 'hover:bg-slate-50 text-slate-700 border border-slate-100'
+                                )}
+                              >
+                                <div className="flex items-center gap-2 truncate pr-2">
+                                  <Calendar className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                                  <span className="truncate">{label}</span>
+                                </div>
+                                <span
+                                  className={cn(
+                                    'text-[10px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0',
+                                    isSelected
+                                      ? 'bg-white/20 text-white'
+                                      : count > 0
+                                      ? 'bg-teal-50 text-teal-800 border border-teal-200'
+                                      : 'bg-slate-100 text-slate-500'
+                                  )}
+                                >
+                                  {count} {count === 1 ? 'doc' : 'docs'}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      activeTimelineDates.length > 0 && (
+                        <div className="space-y-1 pt-1 border-t border-slate-100">
+                          <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Registration History by Date
+                          </div>
+                          <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                            {activeTimelineDates.map(({ dateIso, count, label }) => {
+                              const isSelected = selectedDateFilter === dateIso;
+                              return (
+                                <button
+                                  key={dateIso}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDateFilter(dateIso);
+                                    setIsDateMenuOpen(false);
+                                  }}
+                                  className={cn(
+                                    'w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer',
+                                    isSelected
+                                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                      : 'hover:bg-slate-50 text-slate-700 border border-slate-100'
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 truncate pr-2">
+                                    <Calendar className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                                    <span className="truncate">{label}</span>
+                                  </div>
+                                  <span
+                                    className={cn(
+                                      'text-[10px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0',
+                                      isSelected
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-slate-100 text-slate-700'
+                                    )}
+                                  >
+                                    {count} {count === 1 ? 'sample' : 'samples'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )
+                    )}
+
+                    {/* 3. CALENDAR DATE / MONTH PICKER */}
+                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                      <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        {isDocManager ? 'Pick Any Month & Year' : 'Pick Any Calendar Date'}
+                      </div>
+                      {isDocManager ? (
+                        <MonthYearSearchPicker
+                          value={selectedDateFilter}
+                          onChange={(val) => {
+                            setSelectedDateFilter(val);
+                            setIsDateMenuOpen(false);
+                          }}
+                          docCounts={docCountsRecord}
+                          placeholder="Search Month & Year (e.g. Nov 2026)..."
+                          className="w-full"
+                        />
+                      ) : (
+                        <input
+                          type="date"
+                          value={/^\d{4}-\d{2}-\d{2}$/.test(selectedDateFilter) ? selectedDateFilter : ''}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setSelectedDateFilter(e.target.value);
+                              setIsDateMenuOpen(false);
+                            }
+                          }}
+                          className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 text-slate-800 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+                        />
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -1057,8 +1437,8 @@ function DashboardInner() {
                 >
                   <option value="SUPER_ADMIN">1. Super Admin Dashboard</option>
                   <option value="ADMIN">2. HOD Dashboard</option>
-                  <option value="DOCUMENTATION_MANAGER">3. Documentation Manager</option>
-                  <option value="DEPUTY_MANAGER">4. Deputy Manager Dashboard</option>
+                  <option value="DEPUTY_MANAGER">3. Deputy Manager Dashboard</option>
+                  <option value="DOCUMENTATION_MANAGER">4. Documentation Manager</option>
                   <option value="LAB_TECHNICIAN">5. Sample Registration Analyst Terminal</option>
                   <option value="QC_ANALYST">6. Testing Analyst Execution Workstation</option>
                 </select>

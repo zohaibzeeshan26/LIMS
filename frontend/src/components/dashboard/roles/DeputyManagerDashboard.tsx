@@ -30,7 +30,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/Badge';
-import { formatDateTime } from '@/lib/date';
+import { formatDateTime, getSampleIsoDate, matchesDateFilter, matchesDateRangeFilter } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { getUserLabAccess, Sample } from '@/types/lims';
 import { Modal } from '@/components/ui/Modal';
@@ -40,10 +40,26 @@ import { auditService } from '@/services/audit.service';
 type LabKey = 'ALL' | 'GENERAL' | 'CEPHALOSPORIN' | 'PENICILLIN';
 type WorkflowTab = 'all' | 'in_progress' | 'unassigned';
 
-export function DeputyManagerDashboard() {
+export interface DeputyManagerDashboardProps {
+  dateFilter?: string;
+  onSelectDateFilter?: (date: string) => void;
+}
+
+export function DeputyManagerDashboard({
+  dateFilter,
+  onSelectDateFilter,
+}: DeputyManagerDashboardProps = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { analysts: allAnalysts } = useAllAnalysts();
+
+  // Date Filter Sync State (defaults to ALL if not specified)
+  const [internalDateFilter, setInternalDateFilter] = useState<string>('ALL');
+  const effectiveDateFilter = dateFilter !== undefined ? dateFilter : internalDateFilter;
+  const setEffectiveDateFilter = (newDate: string) => {
+    setInternalDateFilter(newDate);
+    onSelectDateFilter?.(newDate);
+  };
 
   // Filters
   const [selectedLab, setSelectedLab] = useState<LabKey>('ALL');
@@ -112,16 +128,67 @@ export function DeputyManagerDashboard() {
     return 'GENERAL';
   };
 
+  // Dynamically extract unique dates that have registered samples
+  const availableDates = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of allSamples) {
+      const iso = getSampleIsoDate(s.samplingDate || s.createdAt || s.sampledAt);
+      if (iso) {
+        map.set(iso, (map.get(iso) || 0) + 1);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([dateIso, count]) => {
+        let label = dateIso;
+        try {
+          const [y, m, d] = dateIso.split('-').map(Number);
+          const dt = new Date(y, m - 1, d);
+          label = dt.toLocaleDateString('en-GB', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          });
+        } catch {}
+        return { dateIso, count, label };
+      })
+      .sort((a, b) => b.dateIso.localeCompare(a.dateIso));
+  }, [allSamples]);
+
+  // Standard professional timeline presets with live sample counts
+  const presetOptions = useMemo(() => {
+    const getDate = (item: any) => item.samplingDate || item.createdAt || item.sampledAt;
+    const countFor = (key: string) => {
+      if (key === 'ALL') return allSamples.length;
+      return allSamples.filter((s: any) => matchesDateRangeFilter(getDate(s), key)).length;
+    };
+    return [
+      { key: 'ALL', label: 'All Samples', count: countFor('ALL') },
+      { key: 'TODAY', label: 'Today', count: countFor('TODAY') },
+      { key: 'YESTERDAY', label: 'Yesterday', count: countFor('YESTERDAY') },
+      { key: 'WEEK', label: 'This Week', count: countFor('WEEK') },
+      { key: 'MONTH', label: 'This Month', count: countFor('MONTH') },
+      { key: 'YEAR', label: 'This Year', count: countFor('YEAR') },
+    ];
+  }, [allSamples]);
+
+  // Filter all samples by effective date filter
+  const dateFilteredAllSamples = useMemo(() => {
+    if (!effectiveDateFilter || effectiveDateFilter === 'ALL') return allSamples;
+    return allSamples.filter((s: any) =>
+      matchesDateRangeFilter(s.samplingDate || s.createdAt || s.sampledAt, effectiveDateFilter)
+    );
+  }, [allSamples, effectiveDateFilter]);
+
   // Enforce Section / Lab Boundary for Deputy Manager (defaults to ALL)
   const labSamples = useMemo(() => {
-    return allSamples.filter((s: any) => {
+    return dateFilteredAllSamples.filter((s: any) => {
       const sampleLab = getSampleLabKey(s);
       if (authorizedLab === 'GENERAL') return sampleLab === 'GENERAL';
       if (authorizedLab === 'PENICILLIN') return sampleLab === 'PENICILLIN';
       if (authorizedLab === 'CEPHALOSPORIN') return sampleLab === 'CEPHALOSPORIN';
       return true;
     });
-  }, [allSamples, authorizedLab]);
+  }, [dateFilteredAllSamples, authorizedLab]);
 
   // Qualified analysts roster
   const qualifiedAnalysts = useMemo(() => {
@@ -454,95 +521,181 @@ export function DeputyManagerDashboard() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. LABORATORY SELECTION TABS                                              */}
+      {/* 3. LABORATORY SELECTION & DATE FILTER BAR                                 */}
       {/* ========================================================================= */}
-      <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3 overflow-x-auto">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs font-bold text-slate-500 mr-1 hidden sm:inline">Laboratory:</span>
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5">
+        {/* Row 1: Laboratory Scopes */}
+        <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1 border-b border-slate-100">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs font-bold text-slate-500 mr-1 hidden sm:inline">Laboratory:</span>
 
-          {/* All Labs */}
-          <button
-            type="button"
-            onClick={() => setSelectedLab('ALL')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-              selectedLab === 'ALL'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Activity className="h-3.5 w-3.5" />
-            <span>All Laboratories</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                selectedLab === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+            {/* All Labs */}
+            <button
+              type="button"
+              onClick={() => setSelectedLab('ALL')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                selectedLab === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              {labCounts.all}
-            </span>
-          </button>
+              <Activity className="h-3.5 w-3.5" />
+              <span>All Laboratories</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  selectedLab === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+                }`}
+              >
+                {labCounts.all}
+              </span>
+            </button>
 
-          {/* General Lab */}
-          <button
-            type="button"
-            onClick={() => setSelectedLab('GENERAL')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-              selectedLab === 'GENERAL'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <FlaskConical className="h-3.5 w-3.5" />
-            <span>General Lab</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                selectedLab === 'GENERAL' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+            {/* General Lab */}
+            <button
+              type="button"
+              onClick={() => setSelectedLab('GENERAL')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                selectedLab === 'GENERAL'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              {labCounts.general}
-            </span>
-          </button>
+              <FlaskConical className="h-3.5 w-3.5" />
+              <span>General Lab</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  selectedLab === 'GENERAL' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+                }`}
+              >
+                {labCounts.general}
+              </span>
+            </button>
 
-          {/* Cephalosporin Lab */}
-          <button
-            type="button"
-            onClick={() => setSelectedLab('CEPHALOSPORIN')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-              selectedLab === 'CEPHALOSPORIN'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <ShieldAlert className="h-3.5 w-3.5" />
-            <span>Cephalosporin Lab</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                selectedLab === 'CEPHALOSPORIN' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+            {/* Cephalosporin Lab */}
+            <button
+              type="button"
+              onClick={() => setSelectedLab('CEPHALOSPORIN')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                selectedLab === 'CEPHALOSPORIN'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              {labCounts.cephalosporin}
-            </span>
-          </button>
+              <ShieldAlert className="h-3.5 w-3.5" />
+              <span>Cephalosporin Lab</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  selectedLab === 'CEPHALOSPORIN' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+                }`}
+              >
+                {labCounts.cephalosporin}
+              </span>
+            </button>
 
-          {/* Penicillin Lab */}
-          <button
-            type="button"
-            onClick={() => setSelectedLab('PENICILLIN')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-              selectedLab === 'PENICILLIN'
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Microscope className="h-3.5 w-3.5" />
-            <span>Penicillin Lab</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                selectedLab === 'PENICILLIN' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
+            {/* Penicillin Lab */}
+            <button
+              type="button"
+              onClick={() => setSelectedLab('PENICILLIN')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                selectedLab === 'PENICILLIN'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              {labCounts.penicillin}
+              <Microscope className="h-3.5 w-3.5" />
+              <span>Penicillin Lab</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  selectedLab === 'PENICILLIN' ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-800'
+                }`}
+              >
+                {labCounts.penicillin}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: Date Filter Selection Pills */}
+        <div className="flex items-center justify-between gap-3 overflow-x-auto pt-0.5">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span>Timeline:</span>
             </span>
-          </button>
+
+            {/* Presets: All, Today, Yesterday, Week, Month, Year */}
+            {presetOptions.map((opt) => {
+              const isSelected = effectiveDateFilter === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setEffectiveDateFilter(opt.key)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer',
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200'
+                  )}
+                >
+                  <span>{opt.label}</span>
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono',
+                      isSelected ? 'bg-white/20 text-white' : 'bg-white text-slate-700 shadow-2xs'
+                    )}
+                  >
+                    {opt.count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Exact Registration Dates */}
+            {availableDates.map(({ dateIso, count, label }) => {
+              const isSelected = effectiveDateFilter === dateIso;
+              return (
+                <button
+                  key={dateIso}
+                  type="button"
+                  onClick={() => setEffectiveDateFilter(dateIso)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer',
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'text-blue-900 bg-blue-50 border border-blue-200 hover:bg-blue-100'
+                  )}
+                >
+                  <span>{label}</span>
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono',
+                      isSelected ? 'bg-white/20 text-white' : 'bg-white text-blue-800 shadow-2xs'
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {effectiveDateFilter !== 'ALL' && (
+            <div className="shrink-0 flex items-center gap-1.5">
+              <span className="text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
+                Active: <strong>{effectiveDateFilter}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setEffectiveDateFilter('ALL')}
+                className="text-xs font-bold text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-200 flex items-center gap-1 cursor-pointer transition-colors"
+                title="Reset to all dates"
+              >
+                <X className="w-3 h-3" />
+                <span>Show All</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -763,11 +916,23 @@ export function DeputyManagerDashboard() {
               {displayedSamples.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <div className="max-w-xs mx-auto space-y-2">
-                      <p className="font-semibold text-slate-600">No samples found matching criteria</p>
+                    <div className="max-w-sm mx-auto space-y-2">
+                      <p className="font-semibold text-slate-700">No samples found matching criteria</p>
                       <p className="text-xs text-slate-400">
-                        Try adjusting your laboratory filter, status filter, or search keywords.
+                        {effectiveDateFilter !== 'ALL'
+                          ? `No samples registered for ${effectiveDateFilter}. Click "Show All Dates" to view all section records.`
+                          : 'Try adjusting your laboratory filter, status filter, or search keywords.'}
                       </p>
+                      {effectiveDateFilter !== 'ALL' && (
+                        <button
+                          type="button"
+                          onClick={() => setEffectiveDateFilter('ALL')}
+                          className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>Show All Dates</span>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

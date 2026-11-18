@@ -704,9 +704,6 @@ export function ProductFolderViewerModal({
                       >
                         {activeViewingDoc.fileName}
                       </span>
-                      <span className="text-[10px] font-mono font-bold bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded">
-                        v{activeViewingDoc.version}.0
-                      </span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       {activeViewingDoc.title} • {(activeViewingDoc.fileSize / 1024).toFixed(1)} KB
@@ -864,9 +861,6 @@ export function ProductFolderViewerModal({
                             <h5 className="text-xs font-bold text-slate-900 truncate" title={doc.fileName}>
                               {doc.fileName}
                             </h5>
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                              v{doc.version}.0
-                            </span>
                           </div>
 
                           {doc.title && doc.title !== doc.fileName && (
@@ -1075,7 +1069,7 @@ export function ProductFolderViewerModal({
 
             <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1.5 leading-relaxed">
               <p className="font-semibold text-slate-900">
-                File: &ldquo;{requestDeleteDoc.fileName}&rdquo; (v{requestDeleteDoc.version}.0)
+                File: &ldquo;{requestDeleteDoc.fileName}&rdquo;
               </p>
               <p>
                 Documentation Manager cannot delete files directly. Once you submit this request, a notification will be dispatched to the <strong>Administrator</strong>.

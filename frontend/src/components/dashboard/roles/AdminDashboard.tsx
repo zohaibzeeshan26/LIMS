@@ -46,13 +46,18 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
-import { formatDateTime, formatRelativeTime } from '@/lib/date';
+import { formatDateTime, formatRelativeTime, matchesDateFilter } from '@/lib/date';
 import { formatAuditAction, formatAuditRole } from '@/lib/auditFormatter';
 import { cn } from '@/lib/utils';
 import { Sample, User, Role } from '@/types/lims';
 import { PendingDocumentDeletionsCard } from '@/components/dashboard/PendingDocumentDeletionsCard';
 
-export function AdminDashboard() {
+export interface AdminDashboardProps {
+  dateFilter?: string;
+  onSelectDateFilter?: (date: string) => void;
+}
+
+export function AdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: AdminDashboardProps = {}) {
   const { user } = useAuth();
 
   // Active Sub-Tab
@@ -96,10 +101,14 @@ export function AdminDashboard() {
   });
 
   const samples: Sample[] = useMemo(() => {
-    if (Array.isArray(samplesData)) return samplesData;
-    if (Array.isArray((samplesData as any)?.data)) return (samplesData as any).data;
-    return [];
-  }, [samplesData]);
+    let raw: Sample[] = [];
+    if (Array.isArray(samplesData)) raw = samplesData;
+    else if (Array.isArray((samplesData as any)?.data)) raw = (samplesData as any).data;
+    if (!dateFilter || dateFilter === 'ALL') return raw;
+    return raw.filter((s: any) =>
+      matchesDateFilter(s.samplingDate || s.createdAt || s.sampledAt, dateFilter)
+    );
+  }, [samplesData, dateFilter]);
 
   // 2. Fetch Users Directory (Requirement 1 & 7)
   const {

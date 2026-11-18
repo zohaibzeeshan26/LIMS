@@ -67,3 +67,76 @@ export function getRecentDays(count: number = 7) {
   }
   return days;
 }
+
+export function getSampleIsoDate(dateInput: string | Date | null | undefined): string | null {
+  if (!dateInput) return null;
+  try {
+    const date = typeof dateInput === "string" ? parseISO(dateInput) : dateInput;
+    if (isNaN(date.getTime())) return null;
+    return format(date, "yyyy-MM-dd");
+  } catch {
+    return null;
+  }
+}
+
+export function matchesDateFilter(dateInput: string | Date | null | undefined, filter: string | null | undefined): boolean {
+  return matchesDateRangeFilter(dateInput, filter);
+}
+
+export function matchesDateRangeFilter(
+  dateInput: string | Date | null | undefined,
+  filterKey: string | null | undefined,
+  referenceDate: Date = new Date()
+): boolean {
+  if (!filterKey || filterKey === 'ALL') return true;
+  if (!dateInput) return false;
+
+  const itemDate = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+  if (isNaN(itemDate.getTime())) return false;
+
+  const itemIso = getSampleIsoDate(itemDate);
+  if (!itemIso) return false;
+
+  // Exact calendar date string YYYY-MM-DD (e.g. 2026-11-16)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(filterKey)) {
+    return itemIso === filterKey;
+  }
+
+  // Month-wise filter string YYYY-MM (e.g. 2026-11)
+  if (/^\d{4}-\d{2}$/.test(filterKey)) {
+    return itemIso.startsWith(filterKey);
+  }
+
+  const todayIso = getSampleIsoDate(referenceDate);
+  const yesterday = new Date(referenceDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayIso = getSampleIsoDate(yesterday);
+
+  switch (filterKey.toUpperCase()) {
+    case 'TODAY':
+      return itemIso === todayIso;
+
+    case 'YESTERDAY':
+      return itemIso === yesterdayIso;
+
+    case 'WEEK': {
+      const diffDays = (referenceDate.getTime() - itemDate.getTime()) / (1000 * 60 * 60 * 24);
+      return diffDays >= -0.5 && diffDays <= 7.5;
+    }
+
+    case 'MONTH': {
+      return (
+        itemDate.getFullYear() === referenceDate.getFullYear() &&
+        itemDate.getMonth() === referenceDate.getMonth()
+      );
+    }
+
+    case 'YEAR': {
+      return itemDate.getFullYear() === referenceDate.getFullYear();
+    }
+
+    default:
+      return true;
+  }
+}
+

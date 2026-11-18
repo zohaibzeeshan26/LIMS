@@ -585,10 +585,14 @@ export class LaboratoriesService {
     const usersInLab = await prisma.user.findMany({
       where: {
         isActive: true,
+        role: { in: ['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST'] },
+        NOT: {
+          role: { in: ['ADMIN', 'SUPER_ADMIN', 'HOD', 'MANAGER', 'DEPUTY_MANAGER', 'QA_MANAGER', 'AUDITOR', 'DOCUMENTATION_MANAGER'] },
+        },
         OR: [
           { assignedSamples: { some: whereLab } },
           { assignedLab: { equals: labKey, mode: 'insensitive' } },
-          { role: { in: ['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST', 'ADMIN'] } },
+          { assignedLab: { in: ['ALL', 'all', '', null] } },
         ],
       },
       select: {

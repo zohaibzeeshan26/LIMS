@@ -540,7 +540,7 @@ function TaskAssignmentPageInner() {
     setSelectedPriorityVal(task.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT');
     setSelectedShiftVal(task.shift || 'Morning Shift (08:00 - 16:00)');
     setSelectedDueDateVal(task.dueDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
-    
+
     // Special Instructions should NEVER auto-fill on Assign click — always start blank for manual input
     setSelectedInstructionsVal('');
     setIsRowAssignModalOpen(true);
@@ -743,8 +743,8 @@ function TaskAssignmentPageInner() {
             isSampleCompleted || t.status === 'COMPLETED'
               ? 'COMPLETED'
               : isSampleInProgress || t.isAssignedByManager
-              ? 'IN_PROGRESS'
-              : t.status;
+                ? 'IN_PROGRESS'
+                : t.status;
 
           const shouldUpdate =
             t.laboratory !== sampleLab ||
@@ -798,8 +798,8 @@ function TaskAssignmentPageInner() {
             sampleLab === 'CEPHALOSPORIN'
               ? { name: 'Cephalosporin Lab Analyst', id: 'EMP-004' }
               : sampleLab === 'PENICILLIN'
-              ? { name: 'Penicillin Lab Analyst', id: 'EMP-005' }
-              : { name: 'Zubair Raza', id: 'EMP-003' };
+                ? { name: 'Penicillin Lab Analyst', id: 'EMP-005' }
+                : { name: 'Zubair Raza', id: 'EMP-003' };
 
           const defaultProtocol =
             sampleSec === 'semi-base'
@@ -828,17 +828,17 @@ function TaskAssignmentPageInner() {
                 : new Date().toISOString().split('T')[0],
               status:
                 s.status === 'COMPLETED' ||
-                s.status === 'REVIEW_PENDING' ||
-                s.status === 'APPROVED' ||
-                (Array.isArray(s.tests) && s.tests.length > 0 && s.tests.every((testItem: any) => testItem.status === 'COMPLETED' || testItem.status === 'VERIFIED'))
+                  s.status === 'REVIEW_PENDING' ||
+                  s.status === 'APPROVED' ||
+                  (Array.isArray(s.tests) && s.tests.length > 0 && s.tests.every((testItem: any) => testItem.status === 'COMPLETED' || testItem.status === 'VERIFIED'))
                   ? 'COMPLETED'
                   : s.status === 'TESTING' ||
                     s.status === 'IN_PROGRESS' ||
                     s.status === 'TESTING_IN_PROGRESS' ||
                     s.status === 'ASSIGNED_FOR_TESTING' ||
                     Boolean(s.assignedToId)
-                  ? 'IN_PROGRESS'
-                  : 'ASSIGNED',
+                    ? 'IN_PROGRESS'
+                    : 'ASSIGNED',
               isAssignedByManager:
                 s.status === 'COMPLETED' ||
                 s.status === 'REVIEW_PENDING' ||
@@ -905,7 +905,7 @@ function TaskAssignmentPageInner() {
             setTasks(normalized);
             return;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     };
     window.addEventListener('storage', handleSync);
@@ -1109,1035 +1109,875 @@ function TaskAssignmentPageInner() {
       moduleName="Sample Assignment & Task Board"
     >
       <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Link href="/" className="hover:text-blue-600 transition-colors font-semibold">
-            Portal
+        {/* Breadcrumb & Navigation */}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <Link href="/" className="hover:text-blue-600 transition-colors font-semibold">
+              Portal
+            </Link>
+            <span>/</span>
+            <span className="font-bold text-slate-800">{activeLabName} — Sample Assignment</span>
+            {activeSection !== 'all' && (
+              <>
+                <span>/</span>
+                <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                  {activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}
+                </span>
+              </>
+            )}
+          </div>
+
+          <Link
+            href="/"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+          >
+            <span>&larr; Back to Portal</span>
           </Link>
-          <span>/</span>
-          <span className="font-bold text-slate-800">{activeLabName} — Sample Assignment</span>
-          {activeSection !== 'all' && (
-            <>
-              <span>/</span>
-              <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                {activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}
-              </span>
-            </>
-          )}
         </div>
 
-        <Link
-          href="/"
-          className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
-        >
-          <span>&larr; Back to Portal</span>
-        </Link>
-      </div>
-
-      {/* 3-Laboratory Facility Selector Banner */}
-      <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
-        <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/70 px-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
-              Select Analytical Facility (3 Laboratories)
-            </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-              3 Units
-            </span>
-          </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            Switch facility to assign samples across labs
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {LAB_FACILITIES.map((facility) => {
-            const FacilityIcon = facility.icon;
-            const isFacilityActive = activeLabKey === facility.key;
-            const facilityTasksCount = tasks.filter(
-              (t) => normalizeLabKey(t.laboratory) === facility.key
-            ).length;
-            const facilityUrgentCount = tasks.filter(
-              (t) =>
-                normalizeLabKey(t.laboratory) === facility.key &&
-                (t.priority === 'URGENT' || (t.priority as any) === 'STAT')
-            ).length;
-
-            return (
-              <button
-                key={facility.id}
-                type="button"
-                onClick={() => selectLab(facility.id as any)}
-                className={cn(
-                  'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
-                  isFacilityActive
-                    ? `${facility.activeBg} ${facility.activeBorder}`
-                    : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={cn(
-                      'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
-                      isFacilityActive
-                        ? facility.iconBgActive
-                        : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
-                    )}
-                  >
-                    <FacilityIcon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-bold tracking-tight text-slate-900">
-                        {facility.name}
-                      </h4>
-                      <span
-                        className={cn(
-                          'text-[11px] font-bold px-2 py-0.5 rounded-full border',
-                          isFacilityActive
-                            ? facility.badgeActive
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        )}
-                      >
-                        {facilityTasksCount} Tasks
-                      </span>
-                      {facilityUrgentCount > 0 && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
-                          <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                          <span>{facilityUrgentCount} Urgent</span>
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-400 font-medium mt-0.5">
-                      {isFacilityActive ? 'Currently active assignment board' : 'Click to manage sample allocation'}
-                    </div>
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  {isFacilityActive ? (
-                    <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Active Laboratory Header Banner (Strict Laboratory Isolation) */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/20">
-            <UserCheck className="h-5 w-5 sm:h-6 sm:w-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Analytical Laboratory
+        {/* 3-Laboratory Facility Selector Banner */}
+        <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200/70 px-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Select Analytical Facility (3 Laboratories)
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                Active Facility
+                3 Units
               </span>
-              {activeSection !== 'all' && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {activeSection === 'semi-base' ? 'Semi Basics Section' : 'Formulation Section'}
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              Switch facility to assign samples across labs
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {LAB_FACILITIES.map((facility) => {
+              const FacilityIcon = facility.icon;
+              const isFacilityActive = activeLabKey === facility.key;
+              const facilityTasksCount = tasks.filter(
+                (t) => normalizeLabKey(t.laboratory) === facility.key
+              ).length;
+              const facilityUrgentCount = tasks.filter(
+                (t) =>
+                  normalizeLabKey(t.laboratory) === facility.key &&
+                  (t.priority === 'URGENT' || (t.priority as any) === 'STAT')
+              ).length;
+
+              return (
+                <button
+                  key={facility.id}
+                  type="button"
+                  onClick={() => selectLab(facility.id as any)}
+                  className={cn(
+                    'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+                    isFacilityActive
+                      ? `${facility.activeBg} ${facility.activeBorder}`
+                      : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                        isFacilityActive
+                          ? facility.iconBgActive
+                          : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                      )}
+                    >
+                      <FacilityIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                          {facility.name}
+                        </h4>
+                        <span
+                          className={cn(
+                            'text-[11px] font-bold px-2 py-0.5 rounded-full border',
+                            isFacilityActive
+                              ? facility.badgeActive
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          )}
+                        >
+                          {facilityTasksCount} Tasks
+                        </span>
+                        {facilityUrgentCount > 0 && (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                            <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                            <span>{facilityUrgentCount} Urgent</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-medium mt-0.5">
+                        {isFacilityActive ? 'Currently active assignment board' : 'Click to manage sample allocation'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    {isFacilityActive ? (
+                      <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Active Laboratory Header Banner (Strict Laboratory Isolation) */}
+        <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/20">
+              <UserCheck className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Analytical Laboratory
                 </span>
-              )}
-            </div>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
-              {activeLabName} — Task Allocation
-            </h2>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200/80 shadow-2xs">
-            {stats.total} Tasks Active
-          </span>
-        </div>
-      </div>
-
-      {/* Sub-Section Options under Laboratory: All Tasks, Semi Basics, and Formulation */}
-      <div className="bg-slate-50/90 p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Option 1: All Laboratory Tasks */}
-          <button
-            type="button"
-            onClick={() => selectSection('all')}
-            className={cn(
-              'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
-              activeSection === 'all'
-                ? 'bg-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/20'
-                : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
-                  activeSection === 'all'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
-                )}
-              >
-                <FlaskConical className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-sm font-bold tracking-tight text-slate-900">
-                    All {activeLabName}
-                  </h4>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    {allLabCount} Tasks
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  Active Facility
+                </span>
+                {activeSection !== 'all' && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {activeSection === 'semi-base' ? 'Semi Basics Section' : 'Formulation Section'}
                   </span>
-                  {urgentTasksCount > 0 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
-                      <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                      <span>{urgentTasksCount} Urgent</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="shrink-0">
-              {activeSection === 'all' ? (
-                <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-              ) : (
-                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-              )}
-            </div>
-          </button>
-
-          {/* Option 2: Semi Basics */}
-          <button
-            type="button"
-            onClick={() => selectSection('semi-base')}
-            className={cn(
-              'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
-              activeSection === 'semi-base'
-                ? 'bg-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/20'
-                : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
-                  activeSection === 'semi-base'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
                 )}
-              >
-                <Layers className="h-5 w-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-sm font-bold tracking-tight text-slate-900">
-                    Semi Basics
-                  </h4>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    {semiBaseCount} Tasks
-                  </span>
-                  {semiBaseUrgentCount > 0 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
-                      <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                      <span>{semiBaseUrgentCount} Urgent</span>
-                    </span>
-                  )}
-                </div>
-              </div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
+                {activeLabName} — Task Allocation
+              </h2>
             </div>
-            <div className="shrink-0">
-              {activeSection === 'semi-base' ? (
-                <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-              ) : (
-                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-              )}
-            </div>
-          </button>
-
-          {/* Option 3: Formulation */}
-          <button
-            type="button"
-            onClick={() => selectSection('formulation')}
-            className={cn(
-              'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
-              activeSection === 'formulation'
-                ? 'bg-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/20'
-                : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
-                  activeSection === 'formulation'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
-                )}
-              >
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-sm font-bold tracking-tight text-slate-900">
-                    Formulation
-                  </h4>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {formulationCount} Tasks
-                  </span>
-                  {formulationUrgentCount > 0 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
-                      <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                      <span>{formulationUrgentCount} Urgent</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="shrink-0">
-              {activeSection === 'formulation' ? (
-                <CheckCircle2 className="h-5 w-5 text-indigo-600" />
-              ) : (
-                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
-              )}
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Page Header Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#f5f3ff] via-[#ede9fe] to-[#f8f7ff] border border-indigo-100 p-6 sm:p-7 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
-            <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700">
-              QC Laboratory Workload & Allocation
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200/80 shadow-2xs">
+              {stats.total} Tasks Active
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Task Assignment Gateway
-          </h1>
         </div>
 
-        {isHOD && (
-          <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs shrink-0 self-start md:self-auto">
-            <Lock className="w-3.5 h-3.5 text-amber-600" />
-            <span>HOD Read-Only Mode &bull; Assignment Restricted</span>
-          </div>
-        )}
-      </div>
-
-      {/* KPI Cards Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Tasks */}
-        <div className="p-4 rounded-xl border border-indigo-100 bg-white shadow-2xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
-            <span>Total Tasks</span>
-            <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-              <UserCheck className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="text-2xl font-black text-slate-900">{stats.total}</div>
-        </div>
-
-        {/* Card 2: Queued & Pending */}
-        <div className="p-4 rounded-xl border border-amber-100 bg-white shadow-2xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
-            <span>Pending Start</span>
-            <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <Clock className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="text-2xl font-black text-amber-700">{stats.assigned}</div>
-        </div>
-
-        {/* Card 3: In Progress */}
-        <div className="p-4 rounded-xl border border-blue-100 bg-white shadow-2xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
-            <span>In Testing</span>
-            <span className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-              <FlaskConical className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="text-2xl font-black text-blue-700">{stats.inProgress}</div>
-        </div>
-
-        {/* Card 4: Urgent Priority */}
-        <div className="p-4 rounded-xl border border-amber-100 bg-white shadow-2xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
-            <span>Urgent (48h SLA)</span>
-            <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <AlertTriangle className="h-4 w-4" />
-            </span>
-          </div>
-          <div className="text-2xl font-black text-amber-700">{stats.urgentCount}</div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[240px]">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-            <Search className="h-4 w-4" />
-          </div>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
-          />
-        </div>
-
-        {/* Filter Dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Active Lab Badge */}
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold shadow-2xs">
-            <FlaskConical className="h-3.5 w-3.5 text-indigo-600" />
-            <span>{activeLabName}</span>
-          </div>
-
-          {/* Priority Filter */}
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-medium focus:outline-none focus:border-indigo-500"
-          >
-            <option value="ALL">All Priorities</option>
-            <option value="URGENT">Urgent (48h)</option>
-            <option value="ROUTINE">Routine (5d)</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-medium focus:outline-none focus:border-indigo-500"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="ASSIGNED">Assigned</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
-
-          {(searchTerm || selectedPriority !== 'ALL' || selectedStatus !== 'ALL') && (
+        {/* Sub-Section Options under Laboratory: All Tasks, Semi Basics, and Formulation */}
+        <div className="bg-slate-50/90 p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Option 1: All Laboratory Tasks */}
             <button
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedPriority('ALL');
-                setSelectedStatus('ALL');
-              }}
-              className="text-xs px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl font-semibold transition-colors"
+              type="button"
+              onClick={() => selectSection('all')}
+              className={cn(
+                'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+                activeSection === 'all'
+                  ? 'bg-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/20'
+                  : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              )}
             >
-              Reset
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                    activeSection === 'all'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                  )}
+                >
+                  <FlaskConical className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                      All {activeLabName}
+                    </h4>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {allLabCount} Tasks
+                    </span>
+                    {urgentTasksCount > 0 && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                        <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                        <span>{urgentTasksCount} Urgent</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="shrink-0">
+                {activeSection === 'all' ? (
+                  <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                )}
+              </div>
             </button>
+
+            {/* Option 2: Semi Basics */}
+            <button
+              type="button"
+              onClick={() => selectSection('semi-base')}
+              className={cn(
+                'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+                activeSection === 'semi-base'
+                  ? 'bg-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/20'
+                  : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                    activeSection === 'semi-base'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                  )}
+                >
+                  <Layers className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                      Semi Basics
+                    </h4>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {semiBaseCount} Tasks
+                    </span>
+                    {semiBaseUrgentCount > 0 && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                        <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                        <span>{semiBaseUrgentCount} Urgent</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="shrink-0">
+                {activeSection === 'semi-base' ? (
+                  <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                )}
+              </div>
+            </button>
+
+            {/* Option 3: Formulation */}
+            <button
+              type="button"
+              onClick={() => selectSection('formulation')}
+              className={cn(
+                'relative group flex items-center justify-between p-3.5 rounded-xl text-left transition-all duration-200 border cursor-pointer',
+                activeSection === 'formulation'
+                  ? 'bg-white border-indigo-400 shadow-sm ring-1 ring-indigo-400/20'
+                  : 'bg-white/70 hover:bg-white border-slate-200 hover:border-slate-300 shadow-2xs'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs',
+                    activeSection === 'formulation'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                  )}
+                >
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold tracking-tight text-slate-900">
+                      Formulation
+                    </h4>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {formulationCount} Tasks
+                    </span>
+                    {formulationUrgentCount > 0 && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs flex items-center gap-1 animate-pulse">
+                        <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
+                        <span>{formulationUrgentCount} Urgent</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="shrink-0">
+                {activeSection === 'formulation' ? (
+                  <CheckCircle2 className="h-5 w-5 text-indigo-600" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
+                )}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Page Header Banner */}
+        <div className="rounded-2xl bg-gradient-to-r from-[#f5f3ff] via-[#ede9fe] to-[#f8f7ff] border border-indigo-100 p-6 sm:p-7 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-700">
+                QC Laboratory Workload & Allocation
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Task Assignment Gateway
+            </h1>
+          </div>
+
+          {isHOD && (
+            <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs shrink-0 self-start md:self-auto">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>HOD Read-Only Mode &bull; Assignment Restricted</span>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Tasks Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-900">
-              Task Allocation Registry — {activeSection === 'all' ? 'All Tasks' : activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}
-            </h2>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-              {filteredTasks.length} {filteredTasks.length === 1 ? 'Task' : 'Tasks'}
-            </span>
+        {/* KPI Cards Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Total Tasks */}
+          <div className="p-4 rounded-xl border border-indigo-100 bg-white shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+              <span>Total Tasks</span>
+              <span className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                <UserCheck className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="text-2xl font-black text-slate-900">{stats.total}</div>
+          </div>
+
+          {/* Card 2: Queued & Pending */}
+          <div className="p-4 rounded-xl border border-amber-100 bg-white shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+              <span>Pending Start</span>
+              <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <Clock className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="text-2xl font-black text-amber-700">{stats.assigned}</div>
+          </div>
+
+          {/* Card 3: In Progress */}
+          <div className="p-4 rounded-xl border border-blue-100 bg-white shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+              <span>In Testing</span>
+              <span className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                <FlaskConical className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="text-2xl font-black text-blue-700">{stats.inProgress}</div>
+          </div>
+
+          {/* Card 4: Urgent Priority */}
+          <div className="p-4 rounded-xl border border-amber-100 bg-white shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+              <span>Urgent (48h SLA)</span>
+              <span className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="text-2xl font-black text-amber-700">{stats.urgentCount}</div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 whitespace-nowrap">
-                <th className="py-3 px-3.5">Task ID</th>
-                <th className="py-3 px-3.5">A. No.</th>
-                <th className="py-3 px-3.5">Date & Time</th>
-                <th className="py-3 px-3.5 min-w-[200px]">Product Title</th>
-                <th className="py-3 px-3.5">Sample ID</th>
-                <th className="py-3 px-3.5">Stage / Type</th>
-                <th className="py-3 px-3.5">Qty. of Sample</th>
-                <th className="py-3 px-3.5">Batch No. / Lot No.</th>
-                <th className="py-3 px-3.5">MFG Date</th>
-                <th className="py-3 px-3.5">EXP Date</th>
-                <th className="py-3 px-3.5">Submitted By</th>
-                <th className="py-3 px-3.5">Received By</th>
-                <th className="py-3 px-3.5">Assigned Analyst</th>
-                <th className="py-3 px-3.5">Testing Protocol</th>
-                <th className="py-3 px-3.5">Priority</th>
-                <th className="py-3 px-3.5">Due / Shift</th>
-                <th className="py-3 px-3.5">Task Status</th>
-                <th className="py-3 px-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredTasks.length === 0 ? (
-                <tr>
-                  <td colSpan={18} className="py-12 text-center text-slate-400">
-                    <div className="h-10 w-10 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
-                      <UserCheck className="h-5 w-5" />
-                    </div>
-                    <p className="font-semibold text-slate-600 text-xs">No assigned tasks found.</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Use the &ldquo;Assign&rdquo; button in the table to allocate testing work.</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredTasks.map((t) => {
-                  const isUrgent = t.priority === 'URGENT' || (t.priority as any) === 'STAT';
-                  const taskSec = getTaskSection(t);
-
-                  const matchedSample = availableSamples.find((s: any) => {
-                    const sCode = (s.sampleCode || s.accessionNo || s.sampleId || s.id || '').toString().toUpperCase();
-                    const tCode = (t.sampleId || '').toString().toUpperCase();
-                    return (
-                      sCode === tCode ||
-                      (s.accessionNo && s.accessionNo.toUpperCase() === tCode) ||
-                      (s.sampleCode && s.sampleCode.toUpperCase() === tCode)
-                    );
-                  });
-
-                  const aNo = matchedSample?.accessionNo || t.accessionNo || 'A-0001';
-                  const samplingDateVal = matchedSample?.samplingDate || t.samplingDate || t.assignedDate;
-                  const samplingDateFormatted = formatDateTime(samplingDateVal, 'dd/MM/yyyy HH:mm');
-                  const nomenclature = matchedSample?.nomenclature || matchedSample?.materialName || t.sampleName;
-                  const sampleIdCode = matchedSample?.sampleCode || matchedSample?.sampleId || t.sampleId;
-                  const stageType = (
-                    matchedSample?.stageType ||
-                    matchedSample?.sampleType ||
-                    t.stageType ||
-                    (taskSec === 'semi-base' ? 'Raw Material' : 'Finished Product')
-                  ).replace(/^\[(Semi Basics?|Semi Base|Formulation)\]\s*/i, '');
-                  const sampleQtyText = `${matchedSample?.sampleQty || matchedSample?.quantity || t.sampleQty || 100} ${matchedSample?.unit || matchedSample?.quantityUnit || t.unit || 'units'}`;
-                  const batchLotText = matchedSample?.lotNumber || matchedSample?.batchLotNumber || matchedSample?.batch?.batchNumber || t.lotNumber || 'BTH-2026-091';
-                  const mfgFormatted = matchedSample?.mfgDate
-                    ? formatDateTime(matchedSample.mfgDate, 'dd/MM/yyyy')
-                    : matchedSample?.batch?.manufacturingDate
-                    ? formatDateTime(matchedSample.batch.manufacturingDate, 'dd/MM/yyyy')
-                    : t.mfgDate
-                    ? formatDateTime(t.mfgDate, 'dd/MM/yyyy')
-                    : '10/2026';
-                  const expFormatted = matchedSample?.expDate
-                    ? formatDateTime(matchedSample.expDate, 'dd/MM/yyyy')
-                    : matchedSample?.batch?.expiryDate
-                    ? formatDateTime(matchedSample.batch.expiryDate, 'dd/MM/yyyy')
-                    : t.expDate
-                    ? formatDateTime(t.expDate, 'dd/MM/yyyy')
-                    : '10/2028';
-                  const submittedText = matchedSample?.submittedBy || matchedSample?.submittedByUser?.fullName || t.submittedBy || 'Plant Production';
-                  const receivedText = matchedSample?.accessionedBy?.fullName || matchedSample?.receivedByUser?.fullName || t.receivedBy || 'QC Intake Officer';
-
-                  return (
-                    <tr key={t.id} className="hover:bg-slate-50/70 transition-colors">
-                      {/* 1. Task ID */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="font-mono font-bold text-indigo-600">{t.taskCode}</span>
-                        <div className="text-[10px] text-slate-400">Assigned: {t.assignedDate}</div>
-                      </td>
-
-                      {/* 2. A. No. */}
-                      <td className="py-3 px-3.5 font-mono font-bold text-navy-950 text-xs whitespace-nowrap">
-                        {aNo}
-                      </td>
-
-                      {/* 3. Date & Time */}
-                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                        {samplingDateFormatted}
-                      </td>
-
-                      {/* 4. Nomenclature */}
-                      <td className="py-3 px-3.5 min-w-[200px] max-w-xs">
-                        <div className="font-semibold text-slate-900 line-clamp-1">{nomenclature}</div>
-                      </td>
-
-                      {/* 5. Sample ID */}
-                      <td className="py-3 px-3.5 font-mono font-bold text-teal-800 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span>{sampleIdCode}</span>
-                          {isUrgent && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
-                              Urgent
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* 6. Stage / Type */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 inline-block">
-                          {stageType}
-                        </span>
-                      </td>
-
-                      {/* 7. Qty. of Sample */}
-                      <td className="py-3 px-3.5 font-mono text-slate-700 whitespace-nowrap">
-                        {sampleQtyText}
-                      </td>
-
-                      {/* 8. Batch No. / Lot No. */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/70 inline-block">
-                          {batchLotText}
-                        </span>
-                      </td>
-
-                      {/* 9. MFG Date */}
-                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                        {mfgFormatted}
-                      </td>
-
-                      {/* 10. EXP Date */}
-                      <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
-                        {expFormatted}
-                      </td>
-
-                      {/* 11. Submitted By */}
-                      <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[150px] truncate" title={submittedText}>
-                        {submittedText}
-                      </td>
-
-                      {/* 12. Received By */}
-                      <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[150px] truncate" title={receivedText}>
-                        {receivedText}
-                      </td>
-
-                      {/* 13. Assigned Analyst */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
-                            {t.assignedAnalystName.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-slate-800 text-xs">{t.assignedAnalystName}</div>
-                            <div className="text-[10px] text-slate-400">{t.assignedAnalystId}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 14. Testing Protocol */}
-                      <td className="py-3 px-3.5 min-w-[180px]">
-                        <span className="text-slate-700 font-medium text-xs line-clamp-1">{t.testProtocol}</span>
-                      </td>
-
-                      {/* 15. Priority */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        {isUrgent ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
-                            URGENT
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                            ROUTINE
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 16. Due / Shift */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        <div className="font-medium text-slate-700 text-xs">{t.dueDate}</div>
-                        <div className="text-[10px] text-slate-400 truncate max-w-[120px]">{t.shift}</div>
-                      </td>
-
-                      {/* 17. Task Status (Automated Life-Cycle: Pending Start -> In Progress -> Completed) */}
-                      <td className="py-3 px-3.5 whitespace-nowrap">
-                        {t.status === 'COMPLETED' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            <span>Completed</span>
-                          </span>
-                        ) : (t.status === 'IN_PROGRESS' || t.isAssignedByManager) ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                            <span>In Progress</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                            <span>Pending Start</span>
-                          </span>
-                        )}
-                      </td>
-
-                      {/* 18. Action */}
-                      <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {canAssign && (
-                            (t.isAssignedByManager || t.status === 'IN_PROGRESS' || t.status === 'COMPLETED') ? (
-                              <button
-                                type="button"
-                                onClick={() => openRowAssignModal(t)}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                                title={`Assigned to ${t.assignedAnalystName}. Click to modify or re-assign.`}
-                              >
-                                <CheckCircle2 className="h-3 w-3" />
-                                <span>Assigned</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openRowAssignModal(t)}
-                                className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                                title="Assign this sample to a testing analyst"
-                              >
-                                <UserCheck className="h-3 w-3" />
-                                <span>Assign</span>
-                              </button>
-                            )
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setActiveTaskDetails(t)}
-                            className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 text-[11px] font-semibold transition-colors cursor-pointer"
-                          >
-                            Details
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ================= MODAL: ASSIGN NEW TASK ================= */}
-      <Modal
-        isOpen={isNewTaskModalOpen}
-        onClose={() => setIsNewTaskModalOpen(false)}
-        title="Assign New Analytical Task"
-        subtitle="Allocate a testing protocol or worksheet to an analytical chemist"
-        maxWidth="xl"
-      >
-        <form onSubmit={handleCreateTask} className="space-y-4">
-          {/* Sample Identification */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Sample Accession ID *
-              </label>
-              {labSpecificSamples.length > 0 ? (
-                <select
-                  value={newSampleId}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setNewSampleId(id);
-                    const match = labSpecificSamples.find(
-                      (s: any) =>
-                        s.accessionNo === id ||
-                        s.sampleCode === id ||
-                        s.sampleId === id ||
-                        s.id === id
-                    );
-                    if (match) {
-                      const name =
-                        match.nomenclature ||
-                        match.materialName ||
-                        match.drugName ||
-                        match.productName ||
-                        match.sampleName ||
-                        '';
-                      setNewSampleName(name);
-                      setNewSection(getSampleSection(match));
-                      if (match.priority) {
-                        setNewPriority(
-                          match.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT'
-                        );
-                      }
-                    }
-                  }}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  required
-                >
-                  <option value="">Select Sample from {activeLabName}...</option>
-                  {labSpecificSamples.map((s: any) => {
-                    const code = s.sampleCode || s.accessionNo || s.sampleId || s.id;
-                    const name =
-                      s.nomenclature || s.materialName || s.sampleName || 'Sample Record';
-                    const sec =
-                      getSampleSection(s) === 'semi-base' ? 'Semi Basics' : 'Formulation';
-                    return (
-                      <option key={s.id || code} value={code}>
-                        {code} — {name} [{sec}]
-                      </option>
-                    );
-                  })}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={newSampleId}
-                  onChange={(e) => setNewSampleId(e.target.value)}
-                  placeholder="e.g. GL/SB-12"
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-                  required
-                />
-              )}
+        {/* Filter and Search Bar */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[240px]">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Search className="h-4 w-4" />
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Drug / Material Nomenclature *
-              </label>
-              <input
-                type="text"
-                value={newSampleName}
-                onChange={(e) => setNewSampleName(e.target.value)}
-                placeholder="e.g. Amoxicillin 500mg Oral Suspension"
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Section Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Laboratory Section / Classification *
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setNewSection('semi-base')}
-                className={cn(
-                  'px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all cursor-pointer',
-                  newSection === 'semi-base'
-                    ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-2xs font-bold'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                )}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span>Semi Basics</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewSection('formulation')}
-                className={cn(
-                  'px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all cursor-pointer',
-                  newSection === 'formulation'
-                    ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-2xs font-bold'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                )}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Formulation</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Laboratory & Assignee */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Analytical Laboratory *
-              </label>
-              <select
-                value={newLab}
-                onChange={(e) => setNewLab(e.target.value as any)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-              >
-                <option value="GENERAL">General Lab (GL)</option>
-                <option value="CEPHALOSPORIN">Cephalosporin Lab (CEPH)</option>
-                <option value="PENICILLIN">Penicillin Lab (PEN)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Assignee Analyst *
-              </label>
-              <select
-                value={newAnalystId}
-                onChange={(e) => setNewAnalystId(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-              >
-                {allPersonnelList.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.username ? `@${a.username}` : a.id} — {a.name} ({a.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Priority Level *
-            </label>
-            <select
-              value={newPriority}
-              onChange={(e) => setNewPriority(e.target.value as any)}
-              className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-            >
-              <option value="URGENT">URGENT (48h Standard)</option>
-              <option value="ROUTINE">ROUTINE (5-Day Turnaround)</option>
-            </select>
-          </div>
-
-          {/* Shift & Due Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Allocated Shift
-              </label>
-              <select
-                value={newShift}
-                onChange={(e) => setNewShift(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-              >
-                <option value="Morning Shift (08:00 - 16:00)">Morning Shift (08:00 - 16:00)</option>
-                <option value="Evening Shift (16:00 - 00:00)">Evening Shift (16:00 - 00:00)</option>
-                <option value="Night Shift (00:00 - 08:00)">Night Shift (00:00 - 08:00)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Target Completion Due Date *
-              </label>
-              <input
-                type="date"
-                value={newDueDate}
-                onChange={(e) => setNewDueDate(e.target.value)}
-                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Instructions */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Analytical Instructions & Reference
-            </label>
-            <textarea
-              rows={2}
-              value={newInstructions}
-              onChange={(e) => setNewInstructions(e.target.value)}
-              className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800"
             />
           </div>
 
-          {/* Form Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setIsNewTaskModalOpen(false)}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>Assign & Notify Analyst</span>
-            </button>
-          </div>
-        </form>
-      </Modal>
+          {/* Filter Dropdowns */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Active Lab Badge */}
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold shadow-2xs">
+              <FlaskConical className="h-3.5 w-3.5 text-indigo-600" />
+              <span>{activeLabName}</span>
+            </div>
 
-      {/* ================= MODAL: DIRECT ROW SAMPLE ASSIGNMENT ================= */}
-      {isRowAssignModalOpen && targetSampleTask && (
+            {/* Priority Filter */}
+            <select
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
+              className="text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-medium focus:outline-none focus:border-indigo-500"
+            >
+              <option value="ALL">All Priorities</option>
+              <option value="URGENT">Urgent (48h)</option>
+              <option value="ROUTINE">Routine (5d)</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="text-xs px-3 py-2 border border-slate-200 rounded-xl bg-white text-slate-700 font-medium focus:outline-none focus:border-indigo-500"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="ASSIGNED">Assigned</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+
+            {(searchTerm || selectedPriority !== 'ALL' || selectedStatus !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedPriority('ALL');
+                  setSelectedStatus('ALL');
+                }}
+                className="text-xs px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl font-semibold transition-colors"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tasks Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">
+                Task Allocation Registry — {activeSection === 'all' ? 'All Tasks' : activeSection === 'semi-base' ? 'Semi Basics' : 'Formulation'}
+              </h2>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {filteredTasks.length} {filteredTasks.length === 1 ? 'Task' : 'Tasks'}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+                  <th className="py-3 px-3.5">Task ID</th>
+                  <th className="py-3 px-3.5">A. No.</th>
+                  <th className="py-3 px-3.5">Date & Time</th>
+                  <th className="py-3 px-3.5 min-w-[200px]">Product Title</th>
+                  <th className="py-3 px-3.5">Sample ID</th>
+                  <th className="py-3 px-3.5">Stage / Type</th>
+                  <th className="py-3 px-3.5">Qty. of Sample</th>
+                  <th className="py-3 px-3.5">Batch No. / Lot No.</th>
+                  <th className="py-3 px-3.5">MFG Date</th>
+                  <th className="py-3 px-3.5">EXP Date</th>
+                  <th className="py-3 px-3.5">Submitted By</th>
+                  <th className="py-3 px-3.5">Received By</th>
+                  <th className="py-3 px-3.5">Assigned Analyst</th>
+                  <th className="py-3 px-3.5">Testing Protocol</th>
+                  <th className="py-3 px-3.5">Priority</th>
+                  <th className="py-3 px-3.5">Due / Shift</th>
+                  <th className="py-3 px-3.5">Task Status</th>
+                  <th className="py-3 px-3.5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filteredTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={18} className="py-12 text-center text-slate-400">
+                      <div className="h-10 w-10 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                        <UserCheck className="h-5 w-5" />
+                      </div>
+                      <p className="font-semibold text-slate-600 text-xs">No assigned tasks found.</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Use the &ldquo;Assign&rdquo; button in the table to allocate testing work.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTasks.map((t) => {
+                    const isUrgent = t.priority === 'URGENT' || (t.priority as any) === 'STAT';
+                    const taskSec = getTaskSection(t);
+
+                    const matchedSample = availableSamples.find((s: any) => {
+                      const sCode = (s.sampleCode || s.accessionNo || s.sampleId || s.id || '').toString().toUpperCase();
+                      const tCode = (t.sampleId || '').toString().toUpperCase();
+                      return (
+                        sCode === tCode ||
+                        (s.accessionNo && s.accessionNo.toUpperCase() === tCode) ||
+                        (s.sampleCode && s.sampleCode.toUpperCase() === tCode)
+                      );
+                    });
+
+                    const aNo = matchedSample?.accessionNo || t.accessionNo || 'A-0001';
+                    const samplingDateVal = matchedSample?.samplingDate || t.samplingDate || t.assignedDate;
+                    const samplingDateFormatted = formatDateTime(samplingDateVal, 'dd/MM/yyyy HH:mm');
+                    const nomenclature = matchedSample?.nomenclature || matchedSample?.materialName || t.sampleName;
+                    const sampleIdCode = matchedSample?.sampleCode || matchedSample?.sampleId || t.sampleId;
+                    const stageType = (
+                      matchedSample?.stageType ||
+                      matchedSample?.sampleType ||
+                      t.stageType ||
+                      (taskSec === 'semi-base' ? 'Raw Material' : 'Finished Product')
+                    ).replace(/^\[(Semi Basics?|Semi Base|Formulation)\]\s*/i, '');
+                    const sampleQtyText = `${matchedSample?.sampleQty || matchedSample?.quantity || t.sampleQty || 100} ${matchedSample?.unit || matchedSample?.quantityUnit || t.unit || 'units'}`;
+                    const batchLotText = matchedSample?.lotNumber || matchedSample?.batchLotNumber || matchedSample?.batch?.batchNumber || t.lotNumber || 'BTH-2026-091';
+                    const mfgFormatted = matchedSample?.mfgDate
+                      ? formatDateTime(matchedSample.mfgDate, 'dd/MM/yyyy')
+                      : matchedSample?.batch?.manufacturingDate
+                        ? formatDateTime(matchedSample.batch.manufacturingDate, 'dd/MM/yyyy')
+                        : t.mfgDate
+                          ? formatDateTime(t.mfgDate, 'dd/MM/yyyy')
+                          : '10/2026';
+                    const expFormatted = matchedSample?.expDate
+                      ? formatDateTime(matchedSample.expDate, 'dd/MM/yyyy')
+                      : matchedSample?.batch?.expiryDate
+                        ? formatDateTime(matchedSample.batch.expiryDate, 'dd/MM/yyyy')
+                        : t.expDate
+                          ? formatDateTime(t.expDate, 'dd/MM/yyyy')
+                          : '10/2028';
+                    const submittedText = matchedSample?.submittedBy || matchedSample?.submittedByUser?.fullName || t.submittedBy || 'Plant Production';
+                    const receivedText = matchedSample?.accessionedBy?.fullName || matchedSample?.receivedByUser?.fullName || t.receivedBy || 'QC Intake Officer';
+
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-50/70 transition-colors">
+                        {/* 1. Task ID */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <span className="font-mono font-bold text-indigo-600">{t.taskCode}</span>
+                          <div className="text-[10px] text-slate-400">Assigned: {t.assignedDate}</div>
+                        </td>
+
+                        {/* 2. A. No. */}
+                        <td className="py-3 px-3.5 font-mono font-bold text-navy-950 text-xs whitespace-nowrap">
+                          {aNo}
+                        </td>
+
+                        {/* 3. Date & Time */}
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                          {samplingDateFormatted}
+                        </td>
+
+                        {/* 4. Nomenclature */}
+                        <td className="py-3 px-3.5 min-w-[200px] max-w-xs">
+                          <div className="font-semibold text-slate-900 line-clamp-1">{nomenclature}</div>
+                        </td>
+
+                        {/* 5. Sample ID */}
+                        <td className="py-3 px-3.5 font-mono font-bold text-teal-800 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{sampleIdCode}</span>
+                            {isUrgent && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                                Urgent
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 6. Stage / Type */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 inline-block">
+                            {stageType}
+                          </span>
+                        </td>
+
+                        {/* 7. Qty. of Sample */}
+                        <td className="py-3 px-3.5 font-mono text-slate-700 whitespace-nowrap">
+                          {sampleQtyText}
+                        </td>
+
+                        {/* 8. Batch No. / Lot No. */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200/70 inline-block">
+                            {batchLotText}
+                          </span>
+                        </td>
+
+                        {/* 9. MFG Date */}
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                          {mfgFormatted}
+                        </td>
+
+                        {/* 10. EXP Date */}
+                        <td className="py-3 px-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                          {expFormatted}
+                        </td>
+
+                        {/* 11. Submitted By */}
+                        <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[150px] truncate" title={submittedText}>
+                          {submittedText}
+                        </td>
+
+                        {/* 12. Received By */}
+                        <td className="py-3 px-3.5 text-slate-700 text-xs max-w-[150px] truncate" title={receivedText}>
+                          {receivedText}
+                        </td>
+
+                        {/* 13. Assigned Analyst */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+                              {t.assignedAnalystName.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-800 text-xs">{t.assignedAnalystName}</div>
+                              <div className="text-[10px] text-slate-400">{t.assignedAnalystId}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 14. Testing Protocol */}
+                        <td className="py-3 px-3.5 min-w-[180px]">
+                          <span className="text-slate-700 font-medium text-xs line-clamp-1">{t.testProtocol}</span>
+                        </td>
+
+                        {/* 15. Priority */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          {isUrgent ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200">
+                              URGENT
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                              ROUTINE
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 16. Due / Shift */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <div className="font-medium text-slate-700 text-xs">{t.dueDate}</div>
+                          <div className="text-[10px] text-slate-400 truncate max-w-[120px]">{t.shift}</div>
+                        </td>
+
+                        {/* 17. Task Status (Automated Life-Cycle: Pending Start -> In Progress -> Completed) */}
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          {t.status === 'COMPLETED' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              <span>Completed</span>
+                            </span>
+                          ) : (t.status === 'IN_PROGRESS' || t.isAssignedByManager) ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                              <span>In Progress</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              <span>Pending Start</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 18. Action */}
+                        <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {canAssign && (
+                              (t.isAssignedByManager || t.status === 'IN_PROGRESS' || t.status === 'COMPLETED') ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openRowAssignModal(t)}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                  title={`Assigned to ${t.assignedAnalystName}. Click to modify or re-assign.`}
+                                >
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  <span>Assigned</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openRowAssignModal(t)}
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-2xs hover:shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Assign this sample to a testing analyst"
+                                >
+                                  <UserCheck className="h-3 w-3" />
+                                  <span>Assign</span>
+                                </button>
+                              )
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setActiveTaskDetails(t)}
+                              className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 text-[11px] font-semibold transition-colors cursor-pointer"
+                            >
+                              Details
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ================= MODAL: ASSIGN NEW TASK ================= */}
         <Modal
-          isOpen={isRowAssignModalOpen}
-          onClose={() => {
-            setIsRowAssignModalOpen(false);
-            setTargetSampleTask(null);
-          }}
-          title="Assign Sample to Testing Analyst"
-          subtitle={`Designate an analytical chemist for ${targetSampleTask.sampleId}`}
+          isOpen={isNewTaskModalOpen}
+          onClose={() => setIsNewTaskModalOpen(false)}
+          title="Assign New Analytical Task"
+          subtitle="Allocate a testing protocol or worksheet to an analytical chemist"
           maxWidth="xl"
         >
-          <form onSubmit={handleConfirmRowAssignment} className="space-y-4">
-            {/* Target Sample Summary Card */}
-            <div className="p-3.5 rounded-xl bg-gradient-to-r from-indigo-50/90 to-blue-50/70 border border-indigo-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 font-mono">
-                    Sample Accession #{targetSampleTask.sampleId}
-                  </span>
-                  <h4 className="text-sm font-black text-slate-900 mt-0.5">
-                    {targetSampleTask.sampleName}
-                  </h4>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 shadow-2xs">
-                    {typeof targetSampleTask.laboratory === 'string'
-                      ? targetSampleTask.laboratory
-                      : (targetSampleTask.laboratory as any)?.name || 'General'}
-                  </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-emerald-700 border border-emerald-200 shadow-2xs">
-                    {targetSampleTask.section === 'semi-base' ? 'Semi Basics' : 'Formulation'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Select Analyst from 10+ Accounts */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <UserCheck className="h-3.5 w-3.5 text-indigo-600" />
-                  <span>Select Testing Analyst ({allPersonnelList.length} Qualified Analysts) *</span>
+          <form onSubmit={handleCreateTask} className="space-y-4">
+            {/* Sample Identification */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Sample Accession ID *
                 </label>
-                <span className="text-[10px] text-slate-400 font-medium">Assignee receives isolated work</span>
+                {labSpecificSamples.length > 0 ? (
+                  <select
+                    value={newSampleId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setNewSampleId(id);
+                      const match = labSpecificSamples.find(
+                        (s: any) =>
+                          s.accessionNo === id ||
+                          s.sampleCode === id ||
+                          s.sampleId === id ||
+                          s.id === id
+                      );
+                      if (match) {
+                        const name =
+                          match.nomenclature ||
+                          match.materialName ||
+                          match.drugName ||
+                          match.productName ||
+                          match.sampleName ||
+                          '';
+                        setNewSampleName(name);
+                        setNewSection(getSampleSection(match));
+                        if (match.priority) {
+                          setNewPriority(
+                            match.priority === 'ROUTINE' ? 'ROUTINE' : 'URGENT'
+                          );
+                        }
+                      }
+                    }}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    required
+                  >
+                    <option value="">Select Sample from {activeLabName}...</option>
+                    {labSpecificSamples.map((s: any) => {
+                      const code = s.sampleCode || s.accessionNo || s.sampleId || s.id;
+                      const name =
+                        s.nomenclature || s.materialName || s.sampleName || 'Sample Record';
+                      const sec =
+                        getSampleSection(s) === 'semi-base' ? 'Semi Basics' : 'Formulation';
+                      return (
+                        <option key={s.id || code} value={code}>
+                          {code} — {name} [{sec}]
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={newSampleId}
+                    onChange={(e) => setNewSampleId(e.target.value)}
+                    placeholder="e.g. GL/SB-12"
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+                    required
+                  />
+                )}
               </div>
-              <select
-                value={selectedAnalystId}
-                onChange={(e) => setSelectedAnalystId(e.target.value)}
-                className="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs cursor-pointer"
-                required
-              >
-                {allPersonnelList.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.username ? `@${a.username}` : a.id} — {a.name} ({a.department} • {a.id})
-                  </option>
-                ))}
-              </select>
-              <p className="text-[10px] text-slate-500 mt-1">
-                The selected analyst will log in using their credentials and see this sample in their testing queue.
-              </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Drug / Material Nomenclature *
+                </label>
+                <input
+                  type="text"
+                  value={newSampleName}
+                  onChange={(e) => setNewSampleName(e.target.value)}
+                  placeholder="e.g. Amoxicillin 500mg Oral Suspension"
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+                  required
+                />
+              </div>
             </div>
 
-            {/* Workflow Priority */}
+            {/* Section Selection */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Workflow Priority *
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Laboratory Section / Classification *
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedPriorityVal('ROUTINE')}
+                  onClick={() => setNewSection('semi-base')}
                   className={cn(
-                    'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
-                    selectedPriorityVal === 'ROUTINE'
-                      ? 'bg-slate-100 border-slate-400 text-slate-800 shadow-2xs'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                    'px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all cursor-pointer',
+                    newSection === 'semi-base'
+                      ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-2xs font-bold'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   )}
                 >
-                  <span>Routine (5-Day Turnaround)</span>
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>Semi Basics</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedPriorityVal('URGENT')}
+                  onClick={() => setNewSection('formulation')}
                   className={cn(
-                    'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
-                    selectedPriorityVal === 'URGENT'
-                      ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-2xs'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                    'px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all cursor-pointer',
+                    newSection === 'formulation'
+                      ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-2xs font-bold'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   )}
                 >
-                  <span>Urgent (48h Priority)</span>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Formulation</span>
                 </button>
               </div>
+            </div>
+
+            {/* Laboratory & Assignee */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Analytical Laboratory *
+                </label>
+                <select
+                  value={newLab}
+                  onChange={(e) => setNewLab(e.target.value as any)}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+                >
+                  <option value="GENERAL">General Lab (GL)</option>
+                  <option value="CEPHALOSPORIN">Cephalosporin Lab (CEPH)</option>
+                  <option value="PENICILLIN">Penicillin Lab (PEN)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Assignee Analyst *
+                </label>
+                <select
+                  value={newAnalystId}
+                  onChange={(e) => setNewAnalystId(e.target.value)}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+                >
+                  {allPersonnelList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.username ? `@${a.username}` : a.id} — {a.name} ({a.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Priority Level *
+              </label>
+              <select
+                value={newPriority}
+                onChange={(e) => setNewPriority(e.target.value as any)}
+                className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+              >
+                <option value="URGENT">URGENT (48h Standard)</option>
+                <option value="ROUTINE">ROUTINE (5-Day Turnaround)</option>
+              </select>
             </div>
 
             {/* Shift & Due Date */}
@@ -2147,8 +1987,8 @@ function TaskAssignmentPageInner() {
                   Allocated Shift
                 </label>
                 <select
-                  value={selectedShiftVal}
-                  onChange={(e) => setSelectedShiftVal(e.target.value)}
+                  value={newShift}
+                  onChange={(e) => setNewShift(e.target.value)}
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
                 >
                   <option value="Morning Shift (08:00 - 16:00)">Morning Shift (08:00 - 16:00)</option>
@@ -2159,12 +1999,12 @@ function TaskAssignmentPageInner() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Target Due Date *
+                  Target Completion Due Date *
                 </label>
                 <input
                   type="date"
-                  value={selectedDueDateVal}
-                  onChange={(e) => setSelectedDueDateVal(e.target.value)}
+                  value={newDueDate}
+                  onChange={(e) => setNewDueDate(e.target.value)}
                   className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
                   required
                 />
@@ -2174,12 +2014,12 @@ function TaskAssignmentPageInner() {
             {/* Instructions */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Special Instructions for Analyst
+                Analytical Instructions & Reference
               </label>
               <textarea
                 rows={2}
-                value={selectedInstructionsVal}
-                onChange={(e) => setSelectedInstructionsVal(e.target.value)}
+                value={newInstructions}
+                onChange={(e) => setNewInstructions(e.target.value)}
                 className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
@@ -2188,150 +2028,310 @@ function TaskAssignmentPageInner() {
             <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => {
-                  setIsRowAssignModalOpen(false);
-                  setTargetSampleTask(null);
-                }}
+                onClick={() => setIsNewTaskModalOpen(false)}
                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm hover:shadow-md transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
               >
-                <UserCheck className="h-4 w-4" />
-                <span>Confirm &amp; Assign to Analyst</span>
+                <PlusCircle className="h-4 w-4" />
+                <span>Assign & Notify Analyst</span>
               </button>
             </div>
           </form>
         </Modal>
-      )}
 
-      {/* ================= MODAL: TASK DETAILS ================= */}
-      {activeTaskDetails && (
-        <Modal
-          isOpen={!!activeTaskDetails}
-          onClose={() => setActiveTaskDetails(null)}
-          title={`Task Record: ${activeTaskDetails.taskCode}`}
-          subtitle="Detailed assignment parameters and analytical workflow status"
-          maxWidth="md"
-        >
-          <div className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200 flex items-center justify-between">
+        {/* ================= MODAL: DIRECT ROW SAMPLE ASSIGNMENT ================= */}
+        {isRowAssignModalOpen && targetSampleTask && (
+          <Modal
+            isOpen={isRowAssignModalOpen}
+            onClose={() => {
+              setIsRowAssignModalOpen(false);
+              setTargetSampleTask(null);
+            }}
+            title="Assign Sample to Testing Analyst"
+            subtitle={`Designate an analytical chemist for ${targetSampleTask.sampleId}`}
+            maxWidth="xl"
+          >
+            <form onSubmit={handleConfirmRowAssignment} className="space-y-4">
+              {/* Target Sample Summary Card */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-indigo-50/90 to-blue-50/70 border border-indigo-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 font-mono">
+                      Sample Accession #{targetSampleTask.sampleId}
+                    </span>
+                    <h4 className="text-sm font-black text-slate-900 mt-0.5">
+                      {targetSampleTask.sampleName}
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 shadow-2xs">
+                      {typeof targetSampleTask.laboratory === 'string'
+                        ? targetSampleTask.laboratory
+                        : (targetSampleTask.laboratory as any)?.name || 'General'}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-emerald-700 border border-emerald-200 shadow-2xs">
+                      {targetSampleTask.section === 'semi-base' ? 'Semi Basics' : 'Formulation'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Select Analyst from 10+ Accounts */}
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
-                    {typeof activeTaskDetails.laboratory === 'string'
-                      ? activeTaskDetails.laboratory
-                      : (activeTaskDetails.laboratory as any)?.name || 'General'} LAB
-                  </span>
-                  <span
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <UserCheck className="h-3.5 w-3.5 text-indigo-600" />
+                    <span>Select Testing Analyst ({allPersonnelList.length} Qualified Analysts) *</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">Assignee receives isolated work</span>
+                </div>
+                <select
+                  value={selectedAnalystId}
+                  onChange={(e) => setSelectedAnalystId(e.target.value)}
+                  className="w-full text-xs px-3.5 py-2.5 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-2xs cursor-pointer"
+                  required
+                >
+                  {allPersonnelList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.username ? `@${a.username}` : a.id} — {a.name} ({a.department} • {a.id})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  The selected analyst will log in using their credentials and see this sample in their testing queue.
+                </p>
+              </div>
+
+              {/* Workflow Priority */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Workflow Priority *
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriorityVal('ROUTINE')}
                     className={cn(
-                      'text-[9px] font-bold px-1.5 py-0.5 rounded border',
-                      getTaskSection(activeTaskDetails) === 'semi-base'
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
+                      selectedPriorityVal === 'ROUTINE'
+                        ? 'bg-slate-100 border-slate-400 text-slate-800 shadow-2xs'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                     )}
                   >
-                    {getTaskSection(activeTaskDetails) === 'semi-base' ? 'Semi Basics' : 'Formulation'}
-                  </span>
-                </div>
-                <h4 className="text-sm font-bold text-slate-900 mt-0.5">
-                  {activeTaskDetails.sampleId}
-                </h4>
-                <p className="text-xs text-slate-600">{activeTaskDetails.sampleName}</p>
-              </div>
-              <span className="font-mono text-xs font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
-                {activeTaskDetails.priority}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Assigned Analyst</span>
-                <span className="font-bold text-slate-800">{activeTaskDetails.assignedAnalystName}</span>
-                <span className="text-slate-500 block text-[11px]">{activeTaskDetails.assignedAnalystId}</span>
-              </div>
-
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Allocated Shift</span>
-                <span className="font-bold text-slate-800">{activeTaskDetails.shift}</span>
-                <span className="text-slate-500 block text-[11px]">Due: {activeTaskDetails.dueDate}</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl border border-slate-200">
-              <span className="text-slate-400 block text-[10px] font-bold uppercase mb-1">Testing Protocol</span>
-              <p className="text-xs font-semibold text-slate-800">{activeTaskDetails.testProtocol}</p>
-              {activeTaskDetails.instructions && (
-                <p className="text-[11px] text-slate-500 mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <strong>Notes:</strong> {activeTaskDetails.instructions}
-                </p>
-              )}
-            </div>
-
-            {/* Sample Monograph Details from Sampling */}
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2 text-xs">
-              <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
-                Sample Intake Parameters (Sampling Record)
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[11px]">
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">Accession No</span>
-                  <span className="font-mono font-bold text-slate-800">{activeTaskDetails.accessionNo || 'A-0001'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">Batch / Lot No</span>
-                  <span className="font-mono font-bold text-slate-800">{activeTaskDetails.lotNumber || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">Stage / Type</span>
-                  <span className="font-semibold text-slate-700">{activeTaskDetails.stageType || 'Finished Product'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">Qty of Sample</span>
-                  <span className="font-mono font-semibold text-slate-700">
-                    {activeTaskDetails.sampleQty} {activeTaskDetails.unit || 'units'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">MFG Date</span>
-                  <span className="font-mono text-slate-700">
-                    {activeTaskDetails.mfgDate ? formatDateTime(activeTaskDetails.mfgDate, 'dd/MM/yyyy') : '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">EXP Date</span>
-                  <span className="font-mono text-slate-700">
-                    {activeTaskDetails.expDate ? formatDateTime(activeTaskDetails.expDate, 'dd/MM/yyyy') : '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">Submitted By</span>
-                  <span className="text-slate-700">{activeTaskDetails.submittedBy || 'Plant Production'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[9px] font-bold uppercase">Received By</span>
-                  <span className="text-slate-700">{activeTaskDetails.receivedBy || 'QC Intake Officer'}</span>
+                    <span>Routine (5-Day Turnaround)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriorityVal('URGENT')}
+                    className={cn(
+                      'px-3 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center flex items-center justify-center gap-1.5',
+                      selectedPriorityVal === 'URGENT'
+                        ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-2xs'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                    )}
+                  >
+                    <span>Urgent (48h Priority)</span>
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-xs font-semibold text-slate-500">Status: {activeTaskDetails.status}</span>
-              <button
-                type="button"
-                onClick={() => setActiveTaskDetails(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
+              {/* Shift & Due Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Allocated Shift
+                  </label>
+                  <select
+                    value={selectedShiftVal}
+                    onChange={(e) => setSelectedShiftVal(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+                  >
+                    <option value="Morning Shift (08:00 - 16:00)">Morning Shift (08:00 - 16:00)</option>
+                    <option value="Evening Shift (16:00 - 00:00)">Evening Shift (16:00 - 00:00)</option>
+                    <option value="Night Shift (00:00 - 08:00)">Night Shift (00:00 - 08:00)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Target Due Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={selectedDueDateVal}
+                    onChange={(e) => setSelectedDueDateVal(e.target.value)}
+                    className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Special Instructions for Analyst
+                </label>
+                <textarea
+                  rows={2}
+                  value={selectedInstructionsVal}
+                  onChange={(e) => setSelectedInstructionsVal(e.target.value)}
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-xl bg-white text-slate-900 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Form Actions */}
+              <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRowAssignModalOpen(false);
+                    setTargetSampleTask(null);
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  <UserCheck className="h-4 w-4" />
+                  <span>Confirm &amp; Assign to Analyst</span>
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* ================= MODAL: TASK DETAILS ================= */}
+        {activeTaskDetails && (
+          <Modal
+            isOpen={!!activeTaskDetails}
+            onClose={() => setActiveTaskDetails(null)}
+            title={`Task Record: ${activeTaskDetails.taskCode}`}
+            subtitle="Detailed assignment parameters and analytical workflow status"
+            maxWidth="md"
+          >
+            <div className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                      {typeof activeTaskDetails.laboratory === 'string'
+                        ? activeTaskDetails.laboratory
+                        : (activeTaskDetails.laboratory as any)?.name || 'General'} LAB
+                    </span>
+                    <span
+                      className={cn(
+                        'text-[9px] font-bold px-1.5 py-0.5 rounded border',
+                        getTaskSection(activeTaskDetails) === 'semi-base'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      )}
+                    >
+                      {getTaskSection(activeTaskDetails) === 'semi-base' ? 'Semi Basics' : 'Formulation'}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                    {activeTaskDetails.sampleId}
+                  </h4>
+                  <p className="text-xs text-slate-600">{activeTaskDetails.sampleName}</p>
+                </div>
+                <span className="font-mono text-xs font-bold text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-200">
+                  {activeTaskDetails.priority}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Assigned Analyst</span>
+                  <span className="font-bold text-slate-800">{activeTaskDetails.assignedAnalystName}</span>
+                  <span className="text-slate-500 block text-[11px]">{activeTaskDetails.assignedAnalystId}</span>
+                </div>
+
+                <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60">
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Allocated Shift</span>
+                  <span className="font-bold text-slate-800">{activeTaskDetails.shift}</span>
+                  <span className="text-slate-500 block text-[11px]">Due: {activeTaskDetails.dueDate}</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl border border-slate-200">
+                <span className="text-slate-400 block text-[10px] font-bold uppercase mb-1">Testing Protocol</span>
+                <p className="text-xs font-semibold text-slate-800">{activeTaskDetails.testProtocol}</p>
+                {activeTaskDetails.instructions && (
+                  <p className="text-[11px] text-slate-500 mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <strong>Notes:</strong> {activeTaskDetails.instructions}
+                  </p>
+                )}
+              </div>
+
+              {/* Sample Monograph Details from Sampling */}
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2 text-xs">
+                <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
+                  Sample Intake Parameters (Sampling Record)
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">Accession No</span>
+                    <span className="font-mono font-bold text-slate-800">{activeTaskDetails.accessionNo || 'A-0001'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">Batch / Lot No</span>
+                    <span className="font-mono font-bold text-slate-800">{activeTaskDetails.lotNumber || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">Stage / Type</span>
+                    <span className="font-semibold text-slate-700">{activeTaskDetails.stageType || 'Finished Product'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">Qty of Sample</span>
+                    <span className="font-mono font-semibold text-slate-700">
+                      {activeTaskDetails.sampleQty} {activeTaskDetails.unit || 'units'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">MFG Date</span>
+                    <span className="font-mono text-slate-700">
+                      {activeTaskDetails.mfgDate ? formatDateTime(activeTaskDetails.mfgDate, 'dd/MM/yyyy') : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">EXP Date</span>
+                    <span className="font-mono text-slate-700">
+                      {activeTaskDetails.expDate ? formatDateTime(activeTaskDetails.expDate, 'dd/MM/yyyy') : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">Submitted By</span>
+                    <span className="text-slate-700">{activeTaskDetails.submittedBy || 'Plant Production'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] font-bold uppercase">Received By</span>
+                    <span className="text-slate-700">{activeTaskDetails.receivedBy || 'QC Intake Officer'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs font-semibold text-slate-500">Status: {activeTaskDetails.status}</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTaskDetails(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
-    </div>
+          </Modal>
+        )}
+      </div>
     </RoleRouteGuard>
   );
 }

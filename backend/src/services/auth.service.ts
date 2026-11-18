@@ -38,6 +38,8 @@ export class AuthService {
         user = await prisma.user.findFirst({ where: { username: 'admin' } });
       } else if (lower === '0012' || lower.includes('nasir')) {
         user = await prisma.user.findFirst({ where: { username: '0012' } });
+      } else if (lower === 'asim' || lower.includes('asim')) {
+        user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
       }
     }
 

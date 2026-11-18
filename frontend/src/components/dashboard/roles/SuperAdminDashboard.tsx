@@ -77,7 +77,12 @@ const DEFAULT_SETTINGS: SystemSettingsState = {
   passwordExpiryDays: 90,
 };
 
-export function SuperAdminDashboard() {
+export interface SuperAdminDashboardProps {
+  dateFilter?: string;
+  onSelectDateFilter?: (date: string) => void;
+}
+
+export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: SuperAdminDashboardProps = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -951,8 +956,8 @@ export function SuperAdminDashboard() {
                 <option value="">All Roles (6 Total)</option>
                 <option value="SUPER_ADMIN">1. Super Admin</option>
                 <option value="ADMIN">2. HOD</option>
-                <option value="DOCUMENTATION_MANAGER">3. Documentation Manager</option>
-                <option value="DEPUTY_MANAGER">4. Deputy Manager</option>
+                <option value="DEPUTY_MANAGER">3. Deputy Manager</option>
+                <option value="DOCUMENTATION_MANAGER">4. Documentation Manager</option>
                 <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
                 <option value="QC_ANALYST">6. Testing Analyst</option>
               </select>
@@ -1623,8 +1628,8 @@ export function SuperAdminDashboard() {
                 >
                   <option value="SUPER_ADMIN">1. Super Admin</option>
                   <option value="ADMIN">2. HOD</option>
-                  <option value="DOCUMENTATION_MANAGER">3. Documentation Manager</option>
-                  <option value="DEPUTY_MANAGER">4. Deputy Manager</option>
+                  <option value="DEPUTY_MANAGER">3. Deputy Manager</option>
+                  <option value="DOCUMENTATION_MANAGER">4. Documentation Manager</option>
                   <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
                   <option value="QC_ANALYST">6. Testing Analyst</option>
                 </select>
@@ -1707,8 +1712,8 @@ export function SuperAdminDashboard() {
               >
                 <option value="SUPER_ADMIN">1. Super Admin (Full Governance)</option>
                 <option value="ADMIN">2. HOD (Head of Department)</option>
-                <option value="DOCUMENTATION_MANAGER">3. Documentation Manager (STP Dossier)</option>
-                <option value="DEPUTY_MANAGER">4. Deputy Manager (Supervision &amp; Allocation)</option>
+                <option value="DEPUTY_MANAGER">3. Deputy Manager (Supervision &amp; Allocation)</option>
+                <option value="DOCUMENTATION_MANAGER">4. Documentation Manager (STP Dossier)</option>
                 <option value="LAB_TECHNICIAN">5. Sample Registration Analyst (Specimen Intake)</option>
                 <option value="QC_ANALYST">6. Testing Analyst (Worksheet Execution)</option>
               </select>
