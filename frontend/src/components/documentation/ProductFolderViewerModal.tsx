@@ -6,6 +6,7 @@ import { Product, ProductDocument } from '@/types/lims';
 import { productService } from '@/services/product.service';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { matchesDateRangeFilter } from '@/lib/date';
 import {
   Folder,
   FileText,
@@ -114,6 +115,7 @@ interface ProductFolderViewerModalProps {
   onClose: () => void;
   product: Product | null;
   readOnly?: boolean;
+  activeMonthFilter?: string;
   onSelectSlotForUpload?: (product: Product, slotKey: string) => void;
   onDocumentDeleted?: () => void;
   onDocumentUploaded?: () => void;
@@ -124,6 +126,7 @@ export function ProductFolderViewerModal({
   onClose,
   product,
   readOnly = false,
+  activeMonthFilter,
   onSelectSlotForUpload,
   onDocumentDeleted,
   onDocumentUploaded,
@@ -171,14 +174,17 @@ export function ProductFolderViewerModal({
     refetchInterval: 3000,
   });
 
+  // All documents for this product sorted by newest first
+  const productDocs: ProductDocument[] = React.useMemo(() => {
+    const raw = (dynamicProduct || product)?.documents || [];
+    return [...raw].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [dynamicProduct, product]);
+
   if (!isOpen || !product) return null;
 
   const effectiveProduct = dynamicProduct || product;
-
-  // All documents for this product sorted by newest first
-  const productDocs: ProductDocument[] = [...(effectiveProduct.documents || [])].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
 
   const resetUploadForm = () => {
     setIsUploadingInModal(false);

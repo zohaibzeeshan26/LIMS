@@ -1146,9 +1146,6 @@ function TaskAssignmentPageInner() {
                 3 Units
               </span>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium">
-              Switch facility to assign samples across labs
-            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2088,7 +2085,6 @@ function TaskAssignmentPageInner() {
                     <UserCheck className="h-3.5 w-3.5 text-indigo-600" />
                     <span>Select Testing Analyst ({allPersonnelList.length} Qualified Analysts) *</span>
                   </label>
-                  <span className="text-[10px] text-slate-400 font-medium">Assignee receives isolated work</span>
                 </div>
                 <select
                   value={selectedAnalystId}
@@ -2102,9 +2098,6 @@ function TaskAssignmentPageInner() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  The selected analyst will log in using their credentials and see this sample in their testing queue.
-                </p>
               </div>
 
               {/* Workflow Priority */}

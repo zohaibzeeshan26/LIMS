@@ -358,7 +358,7 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
     },
     {
       role: 'DOCUMENTATION_MANAGER',
-      label: 'Doc Manager',
+      label: 'Doc Officer',
       color: 'bg-teal-50 text-teal-800 border-teal-300',
       permissions: {
         user_mgmt: 'NONE',
@@ -957,7 +957,7 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
                 <option value="SUPER_ADMIN">1. Super Admin</option>
                 <option value="ADMIN">2. HOD</option>
                 <option value="DEPUTY_MANAGER">3. Deputy Manager</option>
-                <option value="DOCUMENTATION_MANAGER">4. Documentation Manager</option>
+                <option value="DOCUMENTATION_MANAGER">4. Documentation Officer</option>
                 <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
                 <option value="QC_ANALYST">6. Testing Analyst</option>
               </select>
@@ -1629,7 +1629,7 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
                   <option value="SUPER_ADMIN">1. Super Admin</option>
                   <option value="ADMIN">2. HOD</option>
                   <option value="DEPUTY_MANAGER">3. Deputy Manager</option>
-                  <option value="DOCUMENTATION_MANAGER">4. Documentation Manager</option>
+                  <option value="DOCUMENTATION_MANAGER">4. Documentation Officer</option>
                   <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
                   <option value="QC_ANALYST">6. Testing Analyst</option>
                 </select>
@@ -1713,7 +1713,7 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
                 <option value="SUPER_ADMIN">1. Super Admin (Full Governance)</option>
                 <option value="ADMIN">2. HOD (Head of Department)</option>
                 <option value="DEPUTY_MANAGER">3. Deputy Manager (Supervision &amp; Allocation)</option>
-                <option value="DOCUMENTATION_MANAGER">4. Documentation Manager (STP Dossier)</option>
+                <option value="DOCUMENTATION_MANAGER">4. Documentation Officer (STP Dossier)</option>
                 <option value="LAB_TECHNICIAN">5. Sample Registration Analyst (Specimen Intake)</option>
                 <option value="QC_ANALYST">6. Testing Analyst (Worksheet Execution)</option>
               </select>

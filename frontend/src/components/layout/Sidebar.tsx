@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import React, { Suspense } from 'react';
@@ -25,6 +27,7 @@ import {
   FileSpreadsheet,
   FileCheck2,
   Activity,
+  Clock,
   ChevronLeft,
 } from 'lucide-react';
 
@@ -167,13 +170,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
       ? 'Super Admin Hub'
       : userRole === 'ADMIN' || userRole === 'HOD'
       ? 'HOD Dashboard'
-      : userRole === 'DOCUMENTATION_MANAGER'
-      ? 'Dashboard'
-      : userRole === 'DEPUTY_MANAGER'
-      ? 'Dashboard'
-      : userRole === 'LAB_TECHNICIAN'
-      ? 'Intake Terminal'
-      : 'Testing Workstation';
+      : 'Dashboard';
 
   const menuItems: Array<{
     name: string;
@@ -200,6 +197,20 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         icon: Activity,
         roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
         badge: '3 Labs',
+      },
+      {
+        name: 'Daily Working Activity',
+        href: '/daily-working-activity',
+        icon: Clock,
+        roles: [
+          'SUPER_ADMIN',
+          'ADMIN',
+          'HOD',
+          'DEPUTY_MANAGER',
+          'QA_MANAGER',
+          'AUDITOR',
+        ],
+        badge: 'Live',
       },
       {
         name: 'Priority Notice',
@@ -256,6 +267,24 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
   // Strictly filter menu items to only permitted modules for the active role
   const visibleItems = React.useMemo(() => {
     return menuItems.filter((item) => {
+      // Never show Daily Working Activity to operational personnel (registration, documentation, analysts)
+      if (item.href === '/daily-working-activity') {
+        const isOperational =
+          userRole === 'LAB_TECHNICIAN' ||
+          userRole === 'DOCUMENTATION_MANAGER' ||
+          userRole === 'PRODUCT_DOCUMENTATION_OFFICER' ||
+          userRole === 'QC_ANALYST' ||
+          userRole === 'ANALYST' ||
+          userRole === 'TESTING_ANALYST' ||
+          (user?.username || '').toLowerCase().includes('reg') ||
+          (user?.username || '').toLowerCase().includes('doc') ||
+          (user?.username || '').toLowerCase().includes('analyst') ||
+          (user?.department || '').toLowerCase().includes('intake') ||
+          (user?.department || '').toLowerCase().includes('accession') ||
+          (user?.department || '').toLowerCase().includes('document') ||
+          (user?.department || '').toLowerCase().includes('testing');
+        if (isOperational) return false;
+      }
       if (isSuperAdmin) return true;
       if (item.adminOnly) {
         return userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'HOD';
@@ -265,7 +294,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
       }
       return true;
     });
-  }, [menuItems, userRole, isSuperAdmin]);
+  }, [menuItems, userRole, user, isSuperAdmin]);
 
   return (
     <>
@@ -506,7 +535,11 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
                     .trim()}
                 </p>
                 <p className="text-[10px] text-sky-300 font-medium truncate leading-tight">
-                  {(userRole === 'LAB_TECHNICIAN' ? 'Lab Analyst' : userRole.replace(/_/g, ' '))} &bull; @{user?.username || 'user'}
+                  {(userRole === 'DOCUMENTATION_MANAGER'
+                    ? 'Documentation Officer'
+                    : userRole === 'LAB_TECHNICIAN'
+                    ? 'Lab Analyst'
+                    : userRole.replace(/_/g, ' '))} &bull; @{user?.username || 'user'}
                 </p>
               </div>
             </div>

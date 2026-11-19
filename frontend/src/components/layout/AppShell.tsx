@@ -24,8 +24,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isAccessionOpen, setIsAccessionOpen] = useState(false);
 
   const isPortalPage = pathname === '/';
-  // STRICT REQUIREMENT: Slider is ONLY shown when the user opens the Dashboard (/dashboard)
-  const isDashboardPage = pathname.startsWith('/dashboard');
+  // Sidebar is shown on all workspace pages (dashboard, daily activity, samples, tasks, users, etc.)
+  const showSidebar = !isPortalPage && pathname !== '/login';
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -59,16 +59,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Left Slider Navigation Drawer — STRICTLY shown ONLY on Dashboard */}
-      {isDashboardPage && (
+      {/* Left Slider Navigation Drawer — Shown on all workspace pages */}
+      {showSidebar && (
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       )}
 
-      {/* Main Container — Automatically offsets padding-left (lg:pl-64) ONLY when on Dashboard and left slider is active */}
+      {/* Main Container — Automatically offsets padding-left (lg:pl-64) when left slider is active */}
       <div
         className={cn(
           'flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out',
-          isDashboardPage && sidebarOpen ? 'lg:pl-64' : 'pl-0'
+          showSidebar && sidebarOpen ? 'lg:pl-64' : 'pl-0'
         )}
       >
         {/* Workspace Top Header (shown on all pages except Portal Hub which has its own header) */}
@@ -76,44 +76,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <header className="sticky top-0 z-40 bg-white border-b border-slate-200/90 shadow-2xs px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4 shrink-0">
             {/* Left Actions */}
             <div className="flex items-center gap-2">
-              {isDashboardPage ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                    title={sidebarOpen ? 'Collapse Left Slider' : 'Open Left Slider'}
-                  >
-                    <PanelLeft className="h-4 w-4" />
-                    <span>{sidebarOpen ? 'Collapse Slider' : 'Slider'}</span>
-                  </button>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                title={sidebarOpen ? 'Collapse Left Slider' : 'Open Left Slider'}
+              >
+                <PanelLeft className="h-4 w-4" />
+                <span>{sidebarOpen ? 'Collapse Slider' : 'Slider'}</span>
+              </button>
 
-                  <Link
-                    href="/"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-                    title="Return to Main Portal"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Portal Hub</span>
-                  </Link>
-                </>
-              ) : (
-                <Link
-                  href="/"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-                  title="Return to Main Portal"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Portal Hub</span>
-                </Link>
-              )}
+              <Link
+                href="/"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                title="Return to Main Portal"
+              >
+                <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+                <span>Portal Hub</span>
+              </Link>
             </div>
 
-            {/* Center: Brand (visible on non-dashboard pages, or when slider is collapsed) */}
+            {/* Center: Brand (visible when slider is collapsed) */}
             <div
               className={cn(
                 'flex items-center gap-2 transition-opacity',
-                isDashboardPage && sidebarOpen ? 'lg:opacity-0 lg:pointer-events-none' : 'opacity-100'
+                showSidebar && sidebarOpen ? 'lg:opacity-0 lg:pointer-events-none' : 'opacity-100'
               )}
             >
               <Link href="/" className="flex items-center gap-2 group">
@@ -142,8 +129,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     .replace(/\s*\([^)]*\)/g, '')
                     .trim()}
                 </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200 font-bold">
-                  {user?.role === 'LAB_TECHNICIAN' ? 'Lab Analyst' : user?.role || 'QC'}
+                <span className="text-[10px] font-sans px-2 py-0.5 rounded-lg bg-white text-slate-700 border border-slate-200 font-semibold shadow-2xs">
+                  {user?.role === 'DOCUMENTATION_MANAGER'
+                    ? 'Documentation Officer'
+                    : user?.role === 'LAB_TECHNICIAN'
+                    ? 'Lab Analyst'
+                    : user?.role === 'SUPER_ADMIN'
+                    ? 'Super Admin'
+                    : user?.role === 'ADMIN' || user?.role === 'HOD'
+                    ? 'HOD'
+                    : user?.role === 'DEPUTY_MANAGER'
+                    ? 'Deputy Manager'
+                    : user?.role
+                    ? user.role.replace(/_/g, ' ')
+                    : 'QC'}
                 </span>
               </div>
 

@@ -344,7 +344,7 @@ export default function TestingDocumentationRepositoryPage() {
         </div>
 
         {/* Statistical Metrics Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Products</div>
             <div className="text-xl font-bold text-navy-950 mt-1">{stats.totalProducts}</div>
@@ -373,15 +373,6 @@ export default function TestingDocumentationRepositoryPage() {
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Cephalosporin Lab</div>
             <div className="text-xl font-bold text-purple-700 mt-1">{stats.cephLabDocs}</div>
             <div className="text-[10px] text-slate-500 mt-0.5">Available Documents</div>
-          </div>
-
-          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Compliance Status</div>
-            <div className="text-sm font-bold text-emerald-700 mt-1.5 flex items-center gap-1">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>21 CFR Monitored</span>
-            </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Real-time Versioning</div>
           </div>
         </div>
 

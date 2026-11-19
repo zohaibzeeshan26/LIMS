@@ -27,7 +27,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/Badge';
 import { NewSampleModal } from '@/components/samples/NewSampleModal';
-import { formatDateTime } from '@/lib/date';
+import { formatDateTime, getSampleIsoDate, matchesDateRangeFilter } from '@/lib/date';
+import { MonthYearSearchPicker } from '@/components/dashboard/MonthYearSearchPicker';
 import { cn } from '@/lib/utils';
 import { Sample } from '@/types/lims';
 import { Modal } from '@/components/ui/Modal';
@@ -40,7 +41,8 @@ export function SampleRegistrationDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [labFilter, setLabFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'AWAITING' | 'ASSIGNED' | 'TESTING' | 'COMPLETED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'AWAITING' | 'ASSIGNED'>('ALL');
+  const [effectiveDateFilter, setEffectiveDateFilter] = useState<string>('ALL');
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null);
 
   // Fetch samples registered in the facility
@@ -60,9 +62,103 @@ export function SampleRegistrationDashboard() {
     return [];
   }, [samplesData]);
 
+  // Sample counts mapped by YYYY-MM
+  const monthCountsRecord = useMemo(() => {
+    const rec: Record<string, number> = {};
+    for (const s of samples) {
+      const sampleDate = s.samplingDate || s.createdAt || (s as any).sampledAt;
+      const iso = getSampleIsoDate(sampleDate);
+      if (iso) {
+        const ym = iso.slice(0, 7);
+        rec[ym] = (rec[ym] || 0) + 1;
+      }
+    }
+    return rec;
+  }, [samples]);
+
+  // Month-wise options with sample registration counts
+  const monthOptions = useMemo(() => {
+    const monthCounts = new Map<string, number>();
+    for (const s of samples) {
+      const sampleDate = s.samplingDate || s.createdAt || (s as any).sampledAt;
+      const iso = getSampleIsoDate(sampleDate);
+      if (iso) {
+        const ym = iso.slice(0, 7);
+        monthCounts.set(ym, (monthCounts.get(ym) || 0) + 1);
+      }
+    }
+
+    const monthsSet = new Set<string>();
+    const now = new Date();
+    // Recent 6 calendar months
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      monthsSet.add(`${yyyy}-${mm}`);
+    }
+    // Any months with registered samples
+    monthCounts.forEach((_, ym) => {
+      if (/^\d{4}-\d{2}$/.test(ym)) {
+        monthsSet.add(ym);
+      }
+    });
+
+    return Array.from(monthsSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((monthKey) => {
+        let label = monthKey;
+        try {
+          const [year, month] = monthKey.split('-').map(Number);
+          const date = new Date(year, month - 1, 1);
+          label = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        } catch {}
+        const count = monthCounts.get(monthKey) || 0;
+        return { monthKey, label, count };
+      });
+  }, [samples]);
+
+  // Active filter label
+  const activeFilterLabel = useMemo(() => {
+    if (!effectiveDateFilter || effectiveDateFilter === 'ALL') return 'All Months';
+    if (/^\d{4}-\d{2}$/.test(effectiveDateFilter)) {
+      try {
+        const [year, month] = effectiveDateFilter.split('-').map(Number);
+        return new Date(year, month - 1, 1).toLocaleDateString('en-GB', {
+          month: 'long',
+          year: 'numeric',
+        });
+      } catch {
+        return effectiveDateFilter;
+      }
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(effectiveDateFilter)) {
+      try {
+        const [y, m, d] = effectiveDateFilter.split('-').map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+      } catch {
+        return effectiveDateFilter;
+      }
+    }
+    return effectiveDateFilter;
+  }, [effectiveDateFilter]);
+
+  // Samples filtered by month/date
+  const dateFilteredSamples = useMemo(() => {
+    if (effectiveDateFilter === 'ALL') return samples;
+    return samples.filter((s) => {
+      const sampleDate = s.samplingDate || s.createdAt || (s as any).sampledAt;
+      return matchesDateRangeFilter(sampleDate, effectiveDateFilter);
+    });
+  }, [samples, effectiveDateFilter]);
+
   // Filter samples registered by this analyst (or all registered samples if user is intake technician)
   const registeredSamples = useMemo(() => {
-    return samples.filter((s: any) => {
+    return dateFilteredSamples.filter((s: any) => {
       const term = searchTerm.toLowerCase();
       const matchSearch =
         (s.sampleCode || '').toLowerCase().includes(term) ||
@@ -86,20 +182,10 @@ export function SampleRegistrationDashboard() {
           );
         }
         if (statusFilter === 'ASSIGNED') {
-          return s.status === 'ASSIGNED_FOR_TESTING' || s.status === 'ASSIGNED';
-        }
-        if (statusFilter === 'TESTING') {
           return (
-            s.status === 'TESTING_IN_PROGRESS' ||
-            s.status === 'IN_PROGRESS' ||
-            (s.status as any) === 'IN_ANALYSIS'
-          );
-        }
-        if (statusFilter === 'COMPLETED') {
-          return (
-            s.status === 'REVIEW_PENDING' ||
-            s.status === 'APPROVED' ||
-            (s.status as any) === 'COMPLETED'
+            s.status !== 'RECEIVED' &&
+            s.status !== 'LOGGED' &&
+            s.status !== 'PENDING_SUPERVISOR_ASSIGNMENT'
           );
         }
         return true;
@@ -107,30 +193,21 @@ export function SampleRegistrationDashboard() {
 
       return matchSearch && matchLab && matchPriority && matchStatus;
     });
-  }, [samples, searchTerm, labFilter, priorityFilter, statusFilter]);
+  }, [dateFilteredSamples, searchTerm, labFilter, priorityFilter, statusFilter]);
 
-  // Intake Metrics
+  // Intake Metrics based on selected month
   const metrics = useMemo(() => {
-    const total = samples.length;
-    const awaitingAssignment = samples.filter(
+    const total = dateFilteredSamples.length;
+    const awaitingAssignment = dateFilteredSamples.filter(
       (s) =>
         s.status === 'RECEIVED' ||
         s.status === 'LOGGED' ||
         s.status === 'PENDING_SUPERVISOR_ASSIGNMENT'
     ).length;
-    const assigned = samples.filter(
-      (s) => s.status === 'ASSIGNED_FOR_TESTING' || s.status === 'ASSIGNED'
-    ).length;
-    const inTesting = samples.filter((s) => s.status === 'TESTING_IN_PROGRESS').length;
-    const completedReview = samples.filter(
-      (s) =>
-        s.status === 'REVIEW_PENDING' ||
-        s.status === 'APPROVED' ||
-        (s.status as any) === 'COMPLETED'
-    ).length;
+    const assignedForward = total - awaitingAssignment;
 
-    return { total, awaitingAssignment, assigned, inTesting, completedReview };
-  }, [samples]);
+    return { total, awaitingAssignment, assignedForward };
+  }, [dateFilteredSamples]);
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
@@ -148,149 +225,186 @@ export function SampleRegistrationDashboard() {
             </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
-          <button
-            type="button"
-            onClick={() => refetchSamples()}
-            className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors cursor-pointer"
-            title="Refresh queue"
-          >
-            <RotateCcw className={cn('w-4 h-4', isLoading && 'animate-spin text-teal-600')} />
-          </button>
-        </div>
       </div>
 
-      {/* 2. Key Sample Intake Metrics (Interactive Stage Filtering) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* 1. Total Accessioned */}
+      {/* 2. Key Sample Intake Metrics (3 Primary Operational Counters) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* 1. Total Registered Samples (Registration Role Accessioned) */}
         <button
           type="button"
           onClick={() => setStatusFilter('ALL')}
           className={cn(
-            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1.5 group relative',
             statusFilter === 'ALL'
               ? 'bg-slate-900 text-white border-slate-900 ring-2 ring-slate-900/30 shadow-md -translate-y-0.5'
               : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-900 hover:border-slate-300'
           )}
         >
-          <div className="flex items-center justify-between text-xs font-medium">
-            <span className={statusFilter === 'ALL' ? 'text-slate-300' : 'text-slate-500'}>
-              Total Accessioned
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className={statusFilter === 'ALL' ? 'text-slate-300' : 'text-slate-600'}>
+              Total Samples Registered
             </span>
             <Layers className={cn('w-4 h-4', statusFilter === 'ALL' ? 'text-teal-400' : 'text-teal-600')} />
           </div>
-          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'ALL' ? 'text-white' : 'text-slate-900')}>
+          <div className={cn('text-2xl sm:text-3xl font-black tracking-tight', statusFilter === 'ALL' ? 'text-white' : 'text-slate-900')}>
             {metrics.total}
           </div>
-          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'ALL' ? 'text-teal-300' : 'text-slate-400')}>
-            {statusFilter === 'ALL' ? '● Showing all' : 'Click to view all'}
-          </div>
-        </button>
-
-        {/* 2. Awaiting Allocation */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'AWAITING' ? 'ALL' : 'AWAITING')}
-          className={cn(
-            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
-            statusFilter === 'AWAITING'
-              ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-500/30 shadow-md -translate-y-0.5'
-              : 'bg-white hover:bg-amber-50/50 border-slate-200/90 hover:border-amber-300'
-          )}
-        >
-          <div className="flex items-center justify-between text-xs font-medium">
-            <span className={statusFilter === 'AWAITING' ? 'text-amber-100' : 'text-slate-500'}>
-              Awaiting Allocation
+          <div className={cn('text-[11px] font-medium flex items-center justify-between', statusFilter === 'ALL' ? 'text-teal-300' : 'text-slate-400')}>
+            <span>{statusFilter === 'ALL' ? '● Showing all samples' : 'Click to view all'}</span>
+            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', statusFilter === 'ALL' ? 'bg-white/10 text-teal-200' : 'bg-slate-100 text-slate-600')}>
+              Registration Role
             </span>
-            <Clock className={cn('w-4 h-4', statusFilter === 'AWAITING' ? 'text-white' : 'text-amber-600')} />
-          </div>
-          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'AWAITING' ? 'text-white' : 'text-amber-700')}>
-            {metrics.awaitingAssignment}
-          </div>
-          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'AWAITING' ? 'text-amber-100' : 'text-slate-400')}>
-            {statusFilter === 'AWAITING' ? '● Filter active' : 'Click to filter'}
           </div>
         </button>
 
-        {/* 3. Assigned to Analysts */}
+        {/* 2. Assigned Forward to Analysts (Combined Assigned, In Testing, Completed) */}
         <button
           type="button"
           onClick={() => setStatusFilter(statusFilter === 'ASSIGNED' ? 'ALL' : 'ASSIGNED')}
           className={cn(
-            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1.5 group relative',
             statusFilter === 'ASSIGNED'
               ? 'bg-blue-600 text-white border-blue-700 ring-2 ring-blue-600/30 shadow-md -translate-y-0.5'
               : 'bg-white hover:bg-blue-50/50 border-slate-200/90 hover:border-blue-300'
           )}
         >
-          <div className="flex items-center justify-between text-xs font-medium">
-            <span className={statusFilter === 'ASSIGNED' ? 'text-blue-100' : 'text-slate-500'}>
-              Assigned to Analysts
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className={statusFilter === 'ASSIGNED' ? 'text-blue-100' : 'text-blue-700'}>
+              Assigned Forward to Analysts
             </span>
             <ShieldCheck className={cn('w-4 h-4', statusFilter === 'ASSIGNED' ? 'text-white' : 'text-blue-600')} />
           </div>
-          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'ASSIGNED' ? 'text-white' : 'text-blue-700')}>
-            {metrics.assigned}
+          <div className={cn('text-2xl sm:text-3xl font-black tracking-tight', statusFilter === 'ASSIGNED' ? 'text-white' : 'text-blue-700')}>
+            {metrics.assignedForward}
           </div>
-          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'ASSIGNED' ? 'text-blue-100' : 'text-slate-400')}>
-            {statusFilter === 'ASSIGNED' ? '● Filter active' : 'Click to filter'}
+          <div className={cn('text-[11px] font-medium flex items-center justify-between', statusFilter === 'ASSIGNED' ? 'text-blue-100' : 'text-slate-500')}>
+            <span>{statusFilter === 'ASSIGNED' ? '● Filter active' : 'Click to view assigned'}</span>
+            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', statusFilter === 'ASSIGNED' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700')}>
+              Allocated Forward
+            </span>
           </div>
         </button>
 
-        {/* 4. Under Active Testing */}
+        {/* 3. Not Assigned Yet (Unassigned Queue / Awaiting Allocation) */}
         <button
           type="button"
-          onClick={() => setStatusFilter(statusFilter === 'TESTING' ? 'ALL' : 'TESTING')}
+          onClick={() => setStatusFilter(statusFilter === 'AWAITING' ? 'ALL' : 'AWAITING')}
           className={cn(
-            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 group relative',
-            statusFilter === 'TESTING'
-              ? 'bg-teal-700 text-white border-teal-800 ring-2 ring-teal-700/30 shadow-md -translate-y-0.5'
-              : 'bg-white hover:bg-teal-50/50 border-slate-200/90 hover:border-teal-300'
+            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1.5 group relative',
+            statusFilter === 'AWAITING'
+              ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-500/30 shadow-md -translate-y-0.5'
+              : 'bg-white hover:bg-amber-50/50 border-slate-200/90 hover:border-amber-300'
           )}
         >
-          <div className="flex items-center justify-between text-xs font-medium">
-            <span className={statusFilter === 'TESTING' ? 'text-teal-100' : 'text-slate-500'}>
-              Under Active Testing
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className={statusFilter === 'AWAITING' ? 'text-amber-100' : 'text-amber-800'}>
+              Not Assigned Yet (Unassigned Queue)
             </span>
-            <FlaskConical className={cn('w-4 h-4', statusFilter === 'TESTING' ? 'text-white' : 'text-teal-600')} />
+            <Clock className={cn('w-4 h-4', statusFilter === 'AWAITING' ? 'text-white' : 'text-amber-600')} />
           </div>
-          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'TESTING' ? 'text-white' : 'text-teal-700')}>
-            {metrics.inTesting}
+          <div className={cn('text-2xl sm:text-3xl font-black tracking-tight', statusFilter === 'AWAITING' ? 'text-white' : 'text-amber-700')}>
+            {metrics.awaitingAssignment}
           </div>
-          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'TESTING' ? 'text-teal-100' : 'text-slate-400')}>
-            {statusFilter === 'TESTING' ? '● Filter active' : 'Click to filter'}
-          </div>
-        </button>
-
-        {/* 5. Completed / In Review */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? 'ALL' : 'COMPLETED')}
-          className={cn(
-            'p-4 sm:p-5 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs space-y-1 col-span-2 sm:col-span-1 group relative',
-            statusFilter === 'COMPLETED'
-              ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-600/30 shadow-md -translate-y-0.5'
-              : 'bg-white hover:bg-emerald-50/50 border-slate-200/90 hover:border-emerald-300'
-          )}
-        >
-          <div className="flex items-center justify-between text-xs font-medium">
-            <span className={statusFilter === 'COMPLETED' ? 'text-emerald-100' : 'text-slate-500'}>
-              Completed / In Review
+          <div className={cn('text-[11px] font-medium flex items-center justify-between', statusFilter === 'AWAITING' ? 'text-amber-100' : 'text-slate-500')}>
+            <span>{statusFilter === 'AWAITING' ? '● Filter active' : 'Click to view unassigned'}</span>
+            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', statusFilter === 'AWAITING' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700')}>
+              Awaiting Supervisor
             </span>
-            <CheckCircle2 className={cn('w-4 h-4', statusFilter === 'COMPLETED' ? 'text-white' : 'text-emerald-600')} />
-          </div>
-          <div className={cn('text-2xl sm:text-3xl font-black', statusFilter === 'COMPLETED' ? 'text-white' : 'text-emerald-700')}>
-            {metrics.completedReview}
-          </div>
-          <div className={cn('text-[11px] font-medium flex items-center gap-1', statusFilter === 'COMPLETED' ? 'text-emerald-100' : 'text-slate-400')}>
-            {statusFilter === 'COMPLETED' ? '● Filter active' : 'Click to filter'}
           </div>
         </button>
       </div>
 
       {/* 3. Registration History & Specimen Queue */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-5">
+        {/* Month-Wise Filter Bar for Registration Samples */}
+        <div className="flex items-center justify-between gap-3 overflow-x-auto pb-3 border-b border-slate-100 flex-wrap">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            {/* All Months button */}
+            <button
+              type="button"
+              onClick={() => setEffectiveDateFilter('ALL')}
+              className={cn(
+                'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer',
+                effectiveDateFilter === 'ALL'
+                  ? 'bg-teal-700 text-white shadow-xs font-bold'
+                  : 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200'
+              )}
+            >
+              <span>All Months</span>
+              <span
+                className={cn(
+                  'px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono',
+                  effectiveDateFilter === 'ALL'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-white text-slate-700 shadow-2xs'
+                )}
+              >
+                {samples.length}
+              </span>
+            </button>
+
+            {/* Individual Months buttons */}
+            {monthOptions.map(({ monthKey, label, count }) => {
+              const isSelected = effectiveDateFilter === monthKey;
+              return (
+                <button
+                  key={monthKey}
+                  type="button"
+                  onClick={() => setEffectiveDateFilter(monthKey)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer',
+                    isSelected
+                      ? 'bg-teal-700 text-white shadow-xs font-bold'
+                      : count > 0
+                      ? 'text-teal-900 bg-teal-50 border border-teal-200 hover:bg-teal-100'
+                      : 'text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                  )}
+                >
+                  <span>{label}</span>
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.2 rounded-full text-[10px] font-bold font-mono',
+                      isSelected
+                        ? 'bg-white/20 text-white'
+                        : count > 0
+                        ? 'bg-white text-teal-800 shadow-2xs'
+                        : 'bg-slate-200/70 text-slate-600'
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Month & Year Search Picker */}
+            <div className="flex items-center pl-2 border-l border-slate-200 ml-1">
+              <MonthYearSearchPicker
+                value={effectiveDateFilter}
+                onChange={(val) => setEffectiveDateFilter(val)}
+                docCounts={monthCountsRecord}
+                placeholder="Search Month & Year..."
+              />
+            </div>
+          </div>
+
+          {effectiveDateFilter !== 'ALL' && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-teal-800 bg-teal-50 px-2.5 py-1 rounded-xl border border-teal-200 flex items-center gap-1">
+                Active Month: <strong>{activeFilterLabel}</strong>
+                <span className="font-mono text-slate-600">({dateFilteredSamples.length} samples)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setEffectiveDateFilter('ALL')}
+                className="text-xs text-slate-500 hover:text-slate-800 underline font-medium cursor-pointer"
+              >
+                Reset to All Months
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -300,10 +414,8 @@ export function SampleRegistrationDashboard() {
             {statusFilter !== 'ALL' && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 shadow-2xs animate-in fade-in">
                 <span>
-                  {statusFilter === 'AWAITING' && 'Filtered: Awaiting Allocation'}
-                  {statusFilter === 'ASSIGNED' && 'Filtered: Assigned to Analysts'}
-                  {statusFilter === 'TESTING' && 'Filtered: Under Active Testing'}
-                  {statusFilter === 'COMPLETED' && 'Filtered: Completed / In Review'}
+                  {statusFilter === 'AWAITING' && 'Filtered: Not Assigned Yet'}
+                  {statusFilter === 'ASSIGNED' && 'Filtered: Assigned Forward to Analysts'}
                 </span>
                 <button
                   type="button"
@@ -386,8 +498,24 @@ export function SampleRegistrationDashboard() {
             <tbody className="divide-y divide-slate-100">
               {registeredSamples.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
-                    No samples matching your search criteria.
+                  <td colSpan={8} className="py-10 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <FileText className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                      <p className="text-sm font-semibold text-slate-600">
+                        {effectiveDateFilter !== 'ALL'
+                          ? `Is month (${activeFilterLabel}) mein koi sample register nahi hua.`
+                          : 'No samples matching your search criteria.'}
+                      </p>
+                      {effectiveDateFilter !== 'ALL' && (
+                        <button
+                          type="button"
+                          onClick={() => setEffectiveDateFilter('ALL')}
+                          className="mt-1 px-3 py-1 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition cursor-pointer"
+                        >
+                          Show All Months ({samples.length})
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

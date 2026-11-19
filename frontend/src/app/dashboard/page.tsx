@@ -1424,8 +1424,8 @@ function DashboardInner() {
                 </span>
                 <span className="font-bold text-indigo-200">Role View Switcher:</span>
                 <span className="text-slate-300">Logged in as</span>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-mono font-bold text-[11px] border border-indigo-400/30">
-                  {userRole}
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-sans font-bold text-[11px] border border-indigo-400/30">
+                  Super Admin
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -1438,7 +1438,7 @@ function DashboardInner() {
                   <option value="SUPER_ADMIN">1. Super Admin Dashboard</option>
                   <option value="ADMIN">2. HOD Dashboard</option>
                   <option value="DEPUTY_MANAGER">3. Deputy Manager Dashboard</option>
-                  <option value="DOCUMENTATION_MANAGER">4. Documentation Manager</option>
+                  <option value="DOCUMENTATION_MANAGER">4. Documentation Officer</option>
                   <option value="LAB_TECHNICIAN">5. Sample Registration Analyst Terminal</option>
                   <option value="QC_ANALYST">6. Testing Analyst Execution Workstation</option>
                 </select>

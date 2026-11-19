@@ -418,8 +418,8 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 className="p-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/80 text-teal-950 transition-colors text-left cursor-pointer disabled:opacity-50"
               >
-                <div className="font-bold text-[11px] text-teal-900">4. Doc Manager</div>
-                <div className="text-[10px] text-teal-600 font-mono">doc.manager</div>
+                <div className="font-bold text-[11px] text-teal-900">4. Doc Officer</div>
+                <div className="text-[10px] text-teal-600 font-mono">doc.officer</div>
               </button>
 
               <button

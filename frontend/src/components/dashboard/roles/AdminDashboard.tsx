@@ -1063,7 +1063,7 @@ export function AdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: Admin
                 <option value="QC_ANALYST">QC Analyst</option>
                 <option value="ANALYST">General Analyst</option>
                 <option value="LAB_TECHNICIAN">Sample Registration Analyst / Tech</option>
-                <option value="DOCUMENTATION_MANAGER">Documentation Manager</option>
+                <option value="DOCUMENTATION_MANAGER">Documentation Officer</option>
               </select>
 
               {/* 4. Filter by Module */}

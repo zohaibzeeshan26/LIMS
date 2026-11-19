@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -32,6 +33,8 @@ import {
   CheckCircle,
   XCircle,
   Clock4,
+  Layers,
+  PieChart,
 } from 'lucide-react';
 
 type DateFilterKey = 'today' | 'yesterday' | 'last7days' | 'last30days' | 'custom';
@@ -472,9 +475,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                   Three Separate Laboratory Command Cards
                 </h2>
               </div>
-              <span className="text-xs text-slate-500 font-medium">
-                Filter: <strong className="text-slate-800">{summaryData?.filter?.label || 'Today'}</strong> &bull; Click any card to open its dedicated dashboard
-              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -505,9 +505,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                                 Total: {lab.totalSamples} {lab.totalSamples === 1 ? 'Sample' : 'Samples'}
                               </span>
                             </div>
-                            <span className="text-[11px] text-slate-500 font-medium">
-                              {theme.badgeText}
-                            </span>
                           </div>
                         </div>
 
@@ -516,17 +513,21 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                         </span>
                       </div>
 
-                      {/* Required 6 Primary Metrics Display */}
+                      {/* Primary Metrics Display */}
                       <div className="grid grid-cols-2 gap-2.5 mb-4">
                         {/* 1. Total Samples */}
-                        <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100">
-                          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                            Total Samples
-                          </p>
-                          <p className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
-                            {lab.totalSamples}
-                          </p>
-                          <span className="text-[10px] text-slate-400">Received Today: {lab.receivedToday}</span>
+                        <div className="col-span-2 bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                              Total Samples
+                            </p>
+                            <p className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
+                              {lab.totalSamples}
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-medium bg-white px-2.5 py-1 rounded-md border border-slate-200/80 shadow-2xs">
+                            Received Today: {lab.receivedToday}
+                          </span>
                         </div>
 
                         {/* 2. Samples Assigned */}
@@ -571,23 +572,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                             {lab.completed}
                           </p>
                           <span className="text-[10px] text-slate-500">Disposition Verified</span>
-                        </div>
-
-                        {/* 6. Passed / Failed Samples */}
-                        <div className="bg-emerald-50/50 rounded-xl p-2.5 border border-emerald-100/80">
-                          <p className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider">
-                            Passed / Failed
-                          </p>
-                          <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className="text-lg font-black text-emerald-800 tracking-tight">
-                              {lab.passed}
-                            </span>
-                            <span className="text-xs text-slate-400 font-bold">/</span>
-                            <span className="text-sm font-bold text-rose-700">
-                              {lab.failed}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-emerald-700 font-semibold">Pass Rate: {lab.passRate}</span>
                         </div>
                       </div>
                     </div>
@@ -675,56 +659,272 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
             </div>
           </div>
 
-          {/* Daily Trend Chart for this Lab */}
-          <div className="enterprise-card rounded-2xl bg-white border border-slate-200 p-5 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-                <h3 className="font-bold text-sm text-slate-900">
-                  Daily Intake vs Completion Trend ({labThemeConfig[activeLab]?.title})
-                </h3>
+          {/* Dual Charts Grid: Daily Intake Trend + Live Pipeline Distribution */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Left Chart (7 cols): Daily Intake vs Completion Trend */}
+            <div className="lg:col-span-7 enterprise-card rounded-2xl bg-white border border-slate-200 p-5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 mb-4 gap-2">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">
+                        Daily Intake vs Completion Trend ({labThemeConfig[activeLab]?.title})
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Exact daily sample intake vs completed test releases
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                      <span className="text-slate-700 font-semibold">
+                        Received ({individualData?.dailyTrend?.reduce((acc, x) => acc + x.received, 0) ?? 0})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+                      <span className="text-slate-700 font-semibold">
+                        Completed ({individualData?.dailyTrend?.reduce((acc, x) => acc + x.completed, 0) ?? 0})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real SVG/CSS Bars - NO fake bars when 0 */}
+                <div className="h-48 flex items-end justify-between gap-3 border-b border-slate-200 px-2 pb-2 relative">
+                  {/* Subtle Gridlines */}
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 px-2 pb-2">
+                    <div className="border-b border-dashed border-slate-400 w-full" />
+                    <div className="border-b border-dashed border-slate-400 w-full" />
+                    <div className="border-b border-dashed border-slate-400 w-full" />
+                  </div>
+
+                  {individualData?.dailyTrend.map((d, idx) => {
+                    const maxTrend = Math.max(
+                      1,
+                      ...((individualData?.dailyTrend || []).map((x) => Math.max(x.received, x.completed)))
+                    );
+                    const hRec = d.received > 0 ? Math.max(16, (d.received / maxTrend) * 100) : 0;
+                    const hComp = d.completed > 0 ? Math.max(16, (d.completed / maxTrend) * 100) : 0;
+                    const isZero = d.received === 0 && d.completed === 0;
+
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full group relative z-10">
+                        {/* Hover Tooltip */}
+                        <div className="opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity absolute -top-10 bg-slate-900 text-white text-[10px] rounded px-2.5 py-1 shadow-lg whitespace-nowrap z-20">
+                          <span className="font-bold">{d.label}</span>: {d.received} Received &bull; {d.completed} Completed
+                        </div>
+
+                        {/* Bars Container */}
+                        <div className="flex items-end gap-1.5 justify-center w-full h-[85%]">
+                          {/* Received Bar */}
+                          {d.received > 0 ? (
+                            <div className="flex flex-col items-center justify-end h-full w-4 sm:w-5">
+                              <span className="text-[10px] font-black text-blue-700 leading-none mb-1">
+                                {d.received}
+                              </span>
+                              <div
+                                style={{ height: `${hRec}%` }}
+                                className="w-full bg-blue-600 rounded-t-sm hover:brightness-110 transition-all shadow-2xs"
+                              />
+                            </div>
+                          ) : null}
+
+                          {/* Completed Bar */}
+                          {d.completed > 0 ? (
+                            <div className="flex flex-col items-center justify-end h-full w-4 sm:w-5">
+                              <span className="text-[10px] font-black text-emerald-700 leading-none mb-1">
+                                {d.completed}
+                              </span>
+                              <div
+                                style={{ height: `${hComp}%` }}
+                                className="w-full bg-emerald-500 rounded-t-sm hover:brightness-110 transition-all shadow-2xs"
+                              />
+                            </div>
+                          ) : null}
+
+                          {/* Zero Indicator */}
+                          {isZero ? (
+                            <div className="flex flex-col items-center justify-end h-full pb-0.5">
+                              <span className="text-[10px] font-mono text-slate-300">0</span>
+                              <div className="w-3 h-0.5 bg-slate-200 rounded-full" />
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <span className="text-[10px] text-slate-500 font-semibold mt-2.5">{d.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-600" />
-                  <span className="text-slate-600">Received</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                  <span className="text-slate-600">Completed</span>
-                </div>
+
+              {/* Chart Footer Note */}
+              <div className="pt-3 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Reflects registered sample intake dates for this laboratory</span>
+                <span className="font-semibold text-slate-700">
+                  {individualData?.metrics.totalSamples ?? 0} total samples in record
+                </span>
               </div>
             </div>
 
-            {/* Responsive SVG Bars */}
-            <div className="h-48 flex items-end justify-between gap-2 border-b border-slate-200 px-2 pb-2">
-              {individualData?.dailyTrend.map((d, idx) => {
-                const maxTrend = Math.max(
-                  ...((individualData?.dailyTrend || []).map((x) => Math.max(x.received, x.completed))),
-                  5
-                );
-                const hRec = Math.min(100, Math.max(6, (d.received / maxTrend) * 100));
-                const hComp = Math.min(100, Math.max(6, (d.completed / maxTrend) * 100));
-
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full group relative">
-                    <div className="opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity absolute -top-10 bg-slate-900 text-white text-[10px] rounded px-2 py-1 shadow whitespace-nowrap z-10">
-                      {d.label}: Received {d.received}, Completed {d.completed}
+            {/* Right Chart (5 cols): Live Workflow Pipeline & Distribution */}
+            <div className="lg:col-span-5 enterprise-card rounded-2xl bg-white border border-slate-200 p-5 shadow-2xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-purple-600" />
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">
+                        Workflow Pipeline Distribution
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Current lifecycle stages of registered samples
+                      </p>
                     </div>
-                    <div className="flex items-end gap-1 justify-center w-full">
-                      <div
-                        style={{ height: `${hRec}%` }}
-                        className="w-3 bg-blue-600 rounded-t-xs hover:brightness-110 transition-all"
-                      />
-                      <div
-                        style={{ height: `${hComp}%` }}
-                        className="w-3 bg-emerald-500 rounded-t-xs hover:brightness-110 transition-all"
-                      />
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-medium mt-2">{d.label}</span>
                   </div>
-                );
-              })}
+                  <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
+                    {individualData?.metrics.totalSamples ?? 0} Samples
+                  </span>
+                </div>
+
+                {/* Multi-Segment Stacked Progress Bar */}
+                {(() => {
+                  const total = individualData?.metrics.totalSamples || 0;
+                  const unassigned = individualData?.metrics.unassignedCount || 0;
+                  const assigned = individualData?.metrics.assigned || 0;
+                  const underTesting = individualData?.metrics.underTesting || 0;
+                  const completed = individualData?.metrics.completed || 0;
+                  // Assigned samples awaiting test execution
+                  const assignedAwaiting = Math.max(0, assigned - underTesting);
+
+                  const pctUnassigned = total > 0 ? (unassigned / total) * 100 : 0;
+                  const pctAssigned = total > 0 ? (assignedAwaiting / total) * 100 : 0;
+                  const pctTesting = total > 0 ? (underTesting / total) * 100 : 0;
+                  const pctCompleted = total > 0 ? (completed / total) * 100 : 0;
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Visual Stacked Progress Bar */}
+                      <div>
+                        <div className="h-3.5 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                          {pctUnassigned > 0 && (
+                            <div
+                              style={{ width: `${pctUnassigned}%` }}
+                              className="bg-amber-400 hover:brightness-110 transition-all"
+                              title={`Unassigned: ${unassigned} (${pctUnassigned.toFixed(0)}%)`}
+                            />
+                          )}
+                          {pctAssigned > 0 && (
+                            <div
+                              style={{ width: `${pctAssigned}%` }}
+                              className="bg-blue-600 hover:brightness-110 transition-all"
+                              title={`Assigned for Testing: ${assignedAwaiting} (${pctAssigned.toFixed(0)}%)`}
+                            />
+                          )}
+                          {pctTesting > 0 && (
+                            <div
+                              style={{ width: `${pctTesting}%` }}
+                              className="bg-purple-600 hover:brightness-110 transition-all"
+                              title={`Under Testing: ${underTesting} (${pctTesting.toFixed(0)}%)`}
+                            />
+                          )}
+                          {pctCompleted > 0 && (
+                            <div
+                              style={{ width: `${pctCompleted}%` }}
+                              className="bg-emerald-500 hover:brightness-110 transition-all"
+                              title={`Completed: ${completed} (${pctCompleted.toFixed(0)}%)`}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 4 Pipeline Stage Breakdown Cards */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {/* 1. Unassigned Queue */}
+                        <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                              Unassigned Queue
+                            </span>
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded-full">
+                              {pctUnassigned.toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="text-lg font-black text-amber-900 mt-1">
+                            {unassigned} <span className="text-xs font-medium text-amber-700">sample{unassigned !== 1 ? 's' : ''}</span>
+                          </p>
+                          <span className="text-[10px] text-amber-600 truncate block mt-0.5">
+                            Awaiting assignment
+                          </span>
+                        </div>
+
+                        {/* 2. Assigned for Testing */}
+                        <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">
+                              Assigned Queue
+                            </span>
+                            <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded-full">
+                              {pctAssigned.toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="text-lg font-black text-blue-900 mt-1">
+                            {assignedAwaiting} <span className="text-xs font-medium text-blue-700">sample{assignedAwaiting !== 1 ? 's' : ''}</span>
+                          </p>
+                          <span className="text-[10px] text-blue-600 truncate block mt-0.5">
+                            Allocated to analysts
+                          </span>
+                        </div>
+
+                        {/* 3. In Active Testing */}
+                        <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/40">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-purple-800 uppercase tracking-wider">
+                              In Analysis
+                            </span>
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.2 rounded-full">
+                              {pctTesting.toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="text-lg font-black text-purple-900 mt-1">
+                            {underTesting} <span className="text-xs font-medium text-purple-700">sample{underTesting !== 1 ? 's' : ''}</span>
+                          </p>
+                          <span className="text-[10px] text-purple-600 truncate block mt-0.5">
+                            Worksheet active
+                          </span>
+                        </div>
+
+                        {/* 4. Completed & Verified */}
+                        <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/60">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                              Completed
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.2 rounded-full">
+                              {pctCompleted.toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="text-lg font-black text-slate-900 mt-1">
+                            {completed} <span className="text-xs font-medium text-slate-500">samples</span>
+                          </p>
+                          <span className="text-[10px] text-slate-500 truncate block mt-0.5">
+                            Disposition signed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Distribution Footer Note */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Lifecycle Sync: <strong className="text-slate-800">100% Traceable</strong></span>
+                <span className="text-slate-600">Live operational sync</span>
+              </div>
             </div>
           </div>
 
@@ -999,58 +1199,6 @@ export function LabOperationsView({ onBackToOverview }: LabOperationsViewProps) 
                 </div>
               </div>
             )}
-          </div>
-
-          {/* ===================================================================== */}
-          {/* COMPLETE DAILY WORKING ACTIVITIES / AUDIT LOG STREAM                  */}
-          {/* ===================================================================== */}
-          <div className="enterprise-card rounded-2xl bg-white border border-slate-200 p-5 shadow-2xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <h3 className="font-bold text-sm text-slate-900">
-                  Daily Working Activities &amp; 21 CFR Part 11 Audit Trail
-                </h3>
-              </div>
-              <span className="text-xs text-slate-500 font-medium">
-                Live compliance activity stream for {labThemeConfig[activeLab]?.title}
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {individualData?.recentActivities.map((act) => (
-                <div
-                  key={act.id}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-slate-50/70 border border-slate-100 text-xs"
-                >
-                  <div className="h-7 w-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-bold shrink-0 mt-0.5">
-                    {act.performedByName.slice(0, 1)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-slate-900">
-                        {act.performedByName}{' '}
-                        <span className="text-[10px] font-mono font-normal text-slate-500">
-                          ({act.role})
-                        </span>
-                      </p>
-                      <span className="text-[10px] text-slate-400">
-                        {act.timestamp ? formatDateTime(act.timestamp) : ''}
-                      </span>
-                    </div>
-                    <p className="text-slate-600 mt-0.5">
-                      <strong className="text-slate-800 font-mono text-[11px]">{act.action}</strong>: {act.reasonForChange || `Action on ${act.entityName} ${act.entityId}`}
-                    </p>
-                  </div>
-                </div>
-              ))}
-
-              {individualData?.recentActivities.length === 0 && (
-                <p className="text-center py-4 text-xs text-slate-400">
-                  No recent audit activity recorded today in this laboratory.
-                </p>
-              )}
-            </div>
           </div>
         </div>
       )}

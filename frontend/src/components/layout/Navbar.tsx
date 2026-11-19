@@ -319,6 +319,8 @@ function NavbarInner({ onToggleSidebar }: NavbarProps) {
       ? 'Chief Super Admin'
       : user?.role === 'ADMIN'
       ? 'Master Administrator'
+      : user?.role === 'DOCUMENTATION_MANAGER'
+      ? 'Documentation Officer'
       : user?.role === 'LAB_TECHNICIAN'
       ? 'Lab Analyst'
       : user?.role

@@ -41,7 +41,7 @@ import {
 const ALL_ROLES: { value: Role; label: string; desc: string; badgeColor: string }[] = [
   { value: 'SUPER_ADMIN' as Role, label: 'Super Admin', desc: 'Root authority, master settings & system oversight', badgeColor: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' },
   { value: 'ADMIN', label: 'HOD (Head of Department)', desc: 'Departmental leadership, administrative approvals & operations', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Manager', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Officer', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' },
   { value: 'DEPUTY_MANAGER', label: 'Deputy Manager', desc: 'Sole supervisory management, test assignment & verification', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200' },
   { value: 'TESTING_ANALYST', label: 'Testing Analyst', desc: 'Analytical test execution & instrument runs', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
   { value: 'QC_ANALYST', label: 'QC Analyst', desc: 'Quality control sample analysis & logging', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
@@ -1049,7 +1049,7 @@ export default function UserManagementPage() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-100 text-teal-800 border border-teal-200">
                         DOCUMENTATION_MANAGER
                       </span>
-                      <span className="block text-[11px] font-semibold text-teal-900 mt-0.5">Documentation Manager</span>
+                      <span className="block text-[11px] font-semibold text-teal-900 mt-0.5">Documentation Officer</span>
                     </td>
                     <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>

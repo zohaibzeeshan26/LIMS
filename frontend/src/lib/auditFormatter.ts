@@ -89,6 +89,8 @@ export function formatAuditRole(role: string): { label: string; badgeClass: stri
       return { label: 'QC Analyst', badgeClass: 'bg-blue-50 text-blue-800 border-blue-200 font-bold', isNonAdmin: true };
     case 'LAB_TECHNICIAN':
       return { label: 'Lab Analyst', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 font-bold', isNonAdmin: true };
+    case 'DOCUMENTATION_MANAGER':
+      return { label: 'Documentation Officer', badgeClass: 'bg-teal-50 text-teal-800 border-teal-200 font-bold', isNonAdmin: true };
     case 'AUDITOR':
       return { label: 'Auditor', badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold', isNonAdmin: true };
     default:
