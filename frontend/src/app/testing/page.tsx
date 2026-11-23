@@ -132,7 +132,7 @@ function TestingPageContent() {
   const { analysts: allAnalystsList } = useAllAnalysts();
 
   const isSuperAdmin = user?.role === 'ADMIN' || (user?.role as string) === 'SUPER_ADMIN' || (user?.role as string) === 'HOD';
-  const isManager = isSuperAdmin || user?.role === 'DEPUTY_MANAGER';
+  const isManager = isSuperAdmin || user?.role === 'DEPUTY_MANAGER' || user?.role === 'MANAGER' || user?.role === 'SHIFT_INCHARGE' || (user?.role as string) === 'ASSISTANT_MANAGER';
   const isAnalyst = !isManager;
 
   // Active Laboratory Tab
@@ -593,7 +593,18 @@ function TestingPageContent() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST', 'SUPER_ADMIN']}
+      allowedRoles={[
+        'QC_ANALYST',
+        'ANALYST',
+        'TESTING_ANALYST',
+        'SUPER_ADMIN',
+        'ADMIN',
+        'HOD',
+        'MANAGER',
+        'DEPUTY_MANAGER',
+        'SHIFT_INCHARGE',
+        'ASSISTANT_MANAGER',
+      ]}
       moduleName="Analytical Testing Workstation"
     >
       <div className="space-y-6">
@@ -935,7 +946,9 @@ function TestingPageContent() {
                           <h4 className="text-sm font-bold text-navy-950">No Assigned Samples in Queue</h4>
                           <p className="text-xs text-slate-500 leading-relaxed">
                             {isAnalyst
-                              ? `No active samples are currently assigned to you (${(user?.fullName || 'Zubair Raza').replace(/\s*\([^)]*\)/g, '').trim()}) for ${isAllLabs ? 'any laboratory' : activeLab.name}.`
+                              ? `No active samples are currently assigned to you (${(user?.fullName || 'Personnel').replace(/\s*\([^)]*\)/g, '').trim()}) for ${isAllLabs ? 'any laboratory' : activeLab.name}.`
+                              : selectedAnalystFilter === 'MY_WORK'
+                              ? `No active samples are currently assigned to you (${(user?.fullName || 'Personnel').replace(/\s*\([^)]*\)/g, '').trim()}) for ${isAllLabs ? 'any laboratory' : activeLab.name}.`
                               : `No analytical samples have been registered for ${isAllLabs ? 'any laboratory' : activeLab.name} yet.`}
                           </p>
                           {isManager && (

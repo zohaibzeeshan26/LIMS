@@ -239,7 +239,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Sample Assignment',
         href: '/tasks',
         icon: UserCheck,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
+        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'ASSISTANT_MANAGER'],
         badge: 'Tasks',
       },
       {
@@ -253,7 +253,18 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'Analyst Execution',
         href: '/testing',
         icon: Microscope,
-        roles: ['QC_ANALYST', 'ANALYST', 'TESTING_ANALYST'],
+        roles: [
+          'QC_ANALYST',
+          'ANALYST',
+          'TESTING_ANALYST',
+          'SUPER_ADMIN',
+          'ADMIN',
+          'HOD',
+          'MANAGER',
+          'DEPUTY_MANAGER',
+          'SHIFT_INCHARGE',
+          'ASSISTANT_MANAGER',
+        ],
       },
       {
         name: 'Quality Review & CoA',

@@ -39,16 +39,48 @@ import {
 } from 'lucide-react';
 
 const ALL_ROLES: { value: Role; label: string; desc: string; badgeColor: string }[] = [
+  { value: 'HOD' as Role, label: 'HOD (Head of Department)', desc: 'Departmental leadership, administrative approvals & operations', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 font-bold' },
+  { value: 'MANAGER' as Role, label: 'QC Manager', desc: 'Overall laboratory quality control management & approvals', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200 font-bold' },
+  { value: 'DEPUTY_MANAGER' as Role, label: 'Deputy Manager', desc: 'Supervisory management, test assignment & verification', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200 font-semibold' },
+  { value: 'SHIFT_INCHARGE' as Role, label: 'Assistant Manager', desc: 'Shift operations, bench supervision & test execution', badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200 font-semibold' },
+  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Manager', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200 font-semibold' },
+  { value: 'TESTING_ANALYST' as Role, label: 'Sr. Analyst (Senior Analyst)', desc: 'Senior analytical test execution, HPLC & complex assays', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200 font-semibold' },
+  { value: 'ANALYST' as Role, label: 'Analyst', desc: 'Standard sample testing & results reporting', badgeColor: 'bg-blue-50/70 text-blue-600 border-blue-200' },
+  { value: 'QC_ANALYST' as Role, label: 'QC Analyst', desc: 'Quality control sample analysis & logging', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
   { value: 'SUPER_ADMIN' as Role, label: 'Super Admin', desc: 'Root authority, master settings & system oversight', badgeColor: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' },
-  { value: 'ADMIN', label: 'HOD (Head of Department)', desc: 'Departmental leadership, administrative approvals & operations', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Officer', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200' },
-  { value: 'DEPUTY_MANAGER', label: 'Deputy Manager', desc: 'Sole supervisory management, test assignment & verification', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200' },
-  { value: 'TESTING_ANALYST', label: 'Testing Analyst', desc: 'Analytical test execution & instrument runs', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { value: 'QC_ANALYST', label: 'QC Analyst', desc: 'Quality control sample analysis & logging', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
-  { value: 'ANALYST', label: 'Analyst', desc: 'Standard sample testing & results reporting', badgeColor: 'bg-blue-50/70 text-blue-600 border-blue-200' },
-  { value: 'LAB_TECHNICIAN', label: 'Lab Analyst', desc: 'Sample accessioning & preparation', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { value: 'AUDITOR', label: 'Auditor', desc: 'Read-only regulatory compliance review', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { value: 'ADMIN' as Role, label: 'Administrator', desc: 'System administration & configuration', badgeColor: 'bg-slate-100 text-slate-800 border-slate-300' },
+  { value: 'QA_MANAGER' as Role, label: 'QA Manager', desc: 'Quality assurance review, batch release & CoA sign-off', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold' },
+  { value: 'LAB_TECHNICIAN' as Role, label: 'Lab Technician (Sample Registration)', desc: 'Sample accessioning & preparation', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { value: 'AUDITOR' as Role, label: 'Auditor', desc: 'Read-only regulatory compliance review', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
 ];
+
+export function getUserRolePriority(u: { role?: string; username?: string; fullName?: string }): number {
+  const r = (u?.role || '').toUpperCase();
+  const un = (u?.username || '').toLowerCase();
+  const fn = (u?.fullName || '').toLowerCase();
+
+  // 1. HOD
+  if (r === 'HOD' || un === 'admin.office' || fn.includes('head of department') || (r === 'ADMIN' && un.includes('office'))) return 1;
+  // 2. Manager
+  if (r === 'MANAGER' || un === 'qc.manager' || fn.includes('qc manager')) return 2;
+  // 3. Deputy Manager
+  if (r === 'DEPUTY_MANAGER' || un === 'deputy.manager' || fn.includes('deputy manager')) return 3;
+  // 4. Assistant Manager
+  if (r === 'SHIFT_INCHARGE' || r === 'ASSISTANT_MANAGER' || un === 'shift.incharge' || fn.includes('assistant manager')) return 4;
+  // 5. Documentation Manager
+  if (r === 'DOCUMENTATION_MANAGER' || un === 'doc.manager' || fn.includes('documentation manager') || fn.includes('documentation officer')) return 5;
+  // 6. Sr Analyst
+  if (r === 'TESTING_ANALYST' || un === 'qc.analyst' || fn.includes('senior') || fn.includes('sr.') || fn.includes('testing analyst')) return 6;
+  // 7. Analyst
+  if (r === 'ANALYST' || r === 'QC_ANALYST' || r.includes('ANALYST') || fn.includes('analyst')) return 7;
+  // 8. Remaining roles
+  if (r === 'QA_MANAGER') return 8;
+  if (r === 'LAB_TECHNICIAN') return 9;
+  if (r === 'AUDITOR') return 10;
+  if (r === 'ADMIN') return 11;
+  if (r === 'SUPER_ADMIN') return 12;
+  return 99;
+}
 
 const LAB_OPTIONS = [
   { value: 'GENERAL', label: 'General Lab (GL)' },
@@ -249,9 +281,9 @@ export default function UserManagementPage() {
     }, 6000);
   };
 
-  // Filtered users list
+  // Filtered users list (ordered strictly by laboratory role hierarchy)
   const filteredUsers = useMemo(() => {
-    return visibleUsers.filter((u) => {
+    const list = visibleUsers.filter((u) => {
       // Search filter
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
@@ -265,7 +297,11 @@ export default function UserManagementPage() {
         u.role.toLowerCase().includes(q);
 
       // Role filter
-      const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+      const matchesRole =
+        roleFilter === 'ALL' ||
+        u.role === roleFilter ||
+        (roleFilter === 'HOD' && (u.role === 'HOD' || u.username === 'admin.office')) ||
+        (roleFilter === 'SHIFT_INCHARGE' && (u.role === 'SHIFT_INCHARGE' || (u.role as string) === 'ASSISTANT_MANAGER'));
 
       // Lab filter
       const matchesLab =
@@ -280,6 +316,14 @@ export default function UserManagementPage() {
         (statusFilter === 'INACTIVE' && u.isActive === false);
 
       return matchesSearch && matchesRole && matchesLab && matchesStatus;
+    });
+
+    // 1. HOD -> 2. Manager -> 3. Deputy Manager -> 4. Assistant Manager -> 5. Doc Manager -> 6. Sr Analyst -> 7. Analyst -> 8. Others
+    return [...list].sort((a, b) => {
+      const rankA = getUserRolePriority(a);
+      const rankB = getUserRolePriority(b);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.fullName.localeCompare(b.fullName);
     });
   }, [visibleUsers, searchQuery, roleFilter, labFilter, statusFilter]);
 
@@ -321,7 +365,49 @@ export default function UserManagementPage() {
   };
 
   // Helper for role details
-  const getRoleMeta = (role: Role) => {
+  const getRoleMeta = (role: Role, username?: string, fullName?: string) => {
+    const un = (username || '').toLowerCase();
+    const fn = (fullName || '').toLowerCase();
+    if (role === 'HOD' || un === 'admin.office' || fn.includes('head of department')) {
+      return (
+        ALL_ROLES.find((r) => r.value === 'HOD') || {
+          value: 'HOD' as Role,
+          label: 'HOD (Head of Department)',
+          desc: 'Departmental leadership',
+          badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 font-bold',
+        }
+      );
+    }
+    if (role === 'MANAGER' || un === 'qc.manager') {
+      return (
+        ALL_ROLES.find((r) => r.value === 'MANAGER') || {
+          value: 'MANAGER' as Role,
+          label: 'QC Manager',
+          desc: 'QC Management',
+          badgeColor: 'bg-purple-50 text-purple-700 border-purple-200 font-bold',
+        }
+      );
+    }
+    if (role === 'SHIFT_INCHARGE' || (role as string) === 'ASSISTANT_MANAGER' || un === 'shift.incharge') {
+      return (
+        ALL_ROLES.find((r) => r.value === 'SHIFT_INCHARGE') || {
+          value: 'SHIFT_INCHARGE' as Role,
+          label: 'Assistant Manager',
+          desc: 'Shift operations & bench supervision',
+          badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200 font-semibold',
+        }
+      );
+    }
+    if (role === 'TESTING_ANALYST' || un === 'qc.analyst') {
+      return (
+        ALL_ROLES.find((r) => r.value === 'TESTING_ANALYST') || {
+          value: 'TESTING_ANALYST' as Role,
+          label: 'Sr. Analyst (Senior Analyst)',
+          desc: 'Analytical test execution',
+          badgeColor: 'bg-sky-50 text-sky-700 border-sky-200 font-semibold',
+        }
+      );
+    }
     return ALL_ROLES.find((r) => r.value === role) || {
       value: role,
       label: role.replace(/_/g, ' '),
@@ -658,7 +744,7 @@ export default function UserManagementPage() {
                 </tr>
               ) : (
                 filteredUsers.map((u) => {
-                  const roleMeta = getRoleMeta(u.role);
+                  const roleMeta = getRoleMeta(u.role, u.username, u.fullName);
                   const isUserActive = u.isActive !== false;
                   const initials = u.fullName
                     .split(' ')
@@ -681,13 +767,21 @@ export default function UserManagementPage() {
                           <div
                             className={cn(
                               'h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 border shadow-2xs',
-                              u.role === 'ADMIN' || (u.role as string) === 'SUPER_ADMIN'
-                                ? 'bg-rose-100 text-rose-700 border-rose-200'
-                                : u.role === 'DEPUTY_MANAGER'
+                              u.role === 'HOD' || u.username === 'admin.office'
+                                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                : u.role === 'MANAGER'
                                 ? 'bg-purple-100 text-purple-700 border-purple-200'
+                                : u.role === 'DEPUTY_MANAGER'
+                                ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                : u.role === 'SHIFT_INCHARGE'
+                                ? 'bg-cyan-100 text-cyan-700 border-cyan-200'
                                 : u.role === 'DOCUMENTATION_MANAGER'
                                 ? 'bg-teal-100 text-teal-700 border-teal-200'
-                                : 'bg-blue-100 text-blue-700 border-blue-200'
+                                : u.role === 'TESTING_ANALYST'
+                                ? 'bg-sky-100 text-sky-700 border-sky-200'
+                                : u.role === 'SUPER_ADMIN'
+                                ? 'bg-rose-100 text-rose-700 border-rose-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
                             )}
                           >
                             {initials}
@@ -935,11 +1029,11 @@ export default function UserManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px]">
-                  {/* ADMIN */}
+                  {/* 1. HOD */}
                   <tr className="hover:bg-slate-50/80 font-medium">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
-                        ADMIN / HOD
+                        HOD / ADMIN
                       </span>
                       <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">HOD (Head of Department)</span>
                     </td>
@@ -953,17 +1047,35 @@ export default function UserManagementPage() {
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-bold bg-emerald-50/30">Full</td>
                   </tr>
 
-                  {/* DEPUTY_MANAGER */}
+                  {/* 2. MANAGER */}
                   <tr className="hover:bg-slate-50/80">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-indigo-50/70 text-indigo-600 border border-indigo-200">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 border border-purple-200 font-bold">
+                        MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QC Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Access</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold bg-purple-50/30">Assign &amp; Route</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold">Supervise &amp; Execute</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold bg-purple-50/30">Verify &amp; Approve</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-semibold">CoA Review</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-semibold">Department Read</td>
+                    <td className="py-2.5 px-3 text-center text-purple-700 font-bold">Full Audit</td>
+                  </tr>
+
+                  {/* 3. DEPUTY_MANAGER */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-indigo-50/70 text-indigo-600 border border-indigo-200 font-semibold">
                         DEPUTY_MANAGER
                       </span>
                       <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Deputy Manager</span>
                     </td>
                     <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Access</td>
                     <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Assign</td>
-                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Supervise</td>
+                    <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Supervise &amp; Execute</td>
                     <td className="py-2.5 px-3 text-center text-indigo-700 font-bold bg-indigo-50/30">Verify</td>
                     <td className="py-2.5 px-3 text-center text-indigo-700 font-semibold">Review CoA</td>
                     <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
@@ -971,17 +1083,53 @@ export default function UserManagementPage() {
                     <td className="py-2.5 px-3 text-center text-indigo-700 font-bold">Inspect</td>
                   </tr>
 
-                  {/* TESTING_ANALYST */}
+                  {/* 4. SHIFT_INCHARGE (Assistant Manager) */}
                   <tr className="hover:bg-slate-50/80">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200 font-semibold">
+                        SHIFT_INCHARGE
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Assistant Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-emerald-600 font-semibold">Access</td>
+                    <td className="py-2.5 px-3 text-center text-cyan-700 font-bold bg-cyan-50/30">Assign Shift</td>
+                    <td className="py-2.5 px-3 text-center text-cyan-700 font-bold">Bench &amp; Supervise</td>
+                    <td className="py-2.5 px-3 text-center text-cyan-700 font-bold bg-cyan-50/30">Verify</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Shift Logs</td>
+                  </tr>
+
+                  {/* 5. DOCUMENTATION_MANAGER */}
+                  <tr className="hover:bg-slate-50/80 bg-teal-50/20">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-teal-50/40 font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-100 text-teal-800 border border-teal-200 font-semibold">
+                        DOCUMENTATION_MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-teal-900 mt-0.5">Documentation Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-teal-800 font-bold bg-teal-100/60">Upload, Replace, Version</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-teal-700 font-semibold">Product Audit</td>
+                  </tr>
+
+                  {/* 6. TESTING_ANALYST (Sr. Analyst) */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 border border-sky-200 font-semibold">
                         TESTING_ANALYST
                       </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Testing Analyst</span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Sr. Analyst (Senior Analyst)</span>
                     </td>
                     <td className="py-2.5 px-3 text-center text-slate-600">Assigned Only</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-blue-700 font-bold bg-blue-50/30">Bench Assay</td>
+                    <td className="py-2.5 px-3 text-center text-sky-700 font-bold bg-sky-50/30">Bench Assay &amp; Complex</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                     <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
@@ -989,25 +1137,7 @@ export default function UserManagementPage() {
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                   </tr>
 
-                  {/* QC_ANALYST */}
-                  <tr className="hover:bg-slate-50/80">
-                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 border border-sky-200">
-                        QC_ANALYST
-                      </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QC Analyst</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Assigned Only</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-sky-700 font-bold bg-sky-50/30">Bench Assay</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                  </tr>
-
-                  {/* ANALYST */}
+                  {/* 7. ANALYST */}
                   <tr className="hover:bg-slate-50/80">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-blue-50/70 text-blue-600 border border-blue-200">
@@ -1025,15 +1155,51 @@ export default function UserManagementPage() {
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                   </tr>
 
-                  {/* LAB_TECHNICIAN */}
+                  {/* 8. QC_ANALYST */}
                   <tr className="hover:bg-slate-50/80">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-50 text-teal-700 border border-teal-200">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 border border-sky-200">
+                        QC_ANALYST
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QC Analyst</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Assigned Only</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-sky-700 font-bold bg-sky-50/30">Bench Assay</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                  </tr>
+
+                  {/* 9. QA_MANAGER */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                        QA_MANAGER
+                      </span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">QA Manager</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">QA Final Review</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-700 font-bold bg-emerald-50/30">Batch Release &amp; CoA</td>
+                    <td className="py-2.5 px-3 text-center text-slate-600">View/Download</td>
+                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">Compliance Review</td>
+                  </tr>
+
+                  {/* 10. LAB_TECHNICIAN */}
+                  <tr className="hover:bg-slate-50/80">
+                    <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
                         LAB_TECHNICIAN
                       </span>
-                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Lab Analyst</span>
+                      <span className="block text-[11px] font-semibold text-slate-800 mt-0.5">Lab Technician / Accessioning</span>
                     </td>
-                    <td className="py-2.5 px-3 text-center text-teal-700 font-bold bg-teal-50/30">Accession &amp; Log</td>
+                    <td className="py-2.5 px-3 text-center text-amber-700 font-bold bg-amber-50/30">Accession &amp; Log</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
@@ -1043,25 +1209,7 @@ export default function UserManagementPage() {
                     <td className="py-2.5 px-3 text-center text-slate-400">—</td>
                   </tr>
 
-                  {/* DOCUMENTATION_MANAGER */}
-                  <tr className="hover:bg-slate-50/80 bg-teal-50/20">
-                    <td className="py-2.5 px-3.5 sticky left-0 bg-teal-50/40 font-bold text-slate-900 border-r border-slate-100">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-teal-100 text-teal-800 border border-teal-200">
-                        DOCUMENTATION_MANAGER
-                      </span>
-                      <span className="block text-[11px] font-semibold text-teal-900 mt-0.5">Documentation Officer</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-600">Read</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-teal-800 font-bold bg-teal-100/60">Upload, Replace, Version</td>
-                    <td className="py-2.5 px-3 text-center text-slate-400">—</td>
-                    <td className="py-2.5 px-3 text-center text-teal-700 font-semibold">Product Audit</td>
-                  </tr>
-
-                  {/* AUDITOR */}
+                  {/* 11. AUDITOR */}
                   <tr className="hover:bg-slate-50/80">
                     <td className="py-2.5 px-3.5 sticky left-0 bg-white font-bold text-slate-900 border-r border-slate-100">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700 border border-amber-200">

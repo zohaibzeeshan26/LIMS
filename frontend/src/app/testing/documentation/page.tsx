@@ -316,7 +316,11 @@ export default function TestingDocumentationRepositoryPage() {
         'LAB_TECHNICIAN',
         'SUPER_ADMIN',
         'ADMIN',
+        'HOD',
+        'MANAGER',
         'DEPUTY_MANAGER',
+        'SHIFT_INCHARGE',
+        'ASSISTANT_MANAGER',
         'DOCUMENTATION_MANAGER',
       ]}
       moduleName="Product Documentation Repository"

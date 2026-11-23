@@ -11,7 +11,7 @@
     "start:dev": "node init && ts-node -r tsconfig-paths/register src/server.ts",
     "start.dev": "ts-node -r tsconfig-paths/register src/server.ts",
     "build": "node init && tsc",
-    "start:prod": "node init && node dist/server.js",
+    "start:prod": "node init && node dist/src/server.js",
     "format": "prettier --write \"src/**/*.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

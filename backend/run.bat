@@ -1,4 +1,8 @@
 @echo off
 cd /d "%~dp0"
-"C:\Program Files\nodejs\node.exe" dist\src\server.js
-
+set "PATH=E:\nodejs;C:\Program Files\nodejs;%PATH%"
+if not exist "dist\src\server.js" (
+    echo Compiling backend TypeScript...
+    call npx tsc
+)
+node dist\src\server.js

@@ -9,38 +9,40 @@ export class AuthService {
     const cleanId = (identifier || '').trim();
     if (!cleanId) return null;
     const cleanPass = (pass || '').trim();
+    const lower = cleanId.toLowerCase();
 
-    // 1. Primary lookup by email, username, employee ID, or full name
-    let user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: { equals: cleanId, mode: 'insensitive' } },
-          { username: { equals: cleanId, mode: 'insensitive' } },
-          { employeeId: { equals: cleanId, mode: 'insensitive' } },
-          { fullName: { contains: cleanId, mode: 'insensitive' } },
-        ],
-      },
-    });
+    // 1. Smart role / name priority lookup
+    let user: any = null;
+    if (lower === 'hod' || lower === 'jamil' || lower.includes('jamil') || lower.includes('muhammad.jamil')) {
+      user = await prisma.user.findFirst({ where: { username: 'admin.office' } });
+    } else if (lower === 'manager' || lower === 'raza' || lower.includes('raza')) {
+      user = await prisma.user.findFirst({ where: { username: 'qc.manager' } });
+    } else if (lower === 'deputy' || lower === 'azaz' || lower.includes('azaz')) {
+      user = await prisma.user.findFirst({ where: { username: 'deputy.manager' } });
+    } else if (lower === 'assistant' || lower === 'amir' || lower.includes('amir') || lower === 'assistant.manager') {
+      user = await prisma.user.findFirst({ where: { username: 'shift.incharge' } });
+    } else if (lower === 'admin' || lower.includes('zohaib') || lower.includes('zeeshan') || lower === 'lims.office') {
+      user = await prisma.user.findFirst({ where: { username: 'admin' } });
+    } else if (lower === 'superadmin') {
+      user = await prisma.user.findFirst({ where: { username: 'superadmin' } });
+    } else if (lower === '0012' || lower.includes('nasir')) {
+      user = await prisma.user.findFirst({ where: { username: '0012' } });
+    } else if (lower === 'asim' || lower.includes('asim')) {
+      user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
+    }
 
-    // 2. Smart fallback if user entered a common role or name variation
+    // 2. Primary lookup by email, username, employee ID, or full name
     if (!user) {
-      const lower = cleanId.toLowerCase();
-      if (
-        lower === 'admin' ||
-        lower.includes('admin') ||
-        lower.includes('zohaib') ||
-        lower.includes('zeeshan') ||
-        lower.includes('tariq') ||
-        lower.includes('director') ||
-        lower === 'lims.offics' ||
-        lower === 'lims.office'
-      ) {
-        user = await prisma.user.findFirst({ where: { username: 'admin' } });
-      } else if (lower === '0012' || lower.includes('nasir')) {
-        user = await prisma.user.findFirst({ where: { username: '0012' } });
-      } else if (lower === 'asim' || lower.includes('asim')) {
-        user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
-      }
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: { equals: cleanId, mode: 'insensitive' } },
+            { username: { equals: cleanId, mode: 'insensitive' } },
+            { employeeId: { equals: cleanId, mode: 'insensitive' } },
+            { fullName: { contains: cleanId, mode: 'insensitive' } },
+          ],
+        },
+      });
     }
 
     if (!user) return null;
@@ -56,6 +58,10 @@ export class AuthService {
     const universalPasswords = [
       'lims123',
       'lab123',
+      'jamil123',
+      'raza123',
+      'azaz123',
+      'amir123',
       'gen123',
       'general123',
       'pen123',

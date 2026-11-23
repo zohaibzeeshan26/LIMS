@@ -1,3 +1,3 @@
 @echo off
-start "LIMS-Backend" /min "C:\Star LIMS\backend\run.bat"
-start "LIMS-Frontend" /min "C:\Star LIMS\frontend\run.bat"
+start "LIMS-Backend" /min "%~dp0backend\run.bat"
+start "LIMS-Frontend" /min "%~dp0frontend\run.bat"

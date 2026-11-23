@@ -26,10 +26,6 @@ export function isAnalystRole(role: string): boolean {
   const r = (role || '').toUpperCase();
   if (
     r === 'SUPER_ADMIN' ||
-    r === 'ADMIN' ||
-    r === 'HOD' ||
-    r === 'MANAGER' ||
-    r === 'DEPUTY_MANAGER' ||
     r === 'QA_MANAGER' ||
     r === 'LAB_TECHNICIAN' ||
     r === 'AUDITOR' ||
@@ -38,7 +34,46 @@ export function isAnalystRole(role: string): boolean {
   ) {
     return false;
   }
-  return r === 'QC_ANALYST' || r === 'ANALYST' || r === 'TESTING_ANALYST' || r.includes('ANALYST');
+  return (
+    r === 'QC_ANALYST' ||
+    r === 'ANALYST' ||
+    r === 'TESTING_ANALYST' ||
+    r === 'HOD' ||
+    r === 'ADMIN' ||
+    r === 'MANAGER' ||
+    r === 'DEPUTY_MANAGER' ||
+    r === 'SHIFT_INCHARGE' ||
+    r === 'ASSISTANT_MANAGER' ||
+    r.includes('ANALYST') ||
+    r.includes('ASSISTANT')
+  );
+}
+
+export function getRoleRank(u: any): number {
+  const r = (u?.role || '').toUpperCase();
+  const un = (u?.username || '').toLowerCase();
+  const fn = (u?.fullName || u?.name || '').toLowerCase();
+  // 1. HOD
+  if (r === 'HOD' || un === 'admin.office' || fn.includes('head of department') || (r === 'ADMIN' && un.includes('office'))) return 1;
+  // 2. Manager
+  if (r === 'MANAGER' || un === 'qc.manager' || fn.includes('qc manager')) return 2;
+  // 3. Deputy Manager
+  if (r === 'DEPUTY_MANAGER' || un === 'deputy.manager' || fn.includes('deputy manager')) return 3;
+  // 4. Assistant Manager
+  if (r === 'SHIFT_INCHARGE' || r === 'ASSISTANT_MANAGER' || un === 'shift.incharge' || fn.includes('assistant manager')) return 4;
+  // 5. Documentation Manager
+  if (r === 'DOCUMENTATION_MANAGER' || un === 'doc.manager' || fn.includes('documentation manager') || fn.includes('documentation officer')) return 5;
+  // 6. Sr Analyst
+  if (r === 'TESTING_ANALYST' || un === 'qc.analyst' || fn.includes('senior') || fn.includes('sr.') || fn.includes('testing analyst')) return 6;
+  // 7. Analyst
+  if (r === 'ANALYST' || r === 'QC_ANALYST' || r.includes('ANALYST') || fn.includes('analyst')) return 7;
+  // 8. Remaining roles
+  if (r === 'QA_MANAGER') return 8;
+  if (r === 'LAB_TECHNICIAN') return 9;
+  if (r === 'AUDITOR') return 10;
+  if (r === 'ADMIN') return 11;
+  if (r === 'SUPER_ADMIN') return 12;
+  return 99;
 }
 
 /**
@@ -57,6 +92,12 @@ export function useAllAnalysts(): { analysts: AnalystUserOption[]; isLoading: bo
 
     return dbUsers
       .filter((u: any) => u.isActive !== false && isAnalystRole(u.role))
+      .sort((a: any, b: any) => {
+        const rankA = getRoleRank(a);
+        const rankB = getRoleRank(b);
+        if (rankA !== rankB) return rankA - rankB;
+        return (a.fullName || a.username || '').localeCompare(b.fullName || b.username || '');
+      })
       .map((u: any) => {
       const assignedLabUpper = (u.assignedLab || '').toUpperCase();
       const labKey: 'GENERAL' | 'PENICILLIN' | 'CEPHALOSPORIN' | 'ALL' =

@@ -19,17 +19,17 @@ router.get('/check-sample-id/:sampleCode', (req, res, next) => samplingControlle
 router.get('/submissions/all', (req, res, next) => samplingController.getAllSubmissions(req, res, next));
 router.patch(
   '/submissions/:submissionId/status',
-  requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST),
+  requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.ANALYST, Role.TESTING_ANALYST, Role.MANAGER, Role.DEPUTY_MANAGER, Role.SHIFT_INCHARGE),
   (req, res, next) => samplingController.updateSubmissionStatus(req, res, next)
 );
 
-router.post('/:id/submit', requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.LAB_TECHNICIAN, Role.ANALYST), (req, res, next) =>
+router.post('/:id/submit', requireRoles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.LAB_TECHNICIAN, Role.ANALYST, Role.TESTING_ANALYST, Role.MANAGER, Role.DEPUTY_MANAGER, Role.SHIFT_INCHARGE), (req, res, next) =>
   samplingController.submitToWorkflow(req, res, next)
 );
 
 router.get('/:id/submissions', (req, res, next) => samplingController.getSampleSubmissions(req, res, next));
 router.get('/by-code', (req, res, next) => samplingController.findByCode(req, res, next));
 router.get('/:id', (req, res, next) => samplingController.findOne(req, res, next));
-router.patch('/:id', requireRoles(Role.ADMIN, Role.DEPUTY_MANAGER, Role.QC_ANALYST), (req, res, next) => samplingController.update(req, res, next));
+router.patch('/:id', requireRoles(Role.ADMIN, Role.DEPUTY_MANAGER, Role.QC_ANALYST, Role.ANALYST, Role.TESTING_ANALYST, Role.MANAGER, Role.SHIFT_INCHARGE), (req, res, next) => samplingController.update(req, res, next));
 
 export default router;

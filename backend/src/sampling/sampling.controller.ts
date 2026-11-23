@@ -71,7 +71,7 @@ export class SamplingController {
   }
 
   @Patch('submissions/:submissionId/status')
-  @Roles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST)
+  @Roles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.ANALYST, Role.TESTING_ANALYST, Role.MANAGER, Role.DEPUTY_MANAGER, Role.SHIFT_INCHARGE, Role.HOD)
   @ApiOperation({ summary: 'Update workflow submission status with 21 CFR Part 11 transition rule' })
   updateSubmissionStatus(
     @Param('submissionId') submissionId: string,
@@ -82,7 +82,7 @@ export class SamplingController {
   }
 
   @Post(':id/submit')
-  @Roles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.LAB_TECHNICIAN, Role.ANALYST)
+  @Roles(Role.ADMIN, Role.QA_MANAGER, Role.QC_ANALYST, Role.LAB_TECHNICIAN, Role.ANALYST, Role.TESTING_ANALYST, Role.MANAGER, Role.DEPUTY_MANAGER, Role.SHIFT_INCHARGE, Role.HOD)
   @ApiOperation({ summary: 'Route and submit a sample to Microbiology, Chemical, or Physical Lab' })
   submitToWorkflow(
     @Param('id') id: string,

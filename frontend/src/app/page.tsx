@@ -192,7 +192,7 @@ export default function WelcomePortalPage() {
           return card.id === 'dashboard' || card.id === 'testing';
         }
         if (userRole === 'DEPUTY_MANAGER') {
-          return card.id === 'dashboard' || card.id === 'tasks';
+          return card.id === 'dashboard' || card.id === 'tasks' || card.id === 'testing';
         }
         return true;
       })

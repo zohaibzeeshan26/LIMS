@@ -492,12 +492,16 @@ function TaskAssignmentPageInner() {
     setNewLab(activeLabKey);
   }, [activeLabKey]);
 
-  // Check role permission: Super Admin and Deputy Manager can assign samples. HOD is strictly Read-Only surveillance.
+  // Check role permission: Super Admin, HOD, Manager, Deputy Manager, and Assistant Manager can assign samples (including self-assignment)
   const isHOD = user?.role === 'ADMIN' || (user?.role as string) === 'HOD';
   const canAssign =
-    !isHOD &&
-    ((user?.role as string) === 'SUPER_ADMIN' ||
-      user?.role === 'DEPUTY_MANAGER');
+    (user?.role as string) === 'SUPER_ADMIN' ||
+    user?.role === 'ADMIN' ||
+    (user?.role as string) === 'HOD' ||
+    user?.role === 'MANAGER' ||
+    user?.role === 'DEPUTY_MANAGER' ||
+    user?.role === 'SHIFT_INCHARGE' ||
+    (user?.role as string) === 'ASSISTANT_MANAGER';
 
   // Real Database Analysts Query (combined with system analysts)
   const { data: dbPersonnelData } = useQuery({
@@ -1105,7 +1109,15 @@ function TaskAssignmentPageInner() {
 
   return (
     <RoleRouteGuard
-      allowedRoles={['SUPER_ADMIN', 'ADMIN', 'DEPUTY_MANAGER']}
+      allowedRoles={[
+        'SUPER_ADMIN',
+        'ADMIN',
+        'HOD',
+        'MANAGER',
+        'DEPUTY_MANAGER',
+        'SHIFT_INCHARGE',
+        'ASSISTANT_MANAGER',
+      ]}
       moduleName="Sample Assignment & Task Board"
     >
       <div className="space-y-6 animate-in fade-in duration-300">
@@ -1418,13 +1430,6 @@ function TaskAssignmentPageInner() {
               Task Assignment Gateway
             </h1>
           </div>
-
-          {isHOD && (
-            <div className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold shadow-2xs shrink-0 self-start md:self-auto">
-              <Lock className="w-3.5 h-3.5 text-amber-600" />
-              <span>HOD Read-Only Mode &bull; Assignment Restricted</span>
-            </div>
-          )}
         </div>
 
         {/* KPI Cards Row */}
