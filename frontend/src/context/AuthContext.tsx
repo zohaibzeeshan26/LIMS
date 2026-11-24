@@ -13,6 +13,7 @@ import {
 } from '@/lib/api';
 
 import { Role } from '@/types/lims';
+import { getRoleDashboardPath } from '@/lib/roleRouting';
 
 export interface User {
   id: string;
@@ -37,7 +38,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (identifier: string, pass: string, rememberMe?: boolean) => Promise<void>;
+  login: (identifier: string, pass: string, rememberMe?: boolean) => Promise<User | void>;
   loginAs: (role: User['role']) => Promise<void>;
   logout: () => Promise<void>;
   rememberedIdentifier: string | null;
@@ -187,10 +188,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (user && isLoginPage) {
+      const redirectPath = getRoleDashboardPath(user);
       if (typeof window !== 'undefined') {
-        window.location.replace('/');
+        window.location.replace(redirectPath);
       } else {
-        router.replace('/');
+        router.replace(redirectPath);
       }
       return;
     }
@@ -214,11 +216,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRememberedIdentifier(identifier.trim());
       }
 
+      const redirectPath = getRoleDashboardPath(syncedUser);
       if (typeof window !== 'undefined') {
-        window.location.href = '/';
+        window.location.href = redirectPath;
       } else {
-        router.replace('/');
+        router.replace(redirectPath);
       }
+      return syncedUser;
     } finally {
       setIsLoading(false);
     }

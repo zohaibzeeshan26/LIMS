@@ -26,11 +26,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPortalPage = pathname === '/';
   // Sidebar is shown on all workspace pages (dashboard, daily activity, samples, tasks, users, etc.)
   const showSidebar = !isPortalPage && pathname !== '/login';
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      // Dynamic initial check: only open by default on desktop
+      const isDesktop = window.innerWidth >= 1024;
+      setSidebarOpen(isDesktop);
+
+      // Real-time window resize listener: auto-adapts dynamically on all displays
+      const handleResize = () => {
+        if (window.innerWidth < 1024) {
+          setSidebarOpen(false);
+        } else {
+          setSidebarOpen(true);
+        }
+      };
+
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
   }, []);
+
+  // Auto-close sidebar on mobile/tablet navigation
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  }, [pathname]);
 
   // Auto-redirect if unauthenticated on protected routes
   useEffect(() => {
@@ -73,26 +97,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         {/* Workspace Top Header (shown on all pages except Portal Hub which has its own header) */}
         {!isPortalPage && (
-          <header className="sticky top-0 z-40 bg-white border-b border-slate-200/90 shadow-2xs px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4 shrink-0">
+          <header className="sticky top-0 z-40 bg-white border-b border-slate-200/90 shadow-2xs px-3 sm:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4 shrink-0">
             {/* Left Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-700 text-xs font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
                 title={sidebarOpen ? 'Collapse Left Slider' : 'Open Left Slider'}
               >
                 <PanelLeft className="h-4 w-4" />
-                <span>{sidebarOpen ? 'Collapse Slider' : 'Slider'}</span>
+                <span className="hidden sm:inline">{sidebarOpen ? 'Collapse Slider' : 'Slider'}</span>
               </button>
 
               <Link
                 href="/"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
                 title="Return to Main Portal"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
-                <span>Portal Hub</span>
+                <span className="hidden sm:inline">Portal Hub</span>
               </Link>
             </div>
 
@@ -104,16 +128,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <Link href="/" className="flex items-center gap-2 group">
-                <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-[#0B1A30] border border-slate-800 shadow-xs group-hover:bg-[#071324] transition-colors">
-                  <div className="h-7 w-7 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-2xs shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded-xl bg-[#0B1A30] border border-slate-800 shadow-xs group-hover:bg-[#071324] transition-colors">
+                  <div className="h-6 sm:h-7 w-6 sm:w-7 rounded-lg bg-white p-0.5 flex items-center justify-center shadow-2xs shrink-0">
                     <img
                       src="/city-pharma-logo.png"
                       alt="Citi Pharma Logo"
                       className="h-full w-full object-contain"
                     />
                   </div>
-                  <span className="font-black text-white tracking-tight text-sm">Citi Pharma</span>
-                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0066FF] text-white">
+                  <span className="font-black text-white tracking-tight text-xs sm:text-sm">Citi Pharma</span>
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0066FF] text-white">
                     LIMS
                   </span>
                 </div>
@@ -121,17 +145,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Right: Authenticated User Badge & Sign Out */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
               <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="truncate max-w-[180px]">
+                <span className="truncate max-w-[140px] lg:max-w-[180px]">
                   {(user?.fullName || 'Authorized Staff')
                     .replace(/\s*\([^)]*\)/g, '')
                     .trim()}
                 </span>
                 <span className="text-[10px] font-sans px-2 py-0.5 rounded-lg bg-white text-slate-700 border border-slate-200 font-semibold shadow-2xs">
                   {user?.role === 'DOCUMENTATION_MANAGER'
-                    ? 'Documentation Officer'
+                    ? 'Doc Officer'
                     : user?.role === 'LAB_TECHNICIAN'
                     ? 'Lab Analyst'
                     : user?.role === 'SUPER_ADMIN'
@@ -148,7 +172,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
               <button
                 onClick={() => logout()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-rose-600 transition-colors cursor-pointer shadow-2xs"
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-rose-600 transition-colors cursor-pointer shadow-2xs"
                 title="Sign Out"
               >
                 <LogOut className="h-3.5 w-3.5" />
@@ -159,8 +183,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* Main Full-Width Content View */}
-        <main className="flex-1 overflow-y-auto">
-          <div className={`p-4 sm:p-6 lg:p-8 ${isPortalPage ? 'max-w-6xl' : 'max-w-7xl'} w-full mx-auto`}>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className={`p-3 sm:p-5 lg:p-8 ${isPortalPage ? 'max-w-6xl' : 'max-w-7xl'} w-full mx-auto`}>
             {children}
           </div>
         </main>

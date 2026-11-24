@@ -15,20 +15,20 @@ export class AuthService {
     let user: any = null;
     if (lower === 'hod' || lower === 'jamil' || lower.includes('jamil') || lower.includes('muhammad.jamil')) {
       user = await prisma.user.findFirst({ where: { username: 'admin.office' } });
-    } else if (lower === 'manager' || lower === 'raza' || lower.includes('raza')) {
-      user = await prisma.user.findFirst({ where: { username: 'qc.manager' } });
-    } else if (lower === 'deputy' || lower === 'azaz' || lower.includes('azaz')) {
+    } else if (lower === 'manager' || lower === 'raza' || lower.includes('raza') || lower === 'qc' || lower.includes('qc') || lower.includes('analyst')) {
+      user = await prisma.user.findFirst({ where: { username: 'qc.analyst' } });
+    } else if (lower === 'deputy' || lower === 'azaz' || lower.includes('azaz') || lower.includes('deputy')) {
       user = await prisma.user.findFirst({ where: { username: 'deputy.manager' } });
-    } else if (lower === 'assistant' || lower === 'amir' || lower.includes('amir') || lower === 'assistant.manager') {
-      user = await prisma.user.findFirst({ where: { username: 'shift.incharge' } });
+    } else if (lower.includes('doc') || lower.includes('officer') || lower === 'asim' || lower.includes('asim')) {
+      user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
+    } else if (lower.includes('reg') || lower.includes('registration') || lower.includes('hamza')) {
+      user = await prisma.user.findFirst({ where: { username: 'reg.analyst' } });
     } else if (lower === 'admin' || lower.includes('zohaib') || lower.includes('zeeshan') || lower === 'lims.office') {
       user = await prisma.user.findFirst({ where: { username: 'admin' } });
     } else if (lower === 'superadmin') {
       user = await prisma.user.findFirst({ where: { username: 'superadmin' } });
     } else if (lower === '0012' || lower.includes('nasir')) {
       user = await prisma.user.findFirst({ where: { username: '0012' } });
-    } else if (lower === 'asim' || lower.includes('asim')) {
-      user = await prisma.user.findFirst({ where: { username: 'doc.manager' } });
     }
 
     // 2. Primary lookup by email, username, employee ID, or full name
@@ -104,10 +104,10 @@ export class AuthService {
       universalPasswords.includes(cleanPass) ||
       universalPasswords.includes(cleanPass.toLowerCase());
 
-    // In local lab environment: If password matches universal list, matches username, or is any string >= 3 chars
-    if (!isMatch && (isUniversalMatch || isUsernameMatch || cleanPass.length >= 3)) {
+    // In local lab environment: If password matches universal list, matches username, or has any content
+    if (!isMatch && (isUniversalMatch || isUsernameMatch || cleanPass.length >= 1)) {
       const salt = await bcrypt.genSalt(10);
-      const newHash = await bcrypt.hash(cleanPass, salt);
+      const newHash = await bcrypt.hash(cleanPass || 'admin123', salt);
       await prisma.user.update({
         where: { id: user.id },
         data: { passwordHash: newHash },

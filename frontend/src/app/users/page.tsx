@@ -54,7 +54,7 @@ const ALL_ROLES: { value: Role; label: string; desc: string; badgeColor: string 
   { value: 'AUDITOR' as Role, label: 'Auditor', desc: 'Read-only regulatory compliance review', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
 ];
 
-export function getUserRolePriority(u: { role?: string; username?: string; fullName?: string }): number {
+function getUserRolePriority(u: { role?: string; username?: string; fullName?: string }): number {
   const r = (u?.role || '').toUpperCase();
   const un = (u?.username || '').toLowerCase();
   const fn = (u?.fullName || '').toLowerCase();
