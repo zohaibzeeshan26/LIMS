@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       className="h-full w-full object-contain"
                     />
                   </div>
-                  <span className="font-black text-white tracking-tight text-xs sm:text-sm">Citi Pharma</span>
+                  <span className="hidden sm:inline font-black text-white tracking-tight text-xs sm:text-sm">Citi Pharma</span>
                   <span className="text-[8px] sm:text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-[#0066FF] text-white">
                     LIMS
                   </span>

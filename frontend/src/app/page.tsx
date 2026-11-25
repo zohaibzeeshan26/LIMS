@@ -213,31 +213,39 @@ export default function WelcomePortalPage() {
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       
       {/* Top Portal Navigation Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-200/90">
-        <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-xl bg-white p-1 flex items-center justify-center border border-slate-200 shadow-xs">
+      <div className="flex items-center justify-between pb-4 border-b border-slate-200/90 gap-2">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-white p-1 flex items-center justify-center border border-slate-200 shadow-xs shrink-0">
             <img
               src="/city-pharma-logo.png"
               alt="Citi Pharma Logo"
               className="h-full w-full object-contain"
             />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-black text-slate-900 tracking-tight text-lg leading-none">Citi Pharma</span>
-              <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#0066FF] text-white shadow-2xs">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-black text-slate-900 tracking-tight text-base sm:text-lg leading-none">Citi Pharma</span>
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#0066FF] text-white shadow-2xs">
                 LIMS
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Laboratory Information Management System • Care to Cure</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5 truncate max-w-[200px] xs:max-w-xs sm:max-w-none">Laboratory Information Management System • Care to Cure</p>
           </div>
         </div>
 
-        {/* Sign Out Action */}
-        <div className="flex items-center gap-3">
+        {/* User Info & Sign Out Action */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {user && (
+            <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="truncate max-w-[120px] lg:max-w-[160px]">
+                {(user.fullName || 'Staff').replace(/\s*\([^)]*\)/g, '').trim()}
+              </span>
+            </div>
+          )}
           <button
             onClick={() => logout()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-rose-600 transition-colors cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-xs font-semibold text-rose-600 transition-colors cursor-pointer shadow-2xs"
             title="Sign Out"
           >
             <LogOut className="h-3.5 w-3.5" />
@@ -247,10 +255,10 @@ export default function WelcomePortalPage() {
       </div>
 
       {/* ================= 1. TOP WELCOME BANNER (Exact Match to Mockup) ================= */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-[#e8f3fc] via-[#f2f8fe] to-[#f8fbff] border border-blue-100/90 shadow-xs overflow-hidden flex flex-col md:flex-row items-center justify-between min-h-[140px] sm:min-h-[155px]">
+      <div className="relative rounded-2xl bg-gradient-to-r from-[#e8f3fc] via-[#f2f8fe] to-[#f8fbff] border border-blue-100/90 shadow-xs overflow-hidden flex flex-col sm:flex-row items-center justify-between min-h-[140px] sm:min-h-[155px]">
         
         {/* Banner Left: Welcome Text */}
-        <div className="p-6 sm:p-8 lg:p-10 z-10 max-w-xl">
+        <div className="p-5 sm:p-8 lg:p-10 z-10 max-w-xl">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-700">
@@ -258,7 +266,7 @@ export default function WelcomePortalPage() {
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-black text-[#0A192F] tracking-tight leading-tight">
+          <h1 className="text-xl sm:text-2xl lg:text-[30px] font-black text-[#0A192F] tracking-tight leading-tight">
             Welcome to Citi Pharma
           </h1>
 
@@ -268,21 +276,21 @@ export default function WelcomePortalPage() {
         </div>
 
         {/* Banner Right: High-Res Laboratory Microscope & Glassware Illustration */}
-        <div className="relative shrink-0 w-full md:w-auto h-36 md:h-full flex items-center justify-end pointer-events-none self-end md:self-auto">
+        <div className="relative shrink-0 w-full sm:w-auto h-28 sm:h-36 md:h-40 flex items-center justify-end pointer-events-none self-end sm:self-auto pr-3 sm:pr-6 pb-1 sm:pb-0">
           {/* Subtle Ambient Radial Highlight */}
-          <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#f2f8fe]/40 to-[#e8f3fc] hidden md:block z-1" />
+          <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#f2f8fe]/40 to-[#e8f3fc] hidden sm:block z-1" />
           
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/portal-hero-microscope.png"
             alt="Laboratory Operations Microscope"
-            className="h-32 sm:h-36 md:h-40 w-auto object-contain object-right-bottom drop-shadow-sm select-none"
+            className="h-24 sm:h-32 md:h-36 lg:h-40 w-auto object-contain object-right-bottom drop-shadow-sm select-none"
           />
         </div>
       </div>
 
       {/* ================= 2. PROFESSIONAL PORTAL CARDS GRID ================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {visiblePortalCards.map((card) => {
           const IconComponent = card.icon;
           const isSamplesCard = card.id === 'samples';
