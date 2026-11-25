@@ -7,6 +7,26 @@ import * as z from 'zod';
 import { Eye, EyeOff, AlertCircle, Loader2, User, Lock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getRoleDashboardPath } from '@/lib/roleRouting';
+<<<<<<< HEAD
+=======
+import { cn } from '@/lib/utils';
+import {
+  User as UserIcon,
+  Lock,
+  Eye,
+  EyeOff,
+  LogIn,
+  AlertCircle,
+  Loader2,
+  X,
+  Sparkles,
+  FlaskConical,
+  UserCheck,
+  FileText,
+  Microscope,
+  Award,
+} from 'lucide-react';
+>>>>>>> 8872a5f (chnage)
 
 const loginSchema = z.object({
   identifier: z
@@ -22,12 +42,22 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+<<<<<<< HEAD
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+=======
+  const { login, rememberedIdentifier } = useAuth();
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [showQuickDemo, setShowQuickDemo] = useState(false);
+>>>>>>> 8872a5f (chnage)
 
   const {
     register,
@@ -37,14 +67,27 @@ export default function LoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      identifier: '',
+      identifier: rememberedIdentifier || '',
       password: '',
       rememberMe: true,
     },
   });
 
+<<<<<<< HEAD
   const identifierValue = watch('identifier');
   const passwordValue = watch('password');
+=======
+  // Check URL query parameters for session errors or direct credentials
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlId = params.get('identifier') || params.get('email') || params.get('username');
+      const urlPass = params.get('password') || params.get('pass');
+      if (urlId && urlPass) {
+        handleDirectLogin(urlId, urlPass);
+        return;
+      }
+>>>>>>> 8872a5f (chnage)
 
   const { onBlur: onBlurIdentifier, ...identifierRest } = register('identifier');
   const { onBlur: onBlurPassword, ...passwordRest } = register('password');
@@ -61,13 +104,46 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('Login error:', err);
+<<<<<<< HEAD
       const msg = err.message || 'Invalid username or password. Please try again.';
+=======
+      const msg = err.message || 'Authentication failed. Please check your credentials.';
       setErrorMessage(msg);
       setIsSubmitting(false);
     }
   };
 
+  const handleDirectLogin = async (identifier: string, pass: string) => {
+    setValue('identifier', identifier, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    setValue('password', pass, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const loggedUser = await login(identifier, pass, true);
+      const targetDashboard = getRoleDashboardPath(loggedUser as any);
+      if (typeof window !== 'undefined') {
+        window.location.href = targetDashboard;
+      }
+    } catch (err: any) {
+      console.error('Direct login error:', err);
+      const msg = err.message || 'Authentication failed. Please check your credentials.';
+>>>>>>> 8872a5f (chnage)
+      setErrorMessage(msg);
+      setIsSubmitting(false);
+    }
+  };
+
+  const demoAccounts = [
+    { role: 'HOD', name: 'Muhammad Jamil', id: 'admin.office', pass: 'Admin@123', color: 'border-blue-300 text-blue-700 bg-blue-50' },
+    { role: 'QC Manager', name: 'Raza', id: 'qc.manager', pass: 'Manager@123', color: 'border-purple-300 text-purple-700 bg-purple-50' },
+    { role: 'Deputy Manager', name: 'Azaz', id: 'deputy.manager', pass: 'Deputy@123', color: 'border-indigo-300 text-indigo-700 bg-indigo-50' },
+    { role: 'Assistant Manager', name: 'Amir', id: 'shift.incharge', pass: 'Shift@123', color: 'border-cyan-300 text-cyan-700 bg-cyan-50' },
+    { role: 'QC Analyst', name: 'Muhammad Ali', id: 'qc.analyst', pass: 'Password@123', color: 'border-emerald-300 text-emerald-700 bg-emerald-50' },
+  ];
+
   return (
+<<<<<<< HEAD
     <div className="relative w-screen h-screen overflow-hidden bg-white flex items-center justify-center font-sans select-none">
       
       {/* =========================================================================
@@ -76,6 +152,14 @@ export default function LoginPage() {
           Edge-to-edge perfect lockscreen fit with zero letterbox margin
           ========================================================================= */}
       <div 
+=======
+    <main className="relative w-screen h-screen overflow-hidden bg-white flex items-center justify-center font-sans select-none">
+
+      {/* ========================================================================= */}
+      {/* 1. WIDESCREEN 16:9 VIEWPORT CANVAS (100% Pixel-Perfect Exact Match)       */}
+      {/* ========================================================================= */}
+      <div
+>>>>>>> 8872a5f (chnage)
         className="hidden md:flex relative w-full h-full items-center justify-center overflow-hidden"
         style={{
           aspectRatio: '1678 / 937',
@@ -85,10 +169,17 @@ export default function LoginPage() {
           height: '100%',
         }}
       >
+<<<<<<< HEAD
         {/* User-Provided High-Resolution Login Interface Picture (No Coat Logo) */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/Citi_Pharma_LIMS_Login_no_coat_logo.png?v=no_coat_logo"
+=======
+        {/* Clean Ultra-High-Resolution Reference Graphic (1678 x 937) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/Citi_Pharma_LIMS_Login_clean_bg.png"
+>>>>>>> 8872a5f (chnage)
           alt="Citi Pharma LIMS"
           className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
           style={{
@@ -98,6 +189,7 @@ export default function LoginPage() {
           }}
         />
 
+<<<<<<< HEAD
         {/* =========================================================================
             PURE TRANSPARENT FORM OVERLAY:
             ZERO new visual boxes, ZERO new icons, ZERO new buttons.
@@ -350,9 +442,385 @@ export default function LoginPage() {
 
         <div className="mt-5 text-center text-[10px] text-slate-400 border-t border-slate-100 pt-3">
           Citi Pharma (Pvt.) Ltd. • © 2026 All rights reserved.
+=======
+        {/* Interactive Overlay Hotspots for 5 Feature Cards on Left */}
+        <div className="absolute left-[3.4%] bottom-[15.8%] w-[44.5%] h-[17.5%] grid grid-cols-5 gap-1.5 z-10 pointer-events-auto">
+          <div
+            title="Sample Registration & Accessioning"
+            className="rounded-xl transition-all duration-200 hover:bg-white/30 hover:backdrop-blur-xs hover:border hover:border-cyan-400 hover:shadow-md cursor-pointer"
+          />
+          <div
+            title="Supervisor Sample & Lab Assignment"
+            className="rounded-xl transition-all duration-200 hover:bg-white/30 hover:backdrop-blur-xs hover:border hover:border-cyan-400 hover:shadow-md cursor-pointer"
+          />
+          <div
+            title="cGMP Document Control & Dossier Vault"
+            className="rounded-xl transition-all duration-200 hover:bg-white/30 hover:backdrop-blur-xs hover:border hover:border-emerald-400 hover:shadow-md cursor-pointer"
+          />
+          <div
+            title="Analytical Test Execution & Bench Logging"
+            className="rounded-xl transition-all duration-200 hover:bg-white/30 hover:backdrop-blur-xs hover:border hover:border-cyan-400 hover:shadow-md cursor-pointer"
+          />
+          <div
+            title="Certificate of Analysis (COA) Generation & Release"
+            className="rounded-xl transition-all duration-200 hover:bg-white/30 hover:backdrop-blur-xs hover:border hover:border-cyan-400 hover:shadow-md cursor-pointer"
+          />
         </div>
+
+        {/* ======================================================================= */}
+        {/* REAL INTERACTIVE FORM (Crisp, Pixel-Perfect Matching Canvas Inputs)     */}
+        {/* ======================================================================= */}
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          className="absolute z-20 pointer-events-auto flex flex-col justify-start"
+          style={{
+            left: '68.70%',
+            width: '27.50%',
+            top: '40.6%',
+            height: '36.5%',
+          }}
+        >
+          {/* Error Message Floating Badge */}
+          {errorMessage && (
+            <div className="absolute -top-11 left-0 right-0 p-2 rounded-xl bg-rose-50 border border-rose-300 shadow-md flex items-center justify-between gap-1 text-rose-700 text-[11px] animate-in fade-in duration-150 z-50">
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                <span className="truncate">{errorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMessage(null)}
+                className="text-rose-400 hover:text-rose-600 p-0.5 cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
+          {/* 1. Username or Email Input Field */}
+          <div className="relative flex items-center w-full h-[18.5%] rounded-xl border border-slate-200 bg-white shadow-2xs hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all px-1.5">
+            <div className="h-7 w-7 rounded-lg bg-[#0B2545] flex items-center justify-center text-white shrink-0 ml-0.5 shadow-2xs">
+              <UserIcon className="h-3.5 w-3.5" />
+            </div>
+            <input
+              {...register('identifier')}
+              type="text"
+              disabled={isSubmitting}
+              placeholder="Username or Email"
+              autoComplete="username"
+              className="w-full h-full bg-transparent border-none outline-hidden px-2.5 text-xs lg:text-[13px] text-slate-800 placeholder:text-slate-400 font-medium"
+            />
+          </div>
+
+          {/* 2. Password Input Field */}
+          <div className="relative flex items-center w-full h-[18.5%] rounded-xl border border-slate-200 bg-white shadow-2xs hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all px-1.5 mt-2.5">
+            <div className="h-7 w-7 rounded-lg bg-[#0B2545] flex items-center justify-center text-white shrink-0 ml-0.5 shadow-2xs">
+              <Lock className="h-3.5 w-3.5" />
+            </div>
+            <input
+              {...register('password')}
+              type={showPassword ? 'text' : 'password'}
+              disabled={isSubmitting}
+              placeholder="Password"
+              autoComplete="current-password"
+              className="w-full h-full bg-transparent border-none outline-hidden px-2.5 text-xs lg:text-[13px] text-slate-800 placeholder:text-slate-400 font-medium"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPassword(!showPassword)}
+              className="p-1 text-slate-400 hover:text-slate-700 focus:outline-hidden transition-colors cursor-pointer mr-1"
+              title={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          {/* 3. Remember Me & Forgot Password Row */}
+          <div className="flex items-center justify-between text-[11px] lg:text-[12px] text-slate-700 select-none mt-2 px-0.5">
+            <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700 hover:text-slate-900">
+              <input
+                type="checkbox"
+                {...register('rememberMe')}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span>Remember Me</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(true)}
+              className="text-[#0066cc] hover:underline font-semibold cursor-pointer"
+            >
+              Forgot Password?
+            </button>
+          </div>
+
+          {/* 4. Login Gradient Button */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full h-[21.5%] rounded-full bg-gradient-to-r from-[#0062e0] via-[#0070ba] to-[#16a34a] hover:opacity-95 text-white font-bold text-sm lg:text-base flex items-center justify-center gap-2 shadow-md shadow-blue-900/20 active:scale-[0.99] transition-all disabled:opacity-75 cursor-pointer mt-3"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-4 w-4 lg:h-5 lg:w-5 animate-spin" />
+            ) : (
+              <LogIn className="h-4 w-4 lg:h-5 lg:w-5" />
+            )}
+            <span>{isSubmitting ? 'Signing in...' : 'Login'}</span>
+          </button>
+
+          {/* 5. Secure & Encrypted Connection Row */}
+          <div className="flex items-center justify-center gap-1.5 text-[10px] lg:text-[11px] text-slate-600 font-medium select-none mt-3">
+            <Lock className="h-3 w-3 text-[#0B2545]" />
+            <span>Secure &amp; Encrypted Connection</span>
+          </div>
+        </form>
       </div>
 
-    </div>
+      {/* ========================================================================= */}
+      {/* 2. RESPONSIVE MOBILE VIEWPORT (< md Screens)                              */}
+      {/* ========================================================================= */}
+      <div className="md:hidden w-full min-h-screen bg-slate-50 flex flex-col justify-between p-4">
+        
+        {/* Mobile Header Bar */}
+        <header className="w-full bg-white rounded-2xl border border-slate-200 px-4 py-3 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/city-pharma-logo.png"
+              alt="Citi Pharma Logo"
+              className="h-9 w-auto object-contain"
+            />
+            <div className="h-6 w-px bg-slate-200" />
+            <div>
+              <div className="text-sm font-extrabold text-[#0B2545] leading-tight">Citi Pharma</div>
+              <div className="text-[9px] font-black tracking-[0.25em] text-[#0B2545] leading-none">L I M S</div>
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Form Card */}
+        <div className="w-full max-w-md mx-auto my-4 bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            
+            <div className="text-center">
+              <h2 className="text-xl font-black text-[#0B2545]">Welcome to Citi Pharma LIMS</h2>
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <span className="h-px w-10 bg-slate-200" />
+                <span className="text-xs text-slate-500">Please sign in to your account</span>
+                <span className="h-px w-10 bg-slate-200" />
+              </div>
+            </div>
+
+            {errorMessage && (
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2 text-rose-700 text-xs">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-500" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {/* Username Input */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Username or Email</label>
+              <div className="relative flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
+                <div className="h-8 w-8 rounded-lg bg-[#0B2545] flex items-center justify-center text-white shrink-0">
+                  <UserIcon className="h-4 w-4" />
+                </div>
+                <input
+                  {...register('identifier')}
+                  type="text"
+                  disabled={isSubmitting}
+                  placeholder="Username or Email"
+                  className="w-full bg-transparent border-none outline-hidden px-3 text-sm text-slate-800 placeholder:text-slate-400 font-medium"
+                />
+              </div>
+              {errors.identifier && (
+                <p className="text-[10px] text-rose-500 mt-0.5 font-medium">{errors.identifier.message}</p>
+              )}
+            </div>
+
+            {/* Password Input */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+              <div className="relative flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
+                <div className="h-8 w-8 rounded-lg bg-[#0B2545] flex items-center justify-center text-white shrink-0">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <input
+                  {...register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  disabled={isSubmitting}
+                  placeholder="Password"
+                  className="w-full bg-transparent border-none outline-hidden px-3 text-sm text-slate-800 placeholder:text-slate-400 font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="p-1.5 text-slate-500 hover:text-slate-800 focus:outline-hidden"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-[10px] text-rose-500 mt-0.5 font-medium">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Remember & Forgot */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  {...register('rememberMe')}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600"
+                />
+                <span>Remember Me</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-xs text-[#0066cc] font-semibold hover:underline"
+              >
+                Forgot Password?
+              </button>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full py-3 px-6 rounded-full bg-gradient-to-r from-[#0062e0] via-[#0070ba] to-[#16a34a] text-white font-bold text-base flex items-center justify-center gap-2 shadow-md shadow-blue-900/20 active:scale-[0.99] transition-all cursor-pointer"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <LogIn className="h-5 w-5" />
+              )}
+              <span>{isSubmitting ? 'Signing in...' : 'Login'}</span>
+            </button>
+
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-600 font-medium pt-2">
+              <Lock className="h-3.5 w-3.5 text-[#0B2545]" />
+              <span>Secure &amp; Encrypted Connection</span>
+            </div>
+          </form>
+>>>>>>> 8872a5f (chnage)
+        </div>
+
+        {/* 5 Feature Badges Row for Mobile */}
+        <div className="w-full max-w-md mx-auto grid grid-cols-5 gap-1.5 text-center">
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex flex-col items-center">
+            <FlaskConical className="h-4 w-4 text-cyan-600 mb-1" />
+            <span className="text-[9px] font-semibold text-slate-700 leading-tight">Sample<br />Reg</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex flex-col items-center">
+            <UserCheck className="h-4 w-4 text-cyan-600 mb-1" />
+            <span className="text-[9px] font-semibold text-slate-700 leading-tight">Sample<br />Assign</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex flex-col items-center">
+            <FileText className="h-4 w-4 text-green-600 mb-1" />
+            <span className="text-[9px] font-semibold text-slate-700 leading-tight">Doc<br />Control</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex flex-col items-center">
+            <Microscope className="h-4 w-4 text-cyan-600 mb-1" />
+            <span className="text-[9px] font-semibold text-slate-700 leading-tight">Test<br />Exec</span>
+          </div>
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex flex-col items-center">
+            <Award className="h-4 w-4 text-cyan-600 mb-1" />
+            <span className="text-[9px] font-semibold text-slate-700 leading-tight">COA<br />Gen</span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. QUICK DEMO ACCOUNTS HELPER (Discreet Tool for 1-Click Evaluation)      */}
+      {/* ========================================================================= */}
+      <div className="fixed bottom-3 right-3 z-50">
+        {!showQuickDemo ? (
+          <button
+            type="button"
+            onClick={() => setShowQuickDemo(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 text-white text-[11px] font-bold shadow-lg backdrop-blur-md border border-slate-700 hover:scale-105 transition-all cursor-pointer"
+          >
+            <Sparkles className="h-3 w-3 text-amber-400" />
+            <span>Demo Logins</span>
+          </button>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-3.5 w-72 animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                Quick 1-Click Login
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowQuickDemo(false)}
+                className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="space-y-1.5 mt-2 max-h-60 overflow-y-auto">
+              {demoAccounts.map((acc) => (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => handleDirectLogin(acc.id, acc.pass)}
+                  className={cn(
+                    'w-full text-left p-2 rounded-xl border text-xs flex items-center justify-between transition-all hover:shadow-xs cursor-pointer',
+                    acc.color
+                  )}
+                >
+                  <div>
+                    <div className="font-bold leading-tight">{acc.name}</div>
+                    <div className="text-[10px] opacity-80">{acc.role}</div>
+                  </div>
+                  <span className="text-[10px] font-mono bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 font-bold">
+                    @{acc.id}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. FORGOT PASSWORD MODAL                                                  */}
+      {/* ========================================================================= */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Password Assistance</h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                In compliance with FDA 21 CFR Part 11 and cGMP laboratory regulations, passwords cannot be self-reset without administrative audit logging.
+              </p>
+              <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1 font-medium">
+                <div>Please contact your designated supervisor:</div>
+                <div className="font-bold text-[#0B2545]">• Muhammad Jamil (Head of Department)</div>
+                <div className="font-bold text-[#0B2545]">• Raza (QC Manager)</div>
+                <div className="text-slate-500 text-[11px]">Or contact City Pharma QA IT Administrator.</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0B2545] text-white text-xs font-bold hover:bg-slate-900 transition-colors cursor-pointer"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
+
+    </main>
   );
 }
