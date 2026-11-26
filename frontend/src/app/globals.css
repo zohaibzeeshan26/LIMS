@@ -56,6 +56,22 @@ input::-webkit-credentials-auto-fill-button {
   right: 0 !important;
 }
 
+/* Preserve white background, text color, and focus ring under browser autofill */
+.lims-auth-input:-webkit-autofill,
+.lims-auth-input:-webkit-autofill:hover,
+.lims-auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.lims-auth-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset, 0 0 0 3px rgba(11, 61, 145, 0.15) !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827;
+}
+
 body {
   color: #0f172a;
   background-color: #f8fafc;
