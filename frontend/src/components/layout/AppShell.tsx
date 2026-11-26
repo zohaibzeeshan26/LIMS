@@ -7,6 +7,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { NewSampleModal } from '@/components/samples/NewSampleModal';
 import { cn } from '@/lib/utils';
+import { canAccessPath, getEffectiveUserPermissions } from '@/lib/rbac';
+import { getRoleDashboardPath } from '@/lib/roleRouting';
 import {
   FlaskConical,
   Loader2,
@@ -67,8 +69,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, mounted]);
 
-  // If on login route, render bare layout without header or sidebar
-  if (pathname === '/login') {
+  // If on login or change-password route, render bare layout without header or sidebar
+  if (pathname === '/login' || pathname === '/change-password') {
     return <>{children}</>;
   }
 
@@ -77,6 +79,77 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // Enforce first-login password change
+  if (user.mustChangePassword) {
+    if (typeof window !== 'undefined') {
+      window.location.replace('/change-password');
+    }
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // User with 0 permissions: show only a message to contact the admin and a Logout button
+  const effectivePermissions = getEffectiveUserPermissions(user);
+  if (effectivePermissions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
+          <div className="mx-auto h-12 w-12 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-4">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <h1 className="text-lg font-bold text-slate-900">No Access Assigned</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            Your account does not currently have any module permissions assigned. Please contact your system administrator to request access.
+          </p>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="mt-6 w-full h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Route-level permission guard (prevents direct URL navigation to unauthorized pages)
+  if (!canAccessPath(user, pathname)) {
+    const safeHome = getRoleDashboardPath(user);
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
+          <div className="mx-auto h-12 w-12 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mb-4">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <h1 className="text-lg font-bold text-slate-900">403 — Access Denied</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            You do not have permission to access this module.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Link
+              href={safeHome === pathname ? '/' : safeHome}
+              className="px-4 py-2.5 rounded-xl bg-[#004EB3] hover:bg-[#004098] text-white text-xs font-semibold"
+            >
+              Go to My Workspace
+            </Link>
+            <button
+              type="button"
+              onClick={() => logout()}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

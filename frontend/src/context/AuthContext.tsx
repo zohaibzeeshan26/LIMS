@@ -24,6 +24,11 @@ export interface User {
   department: string;
   role: Role;
   designation?: string;
+  isActive?: boolean;
+  mustChangePassword?: boolean;
+  assignedLab?: string | null;
+  allowedLabs?: string[];
+  permissions?: string[];
 }
 
 interface AuthResponse {
@@ -41,6 +46,7 @@ interface AuthContextType {
   login: (identifier: string, pass: string, rememberMe?: boolean) => Promise<User | void>;
   loginAs: (role: User['role']) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
   rememberedIdentifier: string | null;
 }
 
@@ -246,6 +252,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  const refreshUser = useCallback(async (): Promise<User | null> => {
+    try {
+      const freshProfile = await api.get<User>('/auth/me');
+      if (freshProfile) {
+        setUser(freshProfile);
+        try {
+          localStorage.setItem(USER_KEY, JSON.stringify(freshProfile));
+        } catch {}
+        return freshProfile;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -256,6 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         loginAs,
         logout,
+        refreshUser,
         rememberedIdentifier,
       }}
     >

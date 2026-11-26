@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getUserLabAccess } from '@/types/lims';
 import { samplingService } from '@/services/sampling.service';
 import { cn } from '@/lib/utils';
+import { getAllowedLabs, hasAnyPermission, hasPermission } from '@/lib/rbac';
 import {
   Home,
   LayoutDashboard,
@@ -78,10 +79,10 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
     searchParams.get('lab')?.toLowerCase() ||
     (userAccess === 'ALL' ? 'general' : userAccess.toLowerCase());
 
-  // Always keep all 3 laboratories visible in the slider so nothing disappears
-  const visibleLaboratories = LABORATORIES;
+  const allowedLabCodes = getAllowedLabs(user);
+  const visibleLaboratories = LABORATORIES.filter((lab) => allowedLabCodes.includes(lab.code));
 
-  const labBadgeLabel = '3 Labs';
+  const labBadgeLabel = `${visibleLaboratories.length} Lab${visibleLaboratories.length === 1 ? '' : 's'}`;
 
   // Dedicated query to fetch live laboratory metrics (sample counts per lab) from DB
   const { data: metricsData } = useQuery({
@@ -176,8 +177,7 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
     name: string;
     href: string;
     icon: any;
-    adminOnly?: boolean;
-    roles?: string[];
+    requiredAny?: string[];
     badge?: string;
     isPriority?: boolean;
   }> = [
@@ -190,33 +190,27 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: dashboardLabel,
         href: '/dashboard',
         icon: LayoutDashboard,
+        requiredAny: ['dashboard.view'],
       },
       {
         name: 'Lab Operations',
         href: '/dashboard?tab=lab-operations',
         icon: Activity,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
-        badge: '3 Labs',
+        requiredAny: ['lab_operations.view'],
+        badge: labBadgeLabel,
       },
       {
         name: 'Daily Working Activity',
         href: '/daily-working-activity',
         icon: Clock,
-        roles: [
-          'SUPER_ADMIN',
-          'ADMIN',
-          'HOD',
-          'DEPUTY_MANAGER',
-          'QA_MANAGER',
-          'AUDITOR',
-        ],
+        requiredAny: ['activity.view'],
         badge: 'Live',
       },
       {
         name: 'Priority Notice',
         href: '/priority-notice',
         icon: AlertCircle,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'DEPUTY_MANAGER'],
+        requiredAny: ['priority_notice.view'],
         badge: urgentAdminNotices.length > 0 ? `${urgentAdminNotices.length}` : undefined,
         isPriority: true,
       },
@@ -224,88 +218,53 @@ function SidebarInner({ isOpen, onClose }: SidebarProps) {
         name: 'User Management',
         href: '/users',
         icon: Users,
-        adminOnly: true,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD'],
-        badge: 'HOD',
+        requiredAny: ['users.view', 'users.create', 'users.edit'],
+        badge: 'Admin',
       },
       {
         name: 'Sample Registration',
         href: '/samples',
         icon: FileText,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'LAB_TECHNICIAN'],
+        requiredAny: ['samples.view', 'samples.create', 'samples.edit'],
         badge: labBadgeLabel,
       },
       {
         name: 'Sample Assignment',
         href: '/tasks',
         icon: UserCheck,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD', 'MANAGER', 'DEPUTY_MANAGER', 'SHIFT_INCHARGE', 'ASSISTANT_MANAGER'],
+        requiredAny: ['tasks.view', 'tasks.assign', 'tasks.edit'],
         badge: 'Tasks',
       },
       {
         name: 'Documentation Manager',
         href: '/documentation-manager',
         icon: FileText,
-        roles: ['DOCUMENTATION_MANAGER', 'SUPER_ADMIN', 'ADMIN', 'HOD'],
+        requiredAny: ['documents.view', 'documents.create_product', 'documents.upload', 'documents.delete', 'documents.approve_deletion'],
         badge: 'STP Docs',
       },
       {
         name: 'Analyst Execution',
         href: '/testing',
         icon: Microscope,
-        roles: [
-          'QC_ANALYST',
-          'ANALYST',
-          'TESTING_ANALYST',
-          'SUPER_ADMIN',
-          'ADMIN',
-          'HOD',
-          'MANAGER',
-          'DEPUTY_MANAGER',
-          'SHIFT_INCHARGE',
-          'ASSISTANT_MANAGER',
-        ],
+        requiredAny: ['testing.view', 'testing.execute', 'testing.edit', 'testing.verify'],
       },
       {
         name: 'Quality Review & CoA',
         href: '/quality-review',
         icon: FileCheck2,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'HOD'],
+        requiredAny: ['batches.view', 'batches.create', 'batches.approve'],
         badge: 'CoA',
       },
     ];
 
-  // Strictly filter menu items to only permitted modules for the active role
+  // Strictly filter menu items to only permitted modules for the active user
   const visibleItems = React.useMemo(() => {
     return menuItems.filter((item) => {
-      // Never show Daily Working Activity to operational personnel (registration, documentation, analysts)
-      if (item.href === '/daily-working-activity') {
-        const isOperational =
-          userRole === 'LAB_TECHNICIAN' ||
-          userRole === 'DOCUMENTATION_MANAGER' ||
-          userRole === 'PRODUCT_DOCUMENTATION_OFFICER' ||
-          userRole === 'QC_ANALYST' ||
-          userRole === 'ANALYST' ||
-          userRole === 'TESTING_ANALYST' ||
-          (user?.username || '').toLowerCase().includes('reg') ||
-          (user?.username || '').toLowerCase().includes('doc') ||
-          (user?.username || '').toLowerCase().includes('analyst') ||
-          (user?.department || '').toLowerCase().includes('intake') ||
-          (user?.department || '').toLowerCase().includes('accession') ||
-          (user?.department || '').toLowerCase().includes('document') ||
-          (user?.department || '').toLowerCase().includes('testing');
-        if (isOperational) return false;
-      }
       if (isSuperAdmin) return true;
-      if (item.adminOnly) {
-        return userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'HOD';
-      }
-      if (item.roles && item.roles.length > 0) {
-        return item.roles.includes(userRole);
-      }
-      return true;
+      if (!item.requiredAny || item.requiredAny.length === 0) return true;
+      return hasAnyPermission(user, item.requiredAny);
     });
-  }, [menuItems, userRole, user, isSuperAdmin]);
+  }, [menuItems, user, isSuperAdmin]);
 
   return (
     <>

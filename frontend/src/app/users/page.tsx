@@ -8,6 +8,8 @@ import { User, Role } from '@/types/lims';
 import { useAuth } from '@/context/AuthContext';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
+import { ROLE_DEFAULT_PERMISSIONS } from '@/lib/rbac';
+import { PermissionsSelector } from '@/components/users/PermissionsSelector';
 import {
   Users,
   UserPlus,
@@ -39,19 +41,20 @@ import {
 } from 'lucide-react';
 
 const ALL_ROLES: { value: Role; label: string; desc: string; badgeColor: string }[] = [
-  { value: 'HOD' as Role, label: 'HOD (Head of Department)', desc: 'Departmental leadership, administrative approvals & operations', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 font-bold' },
-  { value: 'MANAGER' as Role, label: 'QC Manager', desc: 'Overall laboratory quality control management & approvals', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200 font-bold' },
-  { value: 'DEPUTY_MANAGER' as Role, label: 'Deputy Manager', desc: 'Supervisory management, test assignment & verification', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200 font-semibold' },
-  { value: 'SHIFT_INCHARGE' as Role, label: 'Assistant Manager', desc: 'Shift operations, bench supervision & test execution', badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200 font-semibold' },
-  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Manager', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200 font-semibold' },
-  { value: 'TESTING_ANALYST' as Role, label: 'Sr. Analyst (Senior Analyst)', desc: 'Senior analytical test execution, HPLC & complex assays', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200 font-semibold' },
-  { value: 'ANALYST' as Role, label: 'Analyst', desc: 'Standard sample testing & results reporting', badgeColor: 'bg-blue-50/70 text-blue-600 border-blue-200' },
-  { value: 'QC_ANALYST' as Role, label: 'QC Analyst', desc: 'Quality control sample analysis & logging', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
   { value: 'SUPER_ADMIN' as Role, label: 'Super Admin', desc: 'Root authority, master settings & system oversight', badgeColor: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' },
-  { value: 'ADMIN' as Role, label: 'Administrator', desc: 'System administration & configuration', badgeColor: 'bg-slate-100 text-slate-800 border-slate-300' },
+  { value: 'ADMIN' as Role, label: 'Admin', desc: 'Main system administrator (manages users & access)', badgeColor: 'bg-slate-100 text-slate-800 border-slate-300' },
+  { value: 'MANAGER' as Role, label: 'Manager (QC Manager)', desc: 'All operational work across users (no HOD/Admin/Superadmin access)', badgeColor: 'bg-purple-50 text-purple-700 border-purple-200 font-bold' },
+  { value: 'DEPUTY_MANAGER' as Role, label: 'Deputy Manager', desc: 'Supervisory management, test assignment & verification', badgeColor: 'bg-indigo-50/70 text-indigo-600 border-indigo-200 font-semibold' },
+  { value: 'SHIFT_INCHARGE' as Role, label: 'Assistant Manager', desc: 'All operational work across users (no HOD/Admin/Superadmin access)', badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200 font-semibold' },
+  { value: 'DOCUMENTATION_MANAGER' as Role, label: 'Documentation Manager', desc: 'Uploads and synchronizes product documentation dossiers', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200 font-semibold' },
+  { value: 'DATA_ENTRY_OPERATOR' as Role, label: 'Data Entry Operator', desc: 'Document & product entry only (no testing, delete, or approval)', badgeColor: 'bg-teal-50 text-teal-700 border-teal-200 font-semibold' },
+  { value: 'TESTING_ANALYST' as Role, label: 'Sr. Analyst (Senior Analyst)', desc: 'Assigned sample testing, result entry & submission only', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200 font-semibold' },
+  { value: 'ANALYST' as Role, label: 'Analyst', desc: 'Assigned sample testing, result entry & submission only', badgeColor: 'bg-blue-50/70 text-blue-600 border-blue-200' },
+  { value: 'HOD' as Role, label: 'HOD (Head of Department)', desc: 'Departmental surveillance & document deletion approvals', badgeColor: 'bg-blue-50 text-blue-700 border-blue-200 font-bold' },
   { value: 'QA_MANAGER' as Role, label: 'QA Manager', desc: 'Quality assurance review, batch release & CoA sign-off', badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold' },
+  { value: 'QC_ANALYST' as Role, label: 'QC Analyst', desc: 'Quality control sample analysis & logging', badgeColor: 'bg-sky-50 text-sky-700 border-sky-200' },
   { value: 'LAB_TECHNICIAN' as Role, label: 'Lab Technician (Sample Registration)', desc: 'Sample accessioning & preparation', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { value: 'AUDITOR' as Role, label: 'Auditor', desc: 'Read-only regulatory compliance review', badgeColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { value: 'USER' as Role, label: 'User (No Default Access)', desc: 'Custom user — assign only selected module permissions', badgeColor: 'bg-slate-100 text-slate-700 border-slate-300 font-semibold' },
 ];
 
 function getUserRolePriority(u: { role?: string; username?: string; fullName?: string }): number {
@@ -117,11 +120,13 @@ export default function UserManagementPage() {
     username: '',
     employeeId: '',
     department: 'Quality Control',
-    role: 'QC_ANALYST',
-    assignedLab: 'GENERAL',
+    role: 'USER',
+    assignedLab: null,
+    allowedLabs: [],
+    permissions: [],
     password: '',
     isActive: true,
-    mustChangePassword: false,
+    mustChangePassword: true,
   });
   const [addFormError, setAddFormError] = useState<string | null>(null);
 
@@ -132,8 +137,10 @@ export default function UserManagementPage() {
     username: '',
     employeeId: '',
     department: '',
-    role: 'QC_ANALYST',
+    role: 'USER',
     assignedLab: '',
+    allowedLabs: [],
+    permissions: [],
     isActive: true,
     mustChangePassword: false,
     password: '',
@@ -162,10 +169,12 @@ export default function UserManagementPage() {
     );
   }, [users, isSuperAdminOnly, isHOD]);
 
-  // Roles available for selection: only Super Admin can assign or filter by SUPER_ADMIN
+  // Roles available for selection: only Super Admin can assign SUPER_ADMIN or ADMIN
   const availableRoles = useMemo(() => {
     if (isSuperAdminOnly) return ALL_ROLES;
-    return ALL_ROLES.filter((r) => (r.value as string) !== 'SUPER_ADMIN');
+    return ALL_ROLES.filter(
+      (r) => (r.value as string) !== 'SUPER_ADMIN' && (r.value as string) !== 'ADMIN'
+    );
   }, [isSuperAdminOnly]);
 
   // Add User Mutation
@@ -180,11 +189,13 @@ export default function UserManagementPage() {
         username: '',
         employeeId: '',
         department: 'Quality Control',
-        role: 'QC_ANALYST',
-        assignedLab: 'GENERAL',
+        role: 'USER',
+        assignedLab: null,
+        allowedLabs: [],
+        permissions: [],
         password: '',
         isActive: true,
-        mustChangePassword: false,
+        mustChangePassword: true,
       });
       setAddFormError(null);
       showNotice('success', `User "${newUser.fullName}" created successfully.`);
@@ -338,11 +349,25 @@ export default function UserManagementPage() {
 
   // Open Edit Modal
   const handleOpenEdit = (userToEdit: User) => {
-    if (!isSuperAdminOnly && (userToEdit.role === 'SUPER_ADMIN' || userToEdit.username === 'superadmin' || userToEdit.username === 'admin')) {
-      showNotice('error', 'Access Denied: Super Admin accounts cannot be viewed or modified.');
+    if (
+      !isSuperAdminOnly &&
+      (userToEdit.role === 'SUPER_ADMIN' ||
+        userToEdit.role === 'ADMIN' ||
+        userToEdit.username === 'superadmin' ||
+        userToEdit.username === 'admin')
+    ) {
+      showNotice('error', 'Access Denied: Only Super Admin can modify Admin or Super Admin accounts.');
       return;
     }
     setEditingUser(userToEdit);
+    const existingPerms =
+      (userToEdit as any).permissions || ROLE_DEFAULT_PERMISSIONS[userToEdit.role] || [];
+    const existingLabs =
+      (userToEdit as any).allowedLabs && (userToEdit as any).allowedLabs.length > 0
+        ? (userToEdit as any).allowedLabs
+        : userToEdit.assignedLab
+        ? [userToEdit.assignedLab]
+        : [];
     setEditForm({
       fullName: userToEdit.fullName,
       email: userToEdit.email,
@@ -351,6 +376,8 @@ export default function UserManagementPage() {
       department: userToEdit.department,
       role: userToEdit.role,
       assignedLab: userToEdit.assignedLab || '',
+      allowedLabs: existingLabs,
+      permissions: existingPerms,
       isActive: userToEdit.isActive !== false,
       mustChangePassword: userToEdit.mustChangePassword || false,
       password: '',
@@ -1566,12 +1593,18 @@ export default function UserManagementPage() {
                 setAddFormError('Password must be at least 6 characters long.');
                 return;
               }
-              const cleanEmpId = addForm.employeeId.trim().toUpperCase();
+              const cleanEmpId = addForm.employeeId.trim();
+              if (!/^\d+$/.test(cleanEmpId)) {
+                setAddFormError('Employee ID must contain digits 0-9 only.');
+                return;
+              }
               const autoEmail = addForm.email?.trim() || `${(addForm.username || cleanEmpId).toLowerCase().replace(/[^a-z0-9]/g, '')}@citypharma.local`;
               addMutation.mutate({
                 ...addForm,
                 employeeId: cleanEmpId,
                 email: autoEmail,
+                permissions: addForm.permissions || [],
+                allowedLabs: addForm.allowedLabs || [],
               });
             }}
             className="space-y-4"
@@ -1599,17 +1632,21 @@ export default function UserManagementPage() {
                 />
               </div>
 
-              {/* Employee ID */}
+              {/* Employee ID (digits 0-9 only) */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Employee ID <span className="text-rose-500">*</span>
+                  Employee ID (Digits 0-9) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   required
                   value={addForm.employeeId}
-                  onChange={(e) => setAddForm({ ...addForm, employeeId: e.target.value.toUpperCase() })}
-                  placeholder="e.g. EMP-104"
+                  onChange={(e) =>
+                    setAddForm({ ...addForm, employeeId: e.target.value.replace(/[^0-9]/g, '') })
+                  }
+                  placeholder="e.g. 00123"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono font-medium focus:outline-hidden focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
@@ -1662,11 +1699,18 @@ export default function UserManagementPage() {
               {/* Role */}
               <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  cGMP Role & System Permissions <span className="text-rose-500">*</span>
+                  cGMP Role &amp; Default Permissions <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={addForm.role}
-                  onChange={(e) => setAddForm({ ...addForm, role: e.target.value as Role })}
+                  onChange={(e) => {
+                    const nextRole = e.target.value as Role;
+                    setAddForm({
+                      ...addForm,
+                      role: nextRole,
+                      permissions: ROLE_DEFAULT_PERMISSIONS[nextRole] || [],
+                    });
+                  }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
                 >
                   {availableRoles.map((r) => (
@@ -1675,6 +1719,17 @@ export default function UserManagementPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Granular Module Permissions & Labs */}
+              <div className="sm:col-span-2">
+                <PermissionsSelector
+                  role={addForm.role}
+                  selectedPermissions={addForm.permissions || []}
+                  selectedLabs={addForm.allowedLabs || []}
+                  onChangePermissions={(permissions) => setAddForm({ ...addForm, permissions })}
+                  onChangeLabs={(allowedLabs) => setAddForm({ ...addForm, allowedLabs })}
+                />
               </div>
 
               {/* Initial Password */}
@@ -1770,6 +1825,8 @@ export default function UserManagementPage() {
                 department: editForm.department,
                 role: editForm.role,
                 assignedLab: editForm.assignedLab || null,
+                allowedLabs: editForm.allowedLabs || [],
+                permissions: editForm.permissions || [],
                 isActive: editForm.isActive,
                 mustChangePassword: editForm.mustChangePassword,
                 password: editForm.password && editForm.password.trim().length > 0 ? editForm.password.trim() : undefined,
@@ -1855,7 +1912,14 @@ export default function UserManagementPage() {
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">cGMP Role</label>
                 <select
                   value={editForm.role}
-                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value as Role })}
+                  onChange={(e) => {
+                    const nextRole = e.target.value as Role;
+                    setEditForm({
+                      ...editForm,
+                      role: nextRole,
+                      permissions: ROLE_DEFAULT_PERMISSIONS[nextRole] || [],
+                    });
+                  }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-hidden focus:border-blue-500 cursor-pointer"
                 >
                   {availableRoles.map((r) => (
@@ -1864,6 +1928,17 @@ export default function UserManagementPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Granular Module Permissions & Labs */}
+              <div className="sm:col-span-2">
+                <PermissionsSelector
+                  role={editForm.role || 'USER'}
+                  selectedPermissions={editForm.permissions || []}
+                  selectedLabs={editForm.allowedLabs || []}
+                  onChangePermissions={(permissions) => setEditForm({ ...editForm, permissions })}
+                  onChangeLabs={(allowedLabs) => setEditForm({ ...editForm, allowedLabs })}
+                />
               </div>
 
               {/* Reset Password */}

@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { samplingService } from '@/services/sampling.service';
 import { getUserLabAccess } from '@/types/lims';
+import { getAllowedLabs, hasAnyPermission } from '@/lib/rbac';
 import { Modal } from '@/components/ui/Modal';
 import { LabSecurityModal, TargetLabInfo } from '@/components/auth/LabSecurityModal';
 import { cn } from '@/lib/utils';
@@ -178,36 +179,45 @@ export default function WelcomePortalPage() {
     userRole === 'SAMPLE_REGISTRATION' ||
     userRole === 'SAMPLE_REGISTRATION_ANALYST';
 
+  const visibleLabOptions = React.useMemo(() => {
+    const allowed = getAllowedLabs(user);
+    return labOptions.filter((l) => allowed.includes(l.code));
+  }, [user]);
+
   const visiblePortalCards = React.useMemo(() => {
-    return portalCards
-      .filter((card) => {
-        if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') return true;
-        if (userRole === 'DOCUMENTATION_MANAGER') {
-          return card.id === 'dashboard' || card.id === 'documentation-manager';
-        }
-        if (userRole === 'LAB_TECHNICIAN') {
-          return card.id === 'dashboard' || card.id === 'samples';
-        }
-        if (userRole === 'QC_ANALYST' || userRole === 'ANALYST' || userRole === 'TESTING_ANALYST') {
-          return card.id === 'dashboard' || card.id === 'testing';
-        }
-        if (userRole === 'DEPUTY_MANAGER') {
-          return card.id === 'dashboard' || card.id === 'tasks' || card.id === 'testing';
-        }
-        return true;
-      })
-      .map((card) => {
-        if (card.id === 'dashboard' && userRole === 'DOCUMENTATION_MANAGER') {
-          return {
-            ...card,
-            title: 'Dashboard',
-            description: 'Commercial formulation catalog, active dossiers, and testing synchronization.',
-            badgeText: undefined,
-          };
-        }
-        return card;
-      });
-  }, [portalCards, userRole]);
+    const cardPerms: Record<string, string[]> = {
+      dashboard: ['dashboard.view'],
+      samples: ['samples.view', 'samples.create', 'samples.edit'],
+      tasks: ['tasks.view', 'tasks.assign', 'tasks.edit'],
+      testing: ['testing.view', 'testing.execute', 'testing.edit', 'testing.verify'],
+      'documentation-manager': [
+        'documents.view',
+        'documents.create_product',
+        'documents.upload',
+        'documents.delete',
+        'documents.approve_deletion',
+      ],
+      'quality-review': ['batches.view', 'batches.create', 'batches.approve'],
+      batches: ['batches.view', 'batches.create', 'batches.approve'],
+      coa: ['batches.view', 'batches.create', 'batches.approve'],
+      oos: ['oos.view', 'oos.create', 'oos.edit', 'oos.approve'],
+      instruments: ['instruments.view', 'instruments.create', 'instruments.edit'],
+      askprol: ['askprol.view', 'askprol.create', 'askprol.delete'],
+      'audit-trail': ['audit.view'],
+      audit: ['audit.view'],
+      users: ['users.view', 'users.create', 'users.edit'],
+      'daily-working-activity': ['activity.view'],
+      'priority-notice': ['priority_notice.view'],
+      'lab-operations': ['lab_operations.view'],
+    };
+
+    return portalCards.filter((card) => {
+      if (userRole === 'SUPER_ADMIN') return true;
+      const reqs = cardPerms[card.id];
+      if (!reqs) return true;
+      return hasAnyPermission(user, reqs);
+    });
+  }, [portalCards, userRole, user]);
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
@@ -398,7 +408,7 @@ export default function WelcomePortalPage() {
         maxWidth="2xl"
       >
         <div className="space-y-3.5">
-          {labOptions.map((lab) => {
+          {visibleLabOptions.map((lab) => {
             const isLocked = userAccess !== 'ALL' && userAccess !== lab.code;
             const LabIcon = lab.icon;
             const labCount =

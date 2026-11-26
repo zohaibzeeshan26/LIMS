@@ -1,91 +1,67 @@
 import { Role } from '@/types/lims';
+import { getEffectiveUserPermissions, getPermittedWorkAreas } from './rbac';
 
 export interface UserRoutingInfo {
   role?: Role | string;
   department?: string;
   username?: string;
   email?: string;
+  permissions?: string[];
+  allowedLabs?: string[];
+  mustChangePassword?: boolean;
 }
 
 /**
- * Maps an authenticated user to their role-based operational dashboard in Citi Pharma LIMS.
+ * Maps an authenticated user to their role-based / permission-based landing page.
  */
 export function getRoleDashboardPath(user: UserRoutingInfo | null | undefined): string {
-  if (!user || !user.role) return '/';
+  if (!user || !user.role) return '/login';
+
+  if (user.mustChangePassword) {
+    return '/change-password';
+  }
+
   const role = (user.role || '').toUpperCase();
-  const dept = (user.department || '').toLowerCase();
-  const username = (user.username || '').toLowerCase();
-  const email = (user.email || '').toLowerCase();
 
-  // 1. Documentation Manager & Product Documentation Officer -> Document Control & Compliance Gateway
-  if (
-    role === 'DOCUMENTATION_MANAGER' ||
-    role === 'PRODUCT_DOCUMENTATION_OFFICER' ||
-    dept.includes('documentation') ||
-    username.includes('doc') ||
-    email.includes('doc')
-  ) {
-    return '/documentation-manager';
-  }
-
-  // 2. QA Manager -> Quality Review & QA Approvals
-  if (role === 'QA_MANAGER' || dept.includes('quality assurance') || email.includes('qa')) {
-    return '/quality-review';
-  }
-
-  // 3. Auditor -> ALCOA+ 21 CFR Part 11 Audit Trail
-  if (role === 'AUDITOR' || email.includes('auditor')) {
-    return '/audit-trail';
-  }
-
-  // 4. HOD, Executive Manager, & HOD Office -> Analytical Executive Dashboard
-  if (
-    role === 'HOD' ||
-    role === 'MANAGER' ||
-    username === 'hod' ||
-    username === '002' ||
-    username === 'admin.office' ||
-    username.includes('qc.manager') ||
-    email.includes('admin.office')
-  ) {
-    return '/dashboard';
-  }
-
-  // 5. Deputy Manager & Shift Incharge -> Duty & Task Management Gateway
-  if (
-    role === 'DEPUTY_MANAGER' ||
-    role === 'SHIFT_INCHARGE' ||
-    username.includes('deputy') ||
-    username.includes('shift') ||
-    email.includes('deputy') ||
-    email.includes('shift')
-  ) {
-    return '/tasks';
-  }
-
-  // 6. QC Analyst, Testing Analyst, Analyst & Sample Intake / Lab Technician -> Worksheets & Samples
-  if (
-    role === 'QC_ANALYST' ||
-    role === 'ANALYST' ||
-    role === 'TESTING_ANALYST' ||
-    role === 'LAB_TECHNICIAN' ||
-    dept.includes('analytical') ||
-    dept.includes('accession') ||
-    dept.includes('registration') ||
-    username.includes('qc') ||
-    username.includes('analyst') ||
-    username.includes('reg') ||
-    email.includes('analyst') ||
-    email.includes('reg')
-  ) {
-    return '/samples';
-  }
-
-  // 7. Super Admin & System Admin -> Central LIMS Welcome Portal (Direct access to all 8 modules & labs)
+  // Super Admin & Admin -> Main Portal / Dashboard
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
     return '/';
   }
 
+  // HOD -> Executive Dashboard
+  if (role === 'HOD') {
+    return '/dashboard';
+  }
+
+  // Manager & Assistant Manager -> Operational Dashboard
+  if (role === 'MANAGER' || role === 'SHIFT_INCHARGE' || role === 'ASSISTANT_MANAGER' || role === 'DEPUTY_MANAGER') {
+    return '/dashboard';
+  }
+
+  // Analyst & Sr. Analyst -> Assigned Testing Work
+  if (role === 'ANALYST' || role === 'TESTING_ANALYST' || role === 'QC_ANALYST') {
+    return '/testing';
+  }
+
+  // Data Entry Operator & Documentation roles -> Document Work
+  if (
+    role === 'DATA_ENTRY_OPERATOR' ||
+    role === 'DOCUMENTATION_MANAGER' ||
+    role === 'PRODUCT_DOCUMENTATION_OFFICER'
+  ) {
+    return '/documentation-manager';
+  }
+
+  // Permission-based routing for custom/standard USER accounts
+  const perms = getEffectiveUserPermissions(user);
+  if (perms.length === 0) {
+    return '/'; // AppShell shows "No Access - Contact Admin" screen with Logout button
+  }
+
+  const areas = getPermittedWorkAreas(user);
+  if (areas.length === 1) {
+    return areas[0].href;
+  }
+
   return '/';
 }
-

@@ -953,13 +953,21 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none"
               >
-                <option value="">All Roles (6 Total)</option>
-                <option value="SUPER_ADMIN">1. Super Admin</option>
-                <option value="ADMIN">2. HOD</option>
-                <option value="DEPUTY_MANAGER">3. Deputy Manager</option>
-                <option value="DOCUMENTATION_MANAGER">4. Documentation Officer</option>
-                <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
-                <option value="QC_ANALYST">6. Testing Analyst</option>
+                <option value="">All Roles</option>
+                <option value="SUPER_ADMIN">Super Admin</option>
+                <option value="ADMIN">Admin</option>
+                <option value="MANAGER">Manager (QC Manager)</option>
+                <option value="DEPUTY_MANAGER">Deputy Manager</option>
+                <option value="SHIFT_INCHARGE">Assistant Manager</option>
+                <option value="DOCUMENTATION_MANAGER">Documentation Manager</option>
+                <option value="DATA_ENTRY_OPERATOR">Data Entry Operator</option>
+                <option value="TESTING_ANALYST">Sr. Analyst (Senior Analyst)</option>
+                <option value="ANALYST">Analyst</option>
+                <option value="HOD">HOD (Head of Department)</option>
+                <option value="QA_MANAGER">QA Manager</option>
+                <option value="QC_ANALYST">Testing Analyst (QC Analyst)</option>
+                <option value="LAB_TECHNICIAN">Sample Registration Analyst</option>
+                <option value="USER">Custom User</option>
               </select>
             </div>
 
@@ -1626,12 +1634,20 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
                   onChange={(e) => setNewUser({ ...newUser, role: e.target.value as Role })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
                 >
-                  <option value="SUPER_ADMIN">1. Super Admin</option>
-                  <option value="ADMIN">2. HOD</option>
-                  <option value="DEPUTY_MANAGER">3. Deputy Manager</option>
-                  <option value="DOCUMENTATION_MANAGER">4. Documentation Officer</option>
-                  <option value="LAB_TECHNICIAN">5. Sample Registration Analyst</option>
-                  <option value="QC_ANALYST">6. Testing Analyst</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="MANAGER">Manager (QC Manager)</option>
+                  <option value="DEPUTY_MANAGER">Deputy Manager</option>
+                  <option value="SHIFT_INCHARGE">Assistant Manager</option>
+                  <option value="DOCUMENTATION_MANAGER">Documentation Manager</option>
+                  <option value="DATA_ENTRY_OPERATOR">Data Entry Operator</option>
+                  <option value="TESTING_ANALYST">Sr. Analyst (Senior Analyst)</option>
+                  <option value="ANALYST">Analyst</option>
+                  <option value="HOD">HOD (Head of Department)</option>
+                  <option value="QA_MANAGER">QA Manager</option>
+                  <option value="QC_ANALYST">Testing Analyst (QC Analyst)</option>
+                  <option value="LAB_TECHNICIAN">Sample Registration Analyst</option>
+                  <option value="USER">Custom User (No Default Access)</option>
                 </select>
               </div>
 
@@ -1710,12 +1726,20 @@ export function SuperAdminDashboard({ dateFilter = 'ALL', onSelectDateFilter }: 
                 onChange={(e) => setSelectedRole(e.target.value as Role)}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800"
               >
-                <option value="SUPER_ADMIN">1. Super Admin (Full Governance)</option>
-                <option value="ADMIN">2. HOD (Head of Department)</option>
-                <option value="DEPUTY_MANAGER">3. Deputy Manager (Supervision &amp; Allocation)</option>
-                <option value="DOCUMENTATION_MANAGER">4. Documentation Officer (STP Dossier)</option>
-                <option value="LAB_TECHNICIAN">5. Sample Registration Analyst (Specimen Intake)</option>
-                <option value="QC_ANALYST">6. Testing Analyst (Worksheet Execution)</option>
+                <option value="SUPER_ADMIN">Super Admin (Full Governance)</option>
+                <option value="ADMIN">Admin (System Administrator)</option>
+                <option value="MANAGER">Manager (QC Manager)</option>
+                <option value="DEPUTY_MANAGER">Deputy Manager (Supervision &amp; Allocation)</option>
+                <option value="SHIFT_INCHARGE">Assistant Manager</option>
+                <option value="DOCUMENTATION_MANAGER">Documentation Manager (STP Dossier)</option>
+                <option value="DATA_ENTRY_OPERATOR">Data Entry Operator</option>
+                <option value="TESTING_ANALYST">Sr. Analyst (Senior Analyst)</option>
+                <option value="ANALYST">Analyst</option>
+                <option value="HOD">HOD (Head of Department)</option>
+                <option value="QA_MANAGER">QA Manager</option>
+                <option value="QC_ANALYST">Testing Analyst (Worksheet Execution)</option>
+                <option value="LAB_TECHNICIAN">Sample Registration Analyst (Specimen Intake)</option>
+                <option value="USER">Custom User (No Default Access)</option>
               </select>
             </div>
 
